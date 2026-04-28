@@ -73,6 +73,36 @@ alembic downgrade -1  # откат на одну миграцию назад
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
+## Парсер мероприятий (staging)
+
+В проект добавлен ручной парсер источников, который сохраняет данные в отдельную таблицу `parsed_event`.
+
+### Миграция
+
+Перед использованием обязательно примените миграции:
+
+```bash
+alembic upgrade head
+```
+
+### Доступные endpoint'ы
+
+- `GET /parser/sources` — список подключенных источников;
+- `POST /parser/run` — запуск парсинга вручную;
+- `GET /parser/events` — просмотр собранных событий из staging-таблицы.
+
+### Пример запуска парсинга
+
+```bash
+curl -X POST "http://localhost:8000/parser/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_keys": ["northdrama", "gck", "norilsk_official"],
+    "include_reserve": false,
+    "max_events_per_source": 100
+  }'
+```
+
 ## Разработка
 
 1. Создайте новую ветку для разработки
