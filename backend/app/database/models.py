@@ -3,7 +3,7 @@ from datetime import datetime, date, time
 from sqlalchemy import DATE, ARRAY, ForeignKey
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import (Integer, Boolean, String, VARCHAR,
-                        TIMESTAMP, text, Column, TIME)
+                        TIMESTAMP, text, Column, TIME, UniqueConstraint)
 
 
 convention = {
@@ -93,3 +93,38 @@ class InfoOrg(Base):
     user_id: int = Column(Integer, ForeignKey("user.id"), nullable=True)
     organization: str = Column(String, nullable=True)
     phone_number: str = Column(String, nullable=True)
+
+
+class ParsedEvent(Base):
+    __tablename__ = "parsed_event"
+    __table_args__ = (
+        UniqueConstraint("name", "date_event", name="parsed_event_name_date_key"),
+    )
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    created_at: datetime = Column(
+        TIMESTAMP(timezone=False),
+        server_default=NOW_AT_UTC,
+        nullable=True,
+        autoincrement=True,
+    )
+    update_at: datetime = Column(
+        TIMESTAMP(timezone=False),
+        server_default=NOW_AT_UTC,
+        nullable=True,
+        onupdate=NOW_AT_UTC,
+        autoincrement=True,
+    )
+    deleted_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
+    source_key: str = Column(String, nullable=False)
+    source_name: str = Column(String, nullable=False)
+    name: str = Column(VARCHAR, nullable=False)
+    description: str = Column(VARCHAR, nullable=True)
+    date_event: str = Column(String, nullable=True)
+    duration: str = Column(String, nullable=True)
+    city: str = Column(String, nullable=True)
+    price: str = Column(String, nullable=True)
+    address: str = Column(String, nullable=True)
+    organization: str = Column(String, nullable=True)
+    age_limit: str = Column(String, nullable=True)
+    external_url: str = Column(String, nullable=True)
