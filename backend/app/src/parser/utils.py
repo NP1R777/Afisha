@@ -88,21 +88,21 @@ def normalize_price(value: Optional[str]) -> Optional[str]:
     if not text:
         return None
     lowered = text.lower()
-    if "бесплат" in lowered:
-        return "0"
     match = re.search(r"(от\s*)?(\d[\d\s]*)\s*(₽|руб\.?|рублей)", text, flags=re.IGNORECASE)
-    if not match:
-        return None
-    prefix = "от " if match.group(1) else ""
-    amount = re.sub(r"\s+", "", match.group(2))
-    return f"{prefix}{amount} ₽"
+    if match:
+        prefix = "от " if match.group(1) else ""
+        amount = re.sub(r"\s+", "", match.group(2))
+        return f"{prefix}{amount} ₽"
+    if re.search(r"\bбесплатно\b|\bвход\s+свободный\b", lowered):
+        return "0"
+    return None
 
 
 def normalize_age_limit(value: Optional[str]) -> Optional[str]:
     text = clean_text(value)
     if not text:
         return None
-    match = re.search(r"\b(0|6|12|14|16|18)\+\b", text)
+    match = re.search(r"(?:^|\b)(0|6|12|14|16|18)\+", text)
     if match:
         return f"{match.group(1)}+"
     return None
