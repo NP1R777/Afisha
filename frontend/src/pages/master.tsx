@@ -19,6 +19,7 @@ import { ContainerFluid } from '../components/ui/container';
 import cross from '../pictures/cross.png';
 import EVENTS from '../shared/config/mock.json';
 import EventImage from '../pictures/picture.png';
+import EventCalendarModal from '../modal/calendar';
 
 interface Event {
   id?: number;
@@ -61,6 +62,7 @@ const Frame = () => {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [previousSearchQuery, setPreviousSearchQuery] = useState('');
   const navigate = useNavigate();
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false); //для календаря
 
   const [isMd, isXl] = useMediaQuery(['(min-width: 768px)', '(min-width: 1280px)'], {
     fallback: [false, false, true],
@@ -398,6 +400,20 @@ const Frame = () => {
                 />
                 <Text>Мои билеты</Text>
               </Button>
+              <Button
+                maxHeight={{ base: '36px', md: '40px' }}
+                bg="white"
+                borderRadius="full"
+                color="black"
+                fontSize={{ base: '8px', md: 'sm' }}
+                height="40px"
+                px={{ base: '10px', md: '16px' }}
+                _hover={{ bg: 'gray.50' }}
+                transition="all 0.2s"
+                onClick={() => setIsCalendarModalOpen(true)}
+              >
+                <Text>Календарь событий</Text>
+              </Button>
             </HStack>
           </Flex>
         </ContainerFluid>
@@ -676,6 +692,10 @@ const Frame = () => {
         isOpen={isRegisterOpen}
         onRequestClose={() => setIsRegisterOpen(false)}
         openLoginModal={openLoginModal}
+      />
+      <EventCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
       />
     </ContainerFluid>
   );
