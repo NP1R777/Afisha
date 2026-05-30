@@ -1,6 +1,7 @@
+import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable, Optional
 
 import requests
@@ -84,12 +85,64 @@ SOURCE_CONFIGS: dict[str, SourceConfig] = {
         organization="ТРЦ Арена-Норильск",
         city="Норильск",
     ),
+    "museum_norilsk_vmuzey": SourceConfig(
+        key="museum_norilsk_vmuzey",
+        name="Музей Норильска (ВМузей)",
+        url="https://vmuzey.com/museum/mvk-muzey-norilska",
+        organization="Музей Норильска",
+        city="Норильск",
+    ),
+    "gallery_norilsk_vmuzey": SourceConfig(
+        key="gallery_norilsk_vmuzey",
+        name="Художественная галерея (ВМузей)",
+        url="https://vmuzey.com/museum/hudozhestvennaya-galereya-4",
+        organization="Художественная галерея",
+        city="Норильск",
+    ),
+    "talnah_museum_vmuzey": SourceConfig(
+        key="talnah_museum_vmuzey",
+        name="Талнахский филиал МВК «Музей Норильска» (ВМузей)",
+        url="https://vmuzey.com/museum/talnahskiy-filial-muzeya-norilska",
+        organization="Талнахский филиал Музея Норильска",
+        city="Талнах",
+    ),
+    "norilsk_art_college_vk": SourceConfig(
+        key="norilsk_art_college_vk",
+        name="Норильский колледж искусств (VK)",
+        url="https://vk.ru/club187615124",
+        organization="Норильский колледж искусств",
+        city="Норильск",
+    ),
+    "talnah_dshi_news": SourceConfig(
+        key="talnah_dshi_news",
+        name="Талнахская детская школа искусств (Новости)",
+        url="https://talnah-dshi.ru/news",
+        organization="Талнахская детская школа искусств",
+        city="Талнах",
+    ),
+    "nordshi_afisha": SourceConfig(
+        key="nordshi_afisha",
+        name="Норильская детская школа искусств (Афиша)",
+        url="https://nordshi.ru/",
+        organization="Норильская детская школа искусств",
+        city="Норильск",
+    ),
 }
 
 
 PRIORITY_SOURCE_KEYS = ["northdrama", "gck", "norilsk_official"]
 RESERVE_SOURCE_KEYS = ["sg_afisha"]
-OTHER_SOURCE_KEYS = ["cinema_arthall", "cinema_rodina", "arena_norilsk"]
+OTHER_SOURCE_KEYS = [
+    "cinema_arthall",
+    "cinema_rodina",
+    "arena_norilsk",
+    "museum_norilsk_vmuzey",
+    "gallery_norilsk_vmuzey",
+    "talnah_museum_vmuzey",
+    "norilsk_art_college_vk",
+    "talnah_dshi_news",
+    "nordshi_afisha",
+]
 
 
 class SourceParseError(RuntimeError):
@@ -158,6 +211,14 @@ def parse_source(config: SourceConfig, *, max_events: int = 100) -> list[ParsedE
         events = _parse_cinema_rodina(config, max_events=max_events)
     elif config.key == "arena_norilsk":
         events = _parse_arena_norilsk(config, max_events=max_events)
+    elif config.key in {"museum_norilsk_vmuzey", "gallery_norilsk_vmuzey", "talnah_museum_vmuzey"}:
+        events = _parse_vmuzey_museum(config, max_events=max_events)
+    elif config.key == "norilsk_art_college_vk":
+        events = _parse_vk_community(config, max_events=max_events)
+    elif config.key == "talnah_dshi_news":
+        events = _parse_talnah_dshi_news(config, max_events=max_events)
+    elif config.key == "nordshi_afisha":
+        events = _parse_nordshi_afisha(config, max_events=max_events)
     else:
         raise SourceParseError(f"Неизвестный источник: {config.key}")
     return events[:max_events]
@@ -409,6 +470,381 @@ def _parse_arena_norilsk(config: SourceConfig, *, max_events: int) -> list[Parse
     return events
 
 
+def _parse_vmuzey_museum(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
+    session = _build_session()
+    response = session.get(config.url, timeout=30, verify=config.verify_ssl)
+    response.raise_for_status()
+
+    if _is_protection_page(response.text):
+        raise SourceParseError(
+            f"Источник {config.key} заблокирован anti-bot защитой. "
+            "Нужен доступ без challenge."
+        )
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    event_links: list[str] = []
+    for link in soup.select("a[href*='/event/']"):
+        href = absolute_url(config.url, link.get("href"))
+        if not href or href in event_links:
+            continue
+        event_links.append(href)
+        if len(event_links) >= max_events:
+            break
+
+    events: list[ParsedEventCreate] = []
+    for event_url in event_links:
+        try:
+            detail_response = session.get(event_url, timeout=30, verify=config.verify_ssl)
+            detail_response.raise_for_status()
+        except requests.RequestException:
+            continue
+
+        if _is_protection_page(detail_response.text):
+            continue
+
+        detail_soup = BeautifulSoup(detail_response.text, "html.parser")
+        detail_text = _fetch_page_summary_from_soup(detail_soup)
+        title = _extract_main_title(detail_soup) or _extract_title_from_page_title(
+            detail_soup.title.get_text(" ", strip=True) if detail_soup.title else None
+        )
+        payload = _event_payload(
+            config,
+            name=title,
+            description=detail_text,
+            date_event=detail_text,
+            duration=detail_text,
+            price=detail_text,
+            address=_extract_address_from_text(detail_text),
+            age_limit=detail_text,
+            external_url=event_url,
+        )
+        if payload:
+            events.append(payload)
+        if len(events) >= max_events:
+            return events
+
+    return events
+
+
+def _parse_vk_community(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
+    token = os.getenv("VK_API_TOKEN")
+    if token:
+        events = _parse_vk_community_with_api(config, max_events=min(max_events, 20), token=token)
+        if events:
+            return events
+
+    fallback_events = _parse_vk_community_from_page(config, max_events=min(max_events, 20))
+    if fallback_events:
+        return fallback_events
+
+    if token:
+        return []
+
+    raise SourceParseError(
+        "Для источника VK не удалось получить посты из публичной страницы. "
+        "Добавьте переменную окружения VK_API_TOKEN для чтения wall.get."
+    )
+
+
+def _parse_vk_community_with_api(
+    config: SourceConfig,
+    *,
+    max_events: int,
+    token: str,
+) -> list[ParsedEventCreate]:
+    session = _build_session()
+    response = session.get(
+        "https://api.vk.com/method/wall.get",
+        params={
+            "owner_id": "-187615124",
+            "count": max_events,
+            "filter": "owner",
+            "extended": 0,
+            "v": "5.199",
+            "access_token": token,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    response_data = payload.get("response", {})
+    items = response_data.get("items", [])
+
+    events: list[ParsedEventCreate] = []
+    for item in items:
+        text = clean_text(item.get("text"))
+        if not text:
+            continue
+        if not _is_vk_event_like(text):
+            continue
+
+        post_id = item.get("id")
+        post_url = f"https://vk.com/wall-187615124_{post_id}" if post_id else config.url
+        first_url = _extract_first_url_from_text(text)
+
+        post_datetime = None
+        if item.get("date"):
+            post_datetime = datetime.fromtimestamp(item["date"], tz=timezone.utc).strftime("%d.%m.%Y")
+
+        payload_item = _event_payload(
+            config,
+            name=_extract_title_from_text_block(text),
+            description=text,
+            date_event=text or post_datetime,
+            duration=text,
+            price=text,
+            address=_extract_address_from_text(text),
+            age_limit=text,
+            external_url=first_url or post_url,
+        )
+        if payload_item:
+            if not payload_item.date_event:
+                payload_item.date_event = post_datetime
+            events.append(payload_item)
+        if len(events) >= max_events:
+            break
+    return events
+
+
+def _parse_vk_community_from_page(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
+    session = _build_session()
+    response = session.get(config.url, timeout=30, verify=config.verify_ssl)
+    response.raise_for_status()
+
+    page_text = clean_text(BeautifulSoup(response.text, "html.parser").get_text("\n", strip=True))
+    if not page_text:
+        return []
+
+    # В ряде окружений VK отдает посты как обычный текст страницы.
+    chunks = re.split(
+        r"\bНорильский\s+колледж\s+искусств\s+запись\s+закреплена\b",
+        page_text,
+        flags=re.IGNORECASE,
+    )
+    if len(chunks) <= 1:
+        return []
+
+    events: list[ParsedEventCreate] = []
+    for chunk in chunks[1: max_events + 1]:
+        text = clean_text(chunk)
+        if not text or not _is_vk_event_like(text):
+            continue
+
+        payload_item = _event_payload(
+            config,
+            name=_extract_title_from_text_block(text),
+            description=text,
+            date_event=text,
+            duration=text,
+            price=text,
+            address=_extract_address_from_text(text),
+            age_limit=text,
+            external_url=_extract_first_url_from_text(text) or config.url,
+        )
+        if payload_item:
+            events.append(payload_item)
+        if len(events) >= max_events:
+            break
+    return events
+
+
+def _parse_talnah_dshi_news(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
+    session = _build_session()
+    response = session.get(config.url, timeout=30, verify=config.verify_ssl)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    cards = soup.select("a.list-group-item.list-group-item-action[href^='/item/']")
+    events: list[ParsedEventCreate] = []
+    for card in cards:
+        detail_url = absolute_url(config.url, card.get("href"))
+        if not detail_url:
+            continue
+        detail = _parse_dshi_detail_page(session, detail_url, verify_ssl=config.verify_ssl)
+        if not detail:
+            continue
+
+        payload_item = _event_payload(
+            config,
+            name=detail["title"],
+            description=detail["text"],
+            date_event=detail["text"] or detail["date"],
+            duration=detail["text"],
+            price=detail["text"],
+            address=_extract_address_from_text(detail["text"]),
+            age_limit=detail["text"],
+            external_url=detail_url,
+        )
+        if payload_item:
+            events.append(payload_item)
+        if len(events) >= max_events:
+            break
+
+    return events
+
+
+def _parse_nordshi_afisha(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
+    session = _build_session()
+    section_urls = [
+        "https://nordshi.ru/item/1332263",  # Афиша -> Концерты
+        "https://nordshi.ru/item/1332334",  # Афиша -> События
+    ]
+
+    detail_urls: list[str] = []
+    for section_url in section_urls:
+        try:
+            response = session.get(section_url, timeout=30, verify=config.verify_ssl)
+            response.raise_for_status()
+        except requests.RequestException:
+            continue
+
+        section_soup = BeautifulSoup(response.text, "html.parser")
+        for card in section_soup.select("a.list-group-item.list-group-item-action[href^='/item/']"):
+            detail_url = absolute_url(section_url, card.get("href"))
+            if not detail_url or detail_url in detail_urls:
+                continue
+            detail_urls.append(detail_url)
+            if len(detail_urls) >= max_events:
+                break
+        if len(detail_urls) >= max_events:
+            break
+
+    events: list[ParsedEventCreate] = []
+    for detail_url in detail_urls:
+        detail = _parse_dshi_detail_page(session, detail_url, verify_ssl=config.verify_ssl)
+        if not detail:
+            continue
+
+        payload_item = _event_payload(
+            config,
+            name=detail["title"],
+            description=detail["text"],
+            date_event=detail["text"] or detail["date"],
+            duration=detail["text"],
+            price=detail["text"],
+            address=_extract_address_from_text(detail["text"]),
+            age_limit=detail["text"],
+            external_url=detail_url,
+        )
+        if payload_item:
+            if not payload_item.date_event:
+                payload_item.date_event = detail["date"]
+            events.append(payload_item)
+        if len(events) >= max_events:
+            break
+
+    return events
+
+
+def _parse_dshi_detail_page(
+    session: requests.Session,
+    detail_url: str,
+    *,
+    verify_ssl: bool,
+) -> Optional[dict[str, Optional[str]]]:
+    try:
+        response = session.get(detail_url, timeout=30, verify=verify_ssl)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    title = _extract_main_title(soup) or _extract_title_from_page_title(
+        soup.title.get_text(" ", strip=True) if soup.title else None
+    )
+    if not title:
+        return None
+
+    detail_text = _extract_dshi_article_text(soup) or _fetch_page_summary_from_soup(soup)
+    if not detail_text:
+        return None
+
+    published_date = clean_text(
+        soup.select_one(".text-muted").get_text(" ", strip=True)
+        if soup.select_one(".text-muted")
+        else None
+    )
+
+    return {
+        "title": title,
+        "text": detail_text,
+        "date": published_date,
+    }
+
+
+def _extract_dshi_article_text(soup: BeautifulSoup) -> Optional[str]:
+    selectors = [
+        ".templater-content-block .my-2",
+        ".templater-content-block .col-12",
+        ".templater-content-block p",
+        ".el-card__body",
+    ]
+    for selector in selectors:
+        for node in soup.select(selector):
+            text = clean_text(node.get_text(" ", strip=True))
+            if not text:
+                continue
+            if "СВЕДЕНИЯ ОБ ОБРАЗОВАТЕЛЬНОЙ ОРГАНИЗАЦИИ" in text and len(text) > 1000:
+                continue
+            if len(text) < 40:
+                continue
+            return text
+    return None
+
+
+def _extract_main_title(soup: BeautifulSoup) -> Optional[str]:
+    for selector in ("h1", ".event-title", ".article-title", "h3"):
+        for node in soup.select(selector):
+            text = clean_text(node.get_text(" ", strip=True))
+            if text:
+                return text
+    return None
+
+
+def _extract_title_from_text_block(text: str) -> str:
+    candidate = clean_text(text)
+    if not candidate:
+        return "Событие"
+    first_sentence = re.split(r"[.!?\\n]", candidate)[0]
+    first_sentence = clean_text(first_sentence)
+    if first_sentence and len(first_sentence) >= 8:
+        return first_sentence[:180]
+    return candidate[:180]
+
+
+def _extract_first_url_from_text(text: Optional[str]) -> Optional[str]:
+    if not text:
+        return None
+    match = re.search(r"https?://\\S+", text)
+    if not match:
+        return None
+    return match.group(0).rstrip(").,]")
+
+
+def _is_vk_event_like(text: str) -> bool:
+    normalized = text.lower()
+    ticket_pattern = re.compile(
+        r"приобрест[ьи]\\s+билет|билеты?\\s+можно\\s+по\\s+ссылке|работает\\s+пушкинская\\s+карта",
+        flags=re.IGNORECASE,
+    )
+    event_pattern = re.compile(
+        r"концерт|спектак|мероприят|приглашаем|жд[её]м\\s+вас|мастер-?класс|выставк",
+        flags=re.IGNORECASE,
+    )
+    if ticket_pattern.search(normalized):
+        return True
+    return bool(event_pattern.search(normalized))
+
+
+def _is_protection_page(text: str) -> bool:
+    lowered = text.lower()
+    return (
+        "user verification" in lowered
+        or "fake bot" in lowered
+        or "проверяем, что вы не робот" in lowered
+    )
+
+
 def _extract_address_from_text(value: Optional[str]) -> Optional[str]:
     text = clean_text(value)
     if not text:
@@ -439,7 +875,23 @@ def _fetch_page_summary(
         return None
 
     soup = BeautifulSoup(response.text, "html.parser")
-    for selector in (".news-detail", ".entry", ".entry-content", ".content", "article"):
+    return _fetch_page_summary_from_soup(soup)
+
+
+def _fetch_page_summary_from_soup(soup: BeautifulSoup) -> Optional[str]:
+    for selector in (
+        ".news-detail",
+        ".entry-content",
+        ".entry",
+        ".event-content",
+        ".event-description",
+        ".templater-content-block .my-2",
+        ".templater-content-block .col-12",
+        ".el-card__body",
+        ".cms-block-content",
+        ".content",
+        "article",
+    ):
         node = soup.select_one(selector)
         if node:
             text = clean_text(node.get_text(" ", strip=True))
