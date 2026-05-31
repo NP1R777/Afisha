@@ -151,6 +151,14 @@ OTHER_SOURCE_KEYS = [
 ]
 
 
+VMUZEY_AFISHA_FALLBACK_URL = "https://norilskmuseum.ru/afisha/"
+VMUZEY_AFISHA_SECTION_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "museum_norilsk_vmuzey": ("главное здание музея норильска",),
+    "gallery_norilsk_vmuzey": ("художественная галерея музея норильска",),
+    "talnah_museum_vmuzey": ("талнахский филиал музея норильска",),
+}
+
+
 class SourceParseError(RuntimeError):
     pass
 
@@ -523,24 +531,65 @@ def _parse_vmuzey_museum(
     max_events: int,
     runtime_config: ParserRuntimeConfig,
 ) -> list[ParsedEventCreate]:
-    session = _build_session(
-        user_agent=runtime_config.vmuzey_user_agent,
-        proxy_url=runtime_config.vmuzey_proxy,
-        cookies_raw=runtime_config.vmuzey_cookies,
+    user_agents: list[Optional[str]] = [runtime_config.vmuzey_user_agent, None]
+    for extra_user_agent in (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    ):
+        if extra_user_agent not in user_agents:
+            user_agents.append(extra_user_agent)
+
+    for user_agent in user_agents:
+        session = _build_session(
+            user_agent=user_agent,
+            proxy_url=runtime_config.vmuzey_proxy,
+            cookies_raw=runtime_config.vmuzey_cookies,
+        )
+        session.headers.update({"Accept-Language": "ru-RU,ru;q=0.9"})
+
+        events = _parse_vmuzey_from_page(
+            config=config,
+            session=session,
+            base_url=config.url,
+            max_events=max_events,
+            verify_ssl=config.verify_ssl,
+        )
+        if events:
+            return events
+
+    fallback_events = _parse_vmuzey_related_html_fallback(config=config, max_events=max_events)
+    if fallback_events:
+        return fallback_events
+
+    raise SourceParseError(
+        f"Источник {config.key} недоступен: vmuzey.com отдает anti-bot, "
+        "а fallback HTML-источники не дали событий."
     )
-    response = session.get(config.url, timeout=30, verify=config.verify_ssl)
-    response.raise_for_status()
+
+
+def _parse_vmuzey_from_page(
+    *,
+    config: SourceConfig,
+    session: requests.Session,
+    base_url: str,
+    max_events: int,
+    verify_ssl: bool,
+) -> list[ParsedEventCreate]:
+    try:
+        response = session.get(base_url, timeout=30, verify=verify_ssl)
+        response.raise_for_status()
+    except requests.RequestException:
+        return []
 
     if _is_protection_page(response.text):
-        raise SourceParseError(
-            f"Источник {config.key} заблокирован anti-bot защитой. "
-            "Нужен доступ без challenge."
-        )
+        return []
 
     soup = BeautifulSoup(response.text, "html.parser")
     event_links: list[str] = []
     for link in soup.select("a[href*='/event/']"):
-        href = absolute_url(config.url, link.get("href"))
+        href = absolute_url(base_url, link.get("href"))
         if not href or href in event_links:
             continue
         event_links.append(href)
@@ -550,7 +599,7 @@ def _parse_vmuzey_museum(
     events: list[ParsedEventCreate] = []
     for event_url in event_links:
         try:
-            detail_response = session.get(event_url, timeout=30, verify=config.verify_ssl)
+            detail_response = session.get(event_url, timeout=30, verify=verify_ssl)
             detail_response.raise_for_status()
         except requests.RequestException:
             continue
@@ -577,9 +626,106 @@ def _parse_vmuzey_museum(
         if payload:
             events.append(payload)
         if len(events) >= max_events:
-            return events
+            break
+    return events
+
+
+def _parse_vmuzey_related_html_fallback(
+    *,
+    config: SourceConfig,
+    max_events: int,
+) -> list[ParsedEventCreate]:
+    section_keywords = VMUZEY_AFISHA_SECTION_KEYWORDS.get(config.key)
+    if not section_keywords:
+        return []
+
+    session = _build_session()
+    session.headers.update({"Accept-Language": "ru-RU,ru;q=0.9"})
+    try:
+        response = session.get(VMUZEY_AFISHA_FALLBACK_URL, timeout=30, verify=config.verify_ssl)
+        response.raise_for_status()
+    except requests.RequestException:
+        return []
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    content = soup.select_one(".entry-content, article")
+    if not content:
+        return []
+
+    events: list[ParsedEventCreate] = []
+    seen_names: set[str] = set()
+    for heading in content.select("h3"):
+        heading_text = clean_text(heading.get_text(" ", strip=True))
+        if not _matches_vmuzey_heading(heading_text, section_keywords):
+            continue
+
+        section_address = _extract_address_from_heading(heading_text)
+        sibling = heading.next_sibling
+        while sibling:
+            sibling_name = getattr(sibling, "name", None)
+            if sibling_name in {"h1", "h2", "h3"}:
+                break
+
+            if sibling_name in {"ul", "ol"}:
+                for li in sibling.select("li"):
+                    payload = _build_vmuzey_fallback_payload(
+                        config=config,
+                        text=clean_text(li.get_text(" ", strip=True)),
+                        section_address=section_address,
+                    )
+                    if not payload or payload.name in seen_names:
+                        continue
+                    seen_names.add(payload.name)
+                    events.append(payload)
+                    if len(events) >= max_events:
+                        return events
+            sibling = sibling.next_sibling
 
     return events
+
+
+def _matches_vmuzey_heading(value: Optional[str], keywords: tuple[str, ...]) -> bool:
+    text = clean_text(value)
+    if not text:
+        return False
+    lowered = text.lower()
+    return any(keyword in lowered for keyword in keywords)
+
+
+def _extract_address_from_heading(value: Optional[str]) -> Optional[str]:
+    text = clean_text(value)
+    if not text:
+        return None
+    match = re.search(r"\(([^)]+)\)", text)
+    if not match:
+        return None
+    return clean_text(match.group(1))
+
+
+def _build_vmuzey_fallback_payload(
+    *,
+    config: SourceConfig,
+    text: Optional[str],
+    section_address: Optional[str],
+) -> Optional[ParsedEventCreate]:
+    line = clean_text(text)
+    if not line:
+        return None
+    lowered = line.lower()
+    if "билеты доступны" in lowered or "пушкинск" in lowered:
+        return None
+
+    return _event_payload(
+        config,
+        name=_extract_title_from_text_block(line),
+        description=line,
+        date_event=line,
+        duration=line,
+        price=line,
+        address=_extract_address_from_text(line) or section_address,
+        age_limit=line,
+        external_url=VMUZEY_AFISHA_FALLBACK_URL,
+    )
 
 
 def _parse_vk_community(

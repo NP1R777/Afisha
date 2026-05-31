@@ -155,6 +155,7 @@ alembic upgrade head
 - `norilsk_art_college_vk` работает в режиме HTML-парсинга (без API-ключа).
 - Если VK отдает динамический shell/anti-bot вместо постов, источник вернет ошибку парсинга.
 - Источники `vmuzey.com` могут быть защищены anti-bot challenge. В таком случае можно передать proxy/cookies через настройки окружения.
+- Для vmuzey-источников добавлен HTML fallback через страницу афиши Музея Норильска (`https://norilskmuseum.ru/afisha/`), если `vmuzey.com` временно недоступен из-за anti-bot.
 
 ### Переменные окружения для внешних источников парсинга
 
