@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.session import get_db
+from core.session import get_db, get_settings
+from core.settings import AppSettings
 from src.parser.schemas import (
     ParseLaunchRequest,
     ParseLaunchResponse,
@@ -30,8 +31,13 @@ async def get_sources() -> list[ParseSourceInfo]:
 async def run_parser(
     payload: ParseLaunchRequest,
     db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
 ) -> ParseLaunchResponse:
-    return await run_parse_and_store(db_connect=db_connect, request=payload)
+    return await run_parse_and_store(
+        db_connect=db_connect,
+        request=payload,
+        settings=settings,
+    )
 
 
 @router.get(

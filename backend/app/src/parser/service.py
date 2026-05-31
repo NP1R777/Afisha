@@ -1,6 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.settings import AppSettings
 from database.models import ParsedEvent
 from src.parser.schemas import (
     ParseLaunchRequest,
@@ -10,12 +11,18 @@ from src.parser.schemas import (
     ParsedEventListResponse,
     ParsedEventOut,
 )
-from src.parser.sources import SOURCE_CONFIGS, parse_source, resolve_source_keys
+from src.parser.sources import (
+    SOURCE_CONFIGS,
+    ParserRuntimeConfig,
+    parse_source,
+    resolve_source_keys,
+)
 
 
 async def run_parse_and_store(
     db_connect: AsyncSession,
     request: ParseLaunchRequest,
+    settings: AppSettings,
 ) -> ParseLaunchResponse:
     source_keys = resolve_source_keys(
         source_keys=request.source_keys,
@@ -27,6 +34,12 @@ async def run_parse_and_store(
     total_inserted = 0
     total_duplicates = 0
     total_errors = 0
+    runtime_config = ParserRuntimeConfig(
+        vk_api_token=settings.vk_api_token,
+        vmuzey_proxy=settings.vmuzey_proxy,
+        vmuzey_cookies=settings.vmuzey_cookies,
+        vmuzey_user_agent=settings.vmuzey_user_agent,
+    )
 
     for source_key in source_keys:
         source = SOURCE_CONFIGS[source_key]
@@ -36,7 +49,11 @@ async def run_parse_and_store(
         errors = 0
 
         try:
-            parsed_items = parse_source(source, max_events=request.max_events_per_source)
+            parsed_items = parse_source(
+                source,
+                max_events=request.max_events_per_source,
+                runtime_config=runtime_config,
+            )
             fetched = len(parsed_items)
         except Exception:
             parsed_items = []

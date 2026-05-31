@@ -33,6 +33,14 @@ class SourceConfig:
     verify_ssl: bool = True
 
 
+@dataclass(frozen=True)
+class ParserRuntimeConfig:
+    vk_api_token: Optional[str] = None
+    vmuzey_proxy: Optional[str] = None
+    vmuzey_cookies: Optional[str] = None
+    vmuzey_user_agent: Optional[str] = None
+
+
 SOURCE_CONFIGS: dict[str, SourceConfig] = {
     "northdrama": SourceConfig(
         key="northdrama",
@@ -149,18 +157,39 @@ class SourceParseError(RuntimeError):
     pass
 
 
-def _build_session() -> requests.Session:
+def _build_session(
+    *,
+    user_agent: Optional[str] = None,
+    proxy_url: Optional[str] = None,
+    cookies_raw: Optional[str] = None,
+) -> requests.Session:
     session = requests.Session()
     session.headers.update(
         {
-            "User-Agent": (
+            "User-Agent": user_agent
+            or (
                 "Mozilla/5.0 (X11; Linux x86_64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/124.0.0.0 Safari/537.36"
             )
         }
     )
+    if proxy_url:
+        session.proxies.update({"http": proxy_url, "https": proxy_url})
+    if cookies_raw:
+        session.cookies.update(_parse_cookie_string(cookies_raw))
     return session
+
+
+def _parse_cookie_string(cookies_raw: str) -> dict[str, str]:
+    cookies: dict[str, str] = {}
+    for chunk in cookies_raw.split(";"):
+        pair = chunk.strip()
+        if not pair or "=" not in pair:
+            continue
+        key, value = pair.split("=", 1)
+        cookies[key.strip()] = value.strip()
+    return cookies
 
 
 def _event_payload(
@@ -196,7 +225,14 @@ def _event_payload(
     )
 
 
-def parse_source(config: SourceConfig, *, max_events: int = 100) -> list[ParsedEventCreate]:
+def parse_source(
+    config: SourceConfig,
+    *,
+    max_events: int = 100,
+    runtime_config: Optional[ParserRuntimeConfig] = None,
+) -> list[ParsedEventCreate]:
+    runtime_config = runtime_config or ParserRuntimeConfig()
+
     if config.key == "northdrama":
         events = _parse_northdrama(config, max_events=max_events)
     elif config.key == "gck":
@@ -212,9 +248,17 @@ def parse_source(config: SourceConfig, *, max_events: int = 100) -> list[ParsedE
     elif config.key == "arena_norilsk":
         events = _parse_arena_norilsk(config, max_events=max_events)
     elif config.key in {"museum_norilsk_vmuzey", "gallery_norilsk_vmuzey", "talnah_museum_vmuzey"}:
-        events = _parse_vmuzey_museum(config, max_events=max_events)
+        events = _parse_vmuzey_museum(
+            config,
+            max_events=max_events,
+            runtime_config=runtime_config,
+        )
     elif config.key == "norilsk_art_college_vk":
-        events = _parse_vk_community(config, max_events=max_events)
+        events = _parse_vk_community(
+            config,
+            max_events=max_events,
+            runtime_config=runtime_config,
+        )
     elif config.key == "talnah_dshi_news":
         events = _parse_talnah_dshi_news(config, max_events=max_events)
     elif config.key == "nordshi_afisha":
@@ -470,8 +514,17 @@ def _parse_arena_norilsk(config: SourceConfig, *, max_events: int) -> list[Parse
     return events
 
 
-def _parse_vmuzey_museum(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
-    session = _build_session()
+def _parse_vmuzey_museum(
+    config: SourceConfig,
+    *,
+    max_events: int,
+    runtime_config: ParserRuntimeConfig,
+) -> list[ParsedEventCreate]:
+    session = _build_session(
+        user_agent=runtime_config.vmuzey_user_agent,
+        proxy_url=runtime_config.vmuzey_proxy,
+        cookies_raw=runtime_config.vmuzey_cookies,
+    )
     response = session.get(config.url, timeout=30, verify=config.verify_ssl)
     response.raise_for_status()
 
@@ -526,10 +579,19 @@ def _parse_vmuzey_museum(config: SourceConfig, *, max_events: int) -> list[Parse
     return events
 
 
-def _parse_vk_community(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
-    token = os.getenv("VK_API_TOKEN")
+def _parse_vk_community(
+    config: SourceConfig,
+    *,
+    max_events: int,
+    runtime_config: ParserRuntimeConfig,
+) -> list[ParsedEventCreate]:
+    token = runtime_config.vk_api_token or os.getenv("VK_API_TOKEN")
     if token:
-        events = _parse_vk_community_with_api(config, max_events=min(max_events, 20), token=token)
+        events = _parse_vk_community_with_api(
+            config,
+            max_events=min(max_events, 20),
+            token=token,
+        )
         if events:
             return events
 
@@ -822,18 +884,57 @@ def _extract_first_url_from_text(text: Optional[str]) -> Optional[str]:
 
 
 def _is_vk_event_like(text: str) -> bool:
-    normalized = text.lower()
+    normalized = clean_text(text)
+    if not normalized:
+        return False
+    lowered = normalized.lower()
+
+    excluded_pattern = re.compile(
+        r"с\s+прискорбием|светлая\s+память|уш[её]л\s+из\s+жизни|"
+        r"соболезн|день\s+полярника|безопасност[ьи]|антикоррупц|"
+        r"финансов(ый|ой)\s+урок|всероссийск(ая|ий)\s+онлайн-акц",
+        flags=re.IGNORECASE,
+    )
+    if excluded_pattern.search(lowered):
+        return False
+
     ticket_pattern = re.compile(
-        r"приобрест[ьи]\\s+билет|билеты?\\s+можно\\s+по\\s+ссылке|работает\\s+пушкинская\\s+карта",
+        r"приобрест[ьи]\s+билет|билеты?\s+можно\s+по\s+ссылке|"
+        r"пушкинская\s+карта|купить\s+билет|касс[ае]",
         flags=re.IGNORECASE,
     )
-    event_pattern = re.compile(
-        r"концерт|спектак|мероприят|приглашаем|жд[её]м\\s+вас|мастер-?класс|выставк",
-        flags=re.IGNORECASE,
-    )
-    if ticket_pattern.search(normalized):
+    if ticket_pattern.search(lowered):
         return True
-    return bool(event_pattern.search(normalized))
+
+    event_pattern = re.compile(
+        r"концерт|спектак|мероприят|мастер-?класс|выставк|творческ(ий|ая)\s+вечер|"
+        r"фестивал|программа\s+концерта|отчетн(ый|ая)\s+концерт",
+        flags=re.IGNORECASE,
+    )
+    invite_pattern = re.compile(
+        r"приглашаем|жд[её]м\s+вас|состоитс[яь]|пройдет|пройд[её]т|"
+        r"начал[оа]\s+в\s+\d{1,2}:\d{2}",
+        flags=re.IGNORECASE,
+    )
+    has_event = bool(event_pattern.search(lowered))
+    has_invite = bool(invite_pattern.search(lowered))
+    has_date_or_time = bool(_contains_date_or_time(lowered))
+
+    score = sum([has_event, has_invite, has_date_or_time])
+    return score >= 2
+
+
+def _contains_date_or_time(text: str) -> bool:
+    return bool(
+        re.search(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b", text)
+        or re.search(r"\b\d{1,2}:\d{2}\b", text)
+        or re.search(
+            r"\b\d{1,2}\s+(января|февраля|марта|апреля|мая|июня|июля|"
+            r"августа|сентября|октября|ноября|декабря)\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def _is_protection_page(text: str) -> bool:
