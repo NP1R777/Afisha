@@ -22,7 +22,6 @@ class AppSettings(BaseSettings):
     refresh_token_expire: int = 30
 
     # Настройки внешних источников парсинга
-    vk_api_token: Optional[str] = None
     vmuzey_proxy: Optional[str] = None
     vmuzey_cookies: Optional[str] = None
     vmuzey_user_agent: Optional[str] = None

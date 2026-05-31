@@ -1,7 +1,6 @@
-import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Iterable, Optional
 
 import requests
@@ -35,7 +34,6 @@ class SourceConfig:
 
 @dataclass(frozen=True)
 class ParserRuntimeConfig:
-    vk_api_token: Optional[str] = None
     vmuzey_proxy: Optional[str] = None
     vmuzey_cookies: Optional[str] = None
     vmuzey_user_agent: Optional[str] = None
@@ -157,6 +155,11 @@ class SourceParseError(RuntimeError):
     pass
 
 
+def _is_vk_source(config: SourceConfig) -> bool:
+    source = config.url.lower()
+    return "vk.com/" in source or "vk.ru/" in source or config.key.endswith("_vk")
+
+
 def _build_session(
     *,
     user_agent: Optional[str] = None,
@@ -253,7 +256,7 @@ def parse_source(
             max_events=max_events,
             runtime_config=runtime_config,
         )
-    elif config.key == "norilsk_art_college_vk":
+    elif _is_vk_source(config):
         events = _parse_vk_community(
             config,
             max_events=max_events,
@@ -585,101 +588,156 @@ def _parse_vk_community(
     max_events: int,
     runtime_config: ParserRuntimeConfig,
 ) -> list[ParsedEventCreate]:
-    token = runtime_config.vk_api_token or os.getenv("VK_API_TOKEN")
-    if token:
-        events = _parse_vk_community_with_api(
-            config,
-            max_events=min(max_events, 20),
-            token=token,
-        )
-        if events:
-            return events
+    _ = runtime_config
+    hard_limit = min(max_events, 20)
+    vk_user_agents = [
+        None,
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+    ]
 
-    fallback_events = _parse_vk_community_from_page(config, max_events=min(max_events, 20))
-    if fallback_events:
-        return fallback_events
+    for user_agent in vk_user_agents:
+        session = _build_session(user_agent=user_agent)
+        session.headers.update({"Accept-Language": "ru-RU,ru;q=0.9"})
 
-    if token:
-        return []
+        for candidate_url in _build_vk_candidate_urls(config.url):
+            try:
+                response = session.get(candidate_url, timeout=30, verify=config.verify_ssl)
+                response.raise_for_status()
+            except requests.RequestException:
+                continue
+
+            events = _extract_vk_events_from_page(
+                config=config,
+                html=response.text,
+                source_url=candidate_url,
+                max_events=hard_limit,
+            )
+            if events:
+                return events
 
     raise SourceParseError(
-        "Для источника VK не удалось получить посты из публичной страницы. "
-        "Добавьте переменную окружения VK_API_TOKEN для чтения wall.get."
+        "Для источника VK не удалось получить посты из HTML-разметки. "
+        "Вероятно, страница отдает динамический shell/anti-bot контент."
     )
 
 
-def _parse_vk_community_with_api(
-    config: SourceConfig,
+def _build_vk_candidate_urls(base_url: str) -> list[str]:
+    candidates: list[str] = []
+    cleaned = base_url.strip().rstrip("/")
+    if cleaned:
+        candidates.append(cleaned)
+        candidates.append(cleaned.replace("vk.ru", "vk.com"))
+
+    match = re.search(r"/(club|public)(\d+)$", cleaned)
+    if match:
+        group_prefix = match.group(1)
+        group_id = match.group(2)
+        candidates.extend(
+            [
+                f"https://vk.com/{group_prefix}{group_id}",
+                f"https://vk.com/wall-{group_id}",
+                f"https://m.vk.com/{group_prefix}{group_id}",
+                f"https://m.vk.com/wall-{group_id}",
+            ]
+        )
+
+    unique: list[str] = []
+    for item in candidates:
+        normalized = item.strip()
+        if normalized and normalized not in unique:
+            unique.append(normalized)
+    return unique
+
+
+def _extract_vk_events_from_page(
     *,
+    config: SourceConfig,
+    html: str,
+    source_url: str,
     max_events: int,
-    token: str,
 ) -> list[ParsedEventCreate]:
-    session = _build_session()
-    response = session.get(
-        "https://api.vk.com/method/wall.get",
-        params={
-            "owner_id": "-187615124",
-            "count": max_events,
-            "filter": "owner",
-            "extended": 0,
-            "v": "5.199",
-            "access_token": token,
-        },
-        timeout=30,
+    soup = BeautifulSoup(html, "html.parser")
+    events = _extract_vk_events_from_blocks(
+        config=config,
+        soup=soup,
+        source_url=source_url,
+        max_events=max_events,
     )
-    response.raise_for_status()
-    payload = response.json()
-    response_data = payload.get("response", {})
-    items = response_data.get("items", [])
+    if events:
+        return events
+    return _extract_vk_events_from_plain_text(
+        config=config,
+        page_text=clean_text(soup.get_text("\n", strip=True)),
+        source_url=source_url,
+        max_events=max_events,
+    )
+
+
+def _extract_vk_events_from_blocks(
+    *,
+    config: SourceConfig,
+    soup: BeautifulSoup,
+    source_url: str,
+    max_events: int,
+) -> list[ParsedEventCreate]:
+    block_selectors = [
+        "div[data-post-id]",
+        "div[data-post]",
+        "article[data-post-id]",
+        ".wall_item",
+        ".post",
+    ]
+
+    blocks = []
+    for selector in block_selectors:
+        blocks.extend(soup.select(selector))
 
     events: list[ParsedEventCreate] = []
-    for item in items:
-        text = clean_text(item.get("text"))
-        if not text:
+    seen_texts: set[str] = set()
+    for block in blocks:
+        text = clean_text(block.get_text(" ", strip=True))
+        if not text or text in seen_texts:
             continue
+        seen_texts.add(text)
         if not _is_vk_event_like(text):
             continue
 
-        post_id = item.get("id")
-        post_url = f"https://vk.com/wall-187615124_{post_id}" if post_id else config.url
-        first_url = _extract_first_url_from_text(text)
-
-        post_datetime = None
-        if item.get("date"):
-            post_datetime = datetime.fromtimestamp(item["date"], tz=timezone.utc).strftime("%d.%m.%Y")
+        post_url = None
+        post_link = block.select_one("a[href*='wall-']")
+        if post_link:
+            post_url = absolute_url(source_url, post_link.get("href"))
 
         payload_item = _event_payload(
             config,
-            name=_extract_title_from_text_block(text),
+            name=_extract_vk_title_from_text(text),
             description=text,
-            date_event=text or post_datetime,
+            date_event=text,
             duration=text,
             price=text,
             address=_extract_address_from_text(text),
             age_limit=text,
-            external_url=first_url or post_url,
+            external_url=post_url or _extract_first_url_from_text(text) or source_url,
         )
         if payload_item:
-            if not payload_item.date_event:
-                payload_item.date_event = post_datetime
             events.append(payload_item)
         if len(events) >= max_events:
             break
     return events
 
 
-def _parse_vk_community_from_page(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
-    session = _build_session()
-    response = session.get(config.url, timeout=30, verify=config.verify_ssl)
-    response.raise_for_status()
-
-    page_text = clean_text(BeautifulSoup(response.text, "html.parser").get_text("\n", strip=True))
+def _extract_vk_events_from_plain_text(
+    *,
+    config: SourceConfig,
+    page_text: Optional[str],
+    source_url: str,
+    max_events: int,
+) -> list[ParsedEventCreate]:
     if not page_text:
         return []
 
-    # В ряде окружений VK отдает посты как обычный текст страницы.
     chunks = re.split(
-        r"\bНорильский\s+колледж\s+искусств\s+запись\s+закреплена\b",
+        r"(?:\bзапись\s+закреплена\b|\bзапись\s+сообщества\b)",
         page_text,
         flags=re.IGNORECASE,
     )
@@ -694,14 +752,14 @@ def _parse_vk_community_from_page(config: SourceConfig, *, max_events: int) -> l
 
         payload_item = _event_payload(
             config,
-            name=_extract_title_from_text_block(text),
+            name=_extract_vk_title_from_text(text),
             description=text,
             date_event=text,
             duration=text,
             price=text,
             address=_extract_address_from_text(text),
             age_limit=text,
-            external_url=_extract_first_url_from_text(text) or config.url,
+            external_url=_extract_first_url_from_text(text) or source_url,
         )
         if payload_item:
             events.append(payload_item)
@@ -872,6 +930,27 @@ def _extract_title_from_text_block(text: str) -> str:
     if first_sentence and len(first_sentence) >= 8:
         return first_sentence[:180]
     return candidate[:180]
+
+
+def _extract_vk_title_from_text(text: str) -> str:
+    candidate = clean_text(text)
+    if not candidate:
+        return "Событие"
+
+    candidate = re.sub(
+        r"^\s*[A-ZА-ЯЁa-zа-яё0-9 .\"«»()_-]{2,80}\s+запись\s+(закреплена|сообщества)\b",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    candidate = re.sub(
+        r"\b(?:сегодня|вчера|\d{1,2}\s+[а-яё]+)\s+в\s+\d{1,2}:\d{2}\b",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    candidate = re.sub(r"\bгосорганизация\b", "", candidate, flags=re.IGNORECASE)
+    return _extract_title_from_text_block(candidate)
 
 
 def _extract_first_url_from_text(text: Optional[str]) -> Optional[str]:
