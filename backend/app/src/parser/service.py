@@ -35,7 +35,6 @@ async def run_parse_and_store(
     total_duplicates = 0
     total_errors = 0
     runtime_config = ParserRuntimeConfig(
-        vk_api_token=settings.vk_api_token,
         vmuzey_proxy=settings.vmuzey_proxy,
         vmuzey_cookies=settings.vmuzey_cookies,
         vmuzey_user_agent=settings.vmuzey_user_agent,

@@ -152,15 +152,13 @@ alembic upgrade head
 
 ### Дополнительно по новым источникам
 
-- Для `norilsk_art_college_vk` рекомендуется задать `VK_API_TOKEN` (иначе VK может не отдавать посты публично).
+- `norilsk_art_college_vk` работает в режиме HTML-парсинга (без API-ключа).
+- Если VK отдает динамический shell/anti-bot вместо постов, источник вернет ошибку парсинга.
 - Источники `vmuzey.com` могут быть защищены anti-bot challenge. В таком случае можно передать proxy/cookies через настройки окружения.
 
 ### Переменные окружения для внешних источников парсинга
 
 ```bash
-# VK
-VK_API_TOKEN=
-
 # vmuzey anti-bot bypass (опционально)
 VMUZEY_PROXY=
 VMUZEY_COOKIES=
