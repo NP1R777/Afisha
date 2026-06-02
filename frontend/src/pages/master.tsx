@@ -28,7 +28,7 @@ interface Event {
   description: string;
   location: string;
   group_id: number;
-  date_event: string;
+  date_event: string[];
   duration: string;
   price: string;
   address: string;
@@ -54,8 +54,10 @@ const Frame = () => {
   const [categoriesFromBackend, setCategoriesFromBackend] = useState<EventCategory[]>([]);
   const [eventsByCategory, setEventsByCategory] = useState<Record<number, Event[]>>({});
   const [categoryIndexes, setCategoryIndexes] = useState<Record<number, number>>({});
-  const [formattedDate, setFormattedDate] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // const [formattedDate, setFormattedDate] = useState<string | null>(null);
+  // const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -63,7 +65,7 @@ const Frame = () => {
   const [previousSearchQuery, setPreviousSearchQuery] = useState('');
   const navigate = useNavigate();
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false); //для календаря
-
+  const [personalizedIndex, setPersonalizedIndex] = useState(0);
   const [isMd, isXl] = useMediaQuery(['(min-width: 768px)', '(min-width: 1280px)'], {
     fallback: [false, false, true],
   });
@@ -98,6 +100,17 @@ const Frame = () => {
     }));
   };
 
+  const handlePersonalizedNext = () => {
+    setPersonalizedIndex(prev =>
+      Math.min(prev + itemsPerPage, personalizedEvents.length - 1)
+    );
+  };
+
+  const handlePersonalizedPrev = () => {
+    setPersonalizedIndex(prev =>
+      Math.max(prev - itemsPerPage, 0)
+    );
+  };
   // const fetchCategories = async () => {
   //   try {
   //     const response = await axios.get('/event/event_list');
@@ -196,21 +209,36 @@ const Frame = () => {
     setSelectedDistricts(selectedValues);
   };
 
-  const handleDateChange = (date: Date | null) => {
-    setSelectedDate(date);
+const handleDateChange = (dates: [Date | null, Date | null]) => {
+  const [start, end] = dates;
 
-    if (date) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+  if (start && end && start.getTime() === end.getTime()) {
+    console.warn("Ошибка: Дата начала и конца не могут совпадать.");
+    setStartDate(start);
+    setEndDate(null);
+    return;
+  }
 
-      const formattedDate = `${year}-${month}-${day}`;
+  setStartDate(start);
+  setEndDate(end);
 
-      setFormattedDate(formattedDate);
-    } else {
-      setFormattedDate(null);
-    }
-  };
+  if (start) {
+    console.log("Выбрана дата начала:", start.toLocaleDateString());
+  }
+
+  if (end) {
+    console.log("Выбрана дата конца:", end.toLocaleDateString());
+  }
+
+  if (start && end) {
+    console.log("Выбран полный период:", start.toLocaleDateString(), "—", end.toLocaleDateString());
+  }
+};
+
+const handleClearDate = () => {
+  setStartDate(null);
+  setEndDate(null);
+};
 
   const handleMyTicketsClick = () => {
     if (userId) {
@@ -241,7 +269,11 @@ const Frame = () => {
   };
 
   const userCategoriesStr = userCategories?.map(String) || [];
-  const areFiltersApplied = selectedCategories.length > 0 || selectedDistricts.length > 0 || formattedDate !== null;
+  const areFiltersApplied = 
+  selectedCategories.length > 0 || 
+  selectedDistricts.length > 0 || 
+  startDate !== null || 
+  endDate !== null;
 
   const filteredCategories = categoriesFromBackend.filter(category => {
     const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
@@ -258,10 +290,21 @@ const Frame = () => {
     }
   });
 
-  const handleClearDate = () => {
-    setSelectedDate(null);
-    setFormattedDate(null);
-  };
+  const personalizedEvents = EVENTS.events
+    .filter(event => {
+      const category = EVENTS.categories.find(
+        category => category.id === event.group_id
+      );
+
+      return category?.name.toLowerCase() === 'театр';
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.date_event[0]).getTime() -
+        new Date(b.date_event[0]).getTime()
+    )
+    .slice(0, 12);
+
 
   return (
     <ContainerFluid>
@@ -270,7 +313,7 @@ const Frame = () => {
           <Flex justify="space-between" fontFamily="Unbounded" w="100%">
             <HStack gap={{ xl: '4', lg: '4', base: '1' }}>
               <Box
-                onClick={() => setIsCalendarOpen(prev => !prev)}
+                
                 bg="white"
                 borderRadius="full"
                 color="black"
@@ -287,25 +330,68 @@ const Frame = () => {
                 _hover={{ bg: 'gray.50' }}
                 transition="all 0.2s"
               >
-                <DatePicker
-                  open={isCalendarOpen}
-                  onClickOutside={() => setIsCalendarOpen(false)}
-                  selected={selectedDate}
-                  onChange={handleDateChange}
-                  dateFormat="dd/MM/yyyy"
-                  minDate={new Date()}
-                  customInput={<Text fontSize={{ base: '8px', sm:"12px", md: 'sm', lg: '15px', '2xl': '15px' }}>Даты</Text>}
-                  wrapperClassName="date-picker-wrapper"
-                  popperPlacement="bottom-start"
-                  popperClassName="react-datepicker-popper"
-                />
-                {selectedDate && (
+                            
+              <DatePicker
+                open={isCalendarOpen}
+                onInputClick={() => setIsCalendarOpen(true)}
+                onClickOutside={() => setIsCalendarOpen(false)}
+                disabledKeyboardNavigation
+                selected={startDate}
+
+                onChange={(date: Date | null) => {
+                  if (!date) return;
+
+                  if (!startDate || (startDate && endDate)) {
+                    setStartDate(date);
+                    setEndDate(null);
+                    return;
+                  }
+
+                  if (date.getTime() === startDate.getTime()) {
+                    return;
+                  }
+
+                  if (date > startDate) {
+                    setEndDate(date);
+                  } else {
+                    setEndDate(startDate);
+                    setStartDate(date);
+                  }
+
+                  setIsCalendarOpen(false);
+                }}
+
+                dateFormat="dd.MM.yyyy"
+                minDate={new Date()}
+                wrapperClassName="date-picker-wrapper"
+                popperPlacement="bottom-start"
+                popperClassName="react-datepicker-popper"
+
+                customInput={
+                  <Text
+                    fontSize={{ base: '8px', sm: "12px", md: 'sm', lg: '15px', '2xl': '15px' }}
+                    whiteSpace="nowrap"
+                    display="inline-block"
+                  >
+                    {startDate && endDate
+                      ? `${startDate.toLocaleDateString()} — ${endDate.toLocaleDateString()}`
+                      : startDate
+                        ? startDate.toLocaleDateString()
+                        : "Даты"}
+                  </Text>
+                }
+              />
+
+              {(startDate || endDate) && (
                   <Button
                     position="absolute"
                     p={0}
                     right={{ base: '-2px', sm:"-9px", md: '-4px' }}
                     top="0"
-                    onClick={handleClearDate}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearDate();
+                    }}
                     bg="transparent"
                     border="none"
                     color="black"
@@ -379,7 +465,7 @@ const Frame = () => {
                 </SelectContent>
               </SelectRoot>
 
-              <Button
+              {/* <Button //нужен или нет вообщев
                 maxHeight={{ base: '36px', md: '40px' }}
                 bg="white"
                 borderRadius="full"
@@ -399,7 +485,7 @@ const Frame = () => {
                   objectFit="contain"
                 />
                 <Text>Мои билеты</Text>
-              </Button>
+              </Button> */}
               <Button
                 maxHeight={{ base: '36px', md: '40px' }}
                 bg="white"
@@ -411,7 +497,15 @@ const Frame = () => {
                 _hover={{ bg: 'gray.50' }}
                 transition="all 0.2s"
                 onClick={() => setIsCalendarModalOpen(true)}
+                fontWeight="400"
               >
+                <Image
+                  display={{ base: 'none', md: 'block' }}
+                  src={ticket}
+                  alt="Билет"
+                  boxSize={{ base: '16px', md: '20px' }}
+                  objectFit="contain"
+                />
                 <Text>Календарь событий</Text>
               </Button>
             </HStack>
@@ -430,23 +524,23 @@ const Frame = () => {
             as="h1"
             fontWeight={500}
             lineHeight={1}
-            fontSize={{ xl: '64px', lg: '32px', sm:"30px", base: '16px' }}
+            fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
             alignSelf="center"
-            mr="25%"
+            
             fontFamily="Unbounded"
           >
-            Развлекайтесь
+            Афиша
           </Heading>
           <Heading
             as="h1"
             fontWeight={500}
             lineHeight={1}
-            ml="25%"
+            
             fontSize={{ xl: '64px', lg: '32px', sm:"30px", base: '16px' }}
             alignSelf="center"
             fontFamily="Unbounded"
           >
-            Наслаждайтесь
+            Мероприятий
           </Heading>
           <Text
             fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
@@ -526,6 +620,147 @@ const Frame = () => {
             города
           </Box>
         </Grid>
+        {personalizedEvents.length > 0 && (
+          <Box mt={9} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+            <Heading
+              lineHeight={1}
+              fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
+              fontFamily="Unbounded"
+              color="white"
+              textAlign="center"
+            >
+              Подборка для вас
+            </Heading>
+
+            <Flex
+              justify="center"
+              gap={8}
+              mt={{ base: '35px', lg: '20px', xl: '60px' }}
+              wrap="wrap"
+            >
+              {personalizedEvents
+                .slice(
+                  personalizedIndex,
+                  personalizedIndex + itemsPerPage
+                )
+                .map((event, index) => (
+                  <motion.div
+                    key={`${event.id}-${index}`}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.5, delay: index * 0.2 }}
+                  >
+                    <Link to={`/event/${event.id}`}>
+                      <VStack
+                        align="center"
+                        textAlign="center"
+                        gap={1}
+                        w={{ xl: '240px', sm: '200px', base: '140px' }}
+                        position="relative"
+                      >
+                        <Image
+                          src={event.pictures_url}
+                          alt={event.name}
+                          width="100%"
+                          height={{ xl: '360px', md: '300px', sm: '290px', base: '200px' }}
+                          borderRadius="6px"
+                          objectFit="cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = EventImage;
+                          }}
+                        />
+
+                        <Box
+                          position="absolute"
+                          bottom="0"
+                          bgImage={`url(${wave})`}
+                          bgSize="cover"
+                          width={{ xl: '240px', sm: '200px', base: '140px' }}
+                          height="150px"
+                          p={2}
+                          borderRadius="md"
+                          textAlign="left"
+                          fontFamily="Unbounded"
+                          color="white"
+                        >
+                          <Text
+                            fontWeight="hairline"
+                            mt={7}
+                            ml={2}
+                            fontSize={{ lg: '14px', base: '12px' }}
+                            style={{
+                              display: '-webkit-box',
+                              overflow: 'hidden',
+                              WebkitBoxOrient: 'vertical',
+                              WebkitLineClamp: 2,
+                            }}
+                          >
+                            {event.name}
+                          </Text>
+
+                          <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
+                            {event.location}
+                          </Text>
+                        </Box>
+
+                        <Box
+                          position="absolute"
+                          bottom="10px"
+                          right="10px"
+                          bgColor="white"
+                          color="black"
+                          borderRadius="xl"
+                          p={1}
+                          fontSize={{ xl: 'sm', base: 'xs' }}
+                          fontFamily="Unbounded"
+                        >
+                          <Text>
+                            {Number(event.price) === 0
+                              ? 'Бесплатно'
+                              : `от ${event.price} руб`}
+                          </Text>
+                        </Box>
+                      </VStack>
+                    </Link>
+                  </motion.div>
+                ))}
+            </Flex>
+              {personalizedEvents.length > itemsPerPage && (
+            <HStack justify="flex-end" w={{ xl: '92%', lg: '88%' }} mt={4}>
+              <Button
+                onClick={handlePersonalizedPrev}
+                disabled={personalizedIndex === 0}
+                bg="transparent"
+                mr={2}
+                borderRadius="full"
+                boxShadow="0 0 0 2px white"
+                width={{ xl: '50px', sm: '45px', base: '40px' }}
+                height={{ xl: '50px', sm: '45px', base: '40px' }}
+                _disabled={{ cursor: 'default', opacity: 0.5 }}
+              >
+                <FaArrowLeft color="white" />
+              </Button>
+
+              <Button
+                onClick={handlePersonalizedNext}
+                disabled={
+                  personalizedIndex + itemsPerPage >=
+                  personalizedEvents.length
+                }
+                bg="transparent"
+                borderRadius="full"
+                boxShadow="0 0 0 2px white"
+                width={{ xl: '50px', sm: '45px', base: '40px' }}
+                height={{ xl: '50px', sm: '45px', base: '40px' }}
+                _disabled={{ cursor: 'default', opacity: 0.5 }}
+              >
+                <FaArrowRight color="white" />
+              </Button>
+            </HStack>
+          )}
+          </Box>
+        )}
         {filteredCategories.length > 0 ? (
           filteredCategories.map(category => {
             const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);

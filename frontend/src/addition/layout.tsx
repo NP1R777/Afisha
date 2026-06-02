@@ -1,4 +1,4 @@
-import { Button, Flex, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import { Button, Flex, HStack, Image, Input, Separator, Stack, Text,Box } from '@chakra-ui/react';
 import { useState } from 'react';
 import { LuSearch } from 'react-icons/lu';
 import { Outlet, useNavigate } from 'react-router-dom';
@@ -7,12 +7,23 @@ import { ContainerFluid } from '../components/ui/container';
 import { InputGroup } from '../components/ui/input-group';
 import LoginModal from '../pages/authorization';
 import RegisterModal from '../pages/registration';
+import assistant from '../pictures/assistant.png';
+import AiAssistantModal from '../modal/assistant';
 
 const Layout = () => {
   const { isAuthenticated, setUsername, setSearchQuery } = useUser();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+
+    const openModal = () => {
+        setIsOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsOpen(false);
+    };
 
   const handleLoginSuccess = () => {
     const storedUsername = localStorage.getItem('username');
@@ -49,6 +60,7 @@ const Layout = () => {
     const value = event.target.value;
     setSearchQuery(value);
   };
+
 
   return (
     <>
@@ -126,7 +138,7 @@ const Layout = () => {
               fontSize={{ base: '13px', lg: '15px', xl: '18px' }}
               textAlign="left"
             >
-              © {new Date().getFullYear()} "СкайНСК" – сайт создан студентами 4 курса Сологубовой Владой и Захаровым Ильёй
+              © {new Date().getFullYear()} "Афиша мероприятий" – сайт создан студентами 4 курса Сологубовой Владой и Захаровым Ильёй
             </Text>
             <Image
               src="/icons/logo-outlined.svg"
@@ -139,6 +151,7 @@ const Layout = () => {
             />
           </HStack>
         </Stack>
+        
       </ContainerFluid>
       <LoginModal
         isOpen={isLoginOpen}
@@ -151,6 +164,34 @@ const Layout = () => {
         onRequestClose={() => setIsRegisterOpen(false)}
         openLoginModal={openLoginModal}
       />
+      <Box
+        position="fixed"
+        right="40px"
+        bottom="60px"
+        zIndex={100}
+        cursor="pointer"
+        onClick={openModal}
+        transition="0.2s"
+        _hover={{
+          transform: 'scale(1.05)',
+        }}
+          _active={{
+          transform: 'scale(0.96)',
+        }}
+        >
+        <Image
+          src={assistant}
+          alt="assistant"
+          maxW={{ base: '120px', md: '180px', lg: '110px' }}
+          pointerEvents="none"
+          userSelect="none"
+
+        />
+        </Box>
+        <AiAssistantModal
+          isOpen={isOpen}
+          onClose={closeModal}
+        />
     </>
   );
 };

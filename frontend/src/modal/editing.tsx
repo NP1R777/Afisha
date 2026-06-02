@@ -100,7 +100,7 @@ const EditingModal: React.FC<EditingModalProps> = ({ isOpen, onRequestClose, onC
       style={{
         overlay: {
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 2,
+          zIndex: 100,
         },
         content: {
           top: '50%',

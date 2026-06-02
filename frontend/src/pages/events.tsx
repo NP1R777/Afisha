@@ -9,6 +9,8 @@ import axios from '../shared/lib/axios';
 import { Toaster, toaster } from "../components/ui/toaster"
 import EVENTS from '../shared/config/mock.json';
 import EventImage from '../pictures/picture1.png';
+import star_empty from '../pictures/Star1.png';
+import star_full from '../pictures/Star2.png';
 
 interface EventDetails {
   id: number;
@@ -17,7 +19,7 @@ interface EventDetails {
   location: string;
   group_id: string;
   external_url: string;
-  date_event: string;
+  date_event: string[];
   duration: string;
   price: string;
   address: string;
@@ -35,6 +37,14 @@ const Events = () => {
   const monthNames = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
+
+  const toggleFavorite = (index: number) => {
+    setFavorites((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
 
   // useEffect(() => {
   //   const fetchEventDetails = async () => {
@@ -110,11 +120,16 @@ useEffect(() => {
   }
   };
 
-  const monthNumber = eventDetails.date_event.split('-')[1];
-  const monthName = monthNames[parseInt(monthNumber, 10) - 1];
+
   const formattedAgeLimit = eventDetails.age_limit.endsWith('+') ? eventDetails.age_limit : `${eventDetails.age_limit}+`;
 
-  const day = parseInt(eventDetails.date_event.split('-')[2], 10);
+  const parsedDates = eventDetails.date_event.map(date => {
+  const [year, month, day] = date.split('-');
+    return {
+      day: parseInt(day, 10),
+      month: parseInt(month, 10),
+    };
+  });
 
   const openLoginModal = () => {
     setIsRegisterOpen(false);
@@ -203,7 +218,7 @@ useEffect(() => {
             >
               {eventDetails.name}
             </Heading>
-            <Button
+            {/* <Button
               bg="white"
               color="black"
               fontSize={{ "2xl": '50px',  lg: '30px',md:"25px",  sm:"16px", base: "13px" }}
@@ -222,7 +237,7 @@ useEffect(() => {
               onClick={handleBookTicket}
             >
               Добавить в избранное
-            </Button>
+            </Button> */}
           </VStack>
       </Flex>
         <Stack >
@@ -233,42 +248,121 @@ useEffect(() => {
         </Stack>
 
         <Flex direction={{ base: "column", "sm": "row" }} align="start" justify="space-between" mt={{ "2xl": '6', base: "2" }}>
-          <HStack justify="space-between" w="100%" align="start">
-            <VStack align="start">
-              <Text fontSize={{ "2xl": '60px', lg: '47px', md: "35px", base: "30px" }} fontWeight="bold" color="white">
-                {day}
-              </Text>
-            </VStack>
-            <VStack align="start" mt={{ "2xl": '7', lg: '5', base: "4" }}>
-              <Text fontSize={{ "2xl": '25px', lg: '20px', md: "15px", base: "11px" }} fontWeight="bold" color="#0E3EA0">
-                {monthName}
-              </Text>
-            </VStack>
-            <HStack align="center" mt={{ "2xl": '7',lg: '5', base: "4" }} ml="auto">
-              <Text fontSize={{ "2xl": '25px', lg: '20px', md: "15px", base: "10px" }} color="white">
-                {eventDetails.duration.substring(0, 5)}
-              </Text>
-              <Text fontSize={{ "2xl": '20px', lg: '15px', md: "15px", base: "10px" }} color="white" ml={{ "2xl": '48', lg: '20',base: "14" }} mr={{ "2xl": '10', sm: "5" }}>
-                {formattedAgeLimit}
-              </Text>
-            </HStack>
-          </HStack>
-          <Box mt={{ base: "4", sm: "0" }} w="100%" display={{ base: "block", "sm": "none" }}>
-            <Button
-              bg="white"
-              color="black"
-              fontSize="23px"
-              fontWeight="900"
-              padding="21px"
-              w="100%"
-              borderRadius="xl"
-              boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
-              _hover={{ bg: 'black', color: 'white' }}
-            >
-              {Number(eventDetails.price) === 0 ? 'Бесплатно' : `от ${eventDetails.price} рублей`}
-            </Button>
-          </Box>
-          <Box display={{ base: "none", "sm": "block" }} mt={{ "2xl": '7px', lg: "4",md: "1",}}>
+          {/* <VStack align="start" gap={2} w="100%">
+            {parsedDates.map((d, index) => (
+              <HStack key={index} w="100%" position="relative">
+  
+                <HStack>
+                  <Text fontSize="60px" fontWeight="bold" color="white">
+                    {d.day}
+                  </Text>
+
+                  <Text fontSize="25px" fontWeight="bold" color="#0E3EA0">
+                    {monthNames[d.month - 1]}
+                  </Text>
+                </HStack>
+
+                <Text
+                  color="white"
+                  position="absolute"
+                  left="50%"
+                  transform="translateX(-50%)"
+                  fontSize="20px"
+                >
+                  {eventDetails.duration.substring(0, 5)}
+                </Text>
+
+                <Text color="white" fontSize="18px" position="absolute" left="70%">
+                  {Number(eventDetails.price) === 0 ? 'Бесплатно' : `от ${eventDetails.price} рублей`}
+                </Text>
+              
+              </HStack>
+              
+            ))}
+            
+          </VStack> */}
+          <VStack align="start" w="100%">
+  {parsedDates.map((d, index) => (
+    <>
+    <HStack key={index} w="100%" justify="space-between" >
+
+      {/* ЛЕВАЯ ЧАСТЬ — дата */}
+      <HStack gap="15px">
+        <Text
+          fontSize={{ "2xl": '60px', lg: '47px', md: "35px", base: "30px" }}
+          fontWeight="bold"
+          color="white"
+        >
+          {d.day}
+        </Text>
+
+        <Text
+          fontSize={{ "2xl": '25px', lg: '20px', md: "15px", base: "11px" }}
+          fontWeight="bold"
+          color="#0E3EA0"
+        >
+          {monthNames[d.month - 1]}
+        </Text>
+      </HStack>
+
+      <HStack >
+
+        <Text color="white" fontSize={{ "2xl": '20px'}} transform="translateX(-340px)">
+          {eventDetails.duration.substring(0, 5)}
+        </Text>
+
+        <Box
+        as="button"
+        onClick={() => toggleFavorite(index)}
+        transition="0.2s"
+        _hover={{
+          transform: "scale(1.08)",
+        }}
+
+      >
+        <Image
+          src={favorites[index] ? star_full : star_empty}
+          alt="favorite"
+          boxSize={{
+            "2xl": "50px",
+            xl: "50px",
+            lg: "45px",
+            md: "40px",
+            sm: "32px",
+          }}
+          objectFit="contain"
+          
+        />
+      </Box>
+
+        <Button
+          bg="white"
+          color="black"
+          fontSize={{ "2xl": '25px', xl: '30px', md: "25px", lg: '25px', sm: "14px"}}
+          fontWeight="800"
+          ml="20px"
+          padding={{ "2xl": '33px', xl: '20px', md: "20px", lg:"10px"}}
+          borderRadius="xl"
+          boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
+          _hover={{ bg: 'black', color: 'white' }}
+          onClick={handleBookTicket}
+        >
+          Купить билет
+        </Button>
+
+      </HStack>
+
+    </HStack>
+    {index !== parsedDates.length - 1 && (
+        <Box w="100%" >
+          <Separator borderColor="white" my={3}/>
+        </Box>
+      )}
+    </>
+  ))}
+</VStack>
+
+          {/* <Box display={{ base: "none", "sm": "block" }} mt={{ "2xl": '7px', lg: "4",md: "1",}}>
             <Button
               bg="white"
               color="black"
@@ -279,10 +373,11 @@ useEffect(() => {
               boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
               _hover={{ bg: 'black', color: 'white' }}
               ml="auto"
+            onClick={handleBookTicket}
             >
-              {Number(eventDetails.price) === 0 ? 'Бесплатно' : `от ${eventDetails.price} рублей`}
+              Добавить в избранное
             </Button>
-          </Box>
+          </Box> */}
         </Flex>
         <Stack w="100%" >
           <Separator mt={5} borderColor="white"/>
@@ -302,11 +397,17 @@ useEffect(() => {
         <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
           {eventDetails.address}
         </Text>
-        <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white" mb={8} mt={5}>
-          Подробная информация от организатора:
-          <br />
-          <a href="https://кдц-высоцкого.рф/repertuar/?place=9a05e654-1532-4d5c-a486-d33fb5dbbc3f&city=7379699a-aff5-49a7-82b0-c53189dc2c44&language=ru" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'underline' }}>
-            https://кдц-высоцкого.рф/repertuar/?place=9a05e654-1532-4d5c-a486-d33fb5dbbc3f&city=7379699a-aff5-49a7-82b0-c53189dc2c44&language=ru
+        <Text
+          fontSize="50px"
+          color="white"
+          mt="10px"
+          fontWeight="bold"
+        >
+          <a
+            href="/organizer"
+            style={{ color: 'white', textDecoration: 'underline' }}
+          >
+            Страница организатора
           </a>
         </Text>
       </Box>

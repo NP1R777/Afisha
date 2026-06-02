@@ -8,6 +8,7 @@ import { PasswordInput } from '../components/ui/password-input';
 import icon from '../pictures/icon.png';
 import axios from '../shared/lib/axios';
 import CategoriesModal from './categories';
+import OrganizerRegisterModal from '../modal/org_registration';
 
 interface FormValues {
   username: string;
@@ -33,6 +34,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onRequestClose, o
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
 
+  const [isOrganizerModalOpen, setIsOrganizerModalOpen] = useState(false);
   const onSubmit = handleSubmit(async data => {
     try {
       const response = await axios.post('/user/registration', {
@@ -86,7 +88,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onRequestClose, o
         style={{
           overlay: {
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 2,
+            zIndex: 100,
           },
           content: {
             top: '50%',
@@ -189,20 +191,48 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onRequestClose, o
             </Stack>
           </form>
           <Text
-            mt="3"
+            mt="6"
+            color="#A0A0A4"
+            fontSize="15px"
+            textAlign="center"
+          >
+            Хотите публиковать свои мероприятия?
+          </Text>
+
+          <Text
+            color="#A0B1CC"
+            fontSize="16px"
+            fontWeight="600"
+            cursor="pointer"
+            _hover={{ textDecoration: 'underline', color: '#7296CC' }}
+            transition="0.2s"
+            textAlign="center"
+            onClick={() => {
+              onRequestClose();
+              setIsOrganizerModalOpen(true);
+            }}
+          >
+            Подать заявку организатора
+          </Text>
+          <Text
             color="#A0A0A4"
             _hover={{ textDecoration: 'underline', cursor: 'pointer' }}
             onClick={() => {
               onRequestClose();
               openLoginModal();
             }}
-            style={{ textDecoration: 'none', marginTop: '16px', display: 'block' }}
+            style={{ marginTop: '16px', display: 'block' }}
           >
             Или войдите в аккаунт тут, если уже зарегистрированы
           </Text>
         </Box>
       </Modal>
       <CategoriesModal isOpen={isCategoriesModalOpen} onRequestClose={() => setIsCategoriesModalOpen(false)} />
+      <OrganizerRegisterModal
+        isOpen={isOrganizerModalOpen}
+        onRequestClose={() => setIsOrganizerModalOpen(false)}
+        openLoginModal={openLoginModal}
+      />
     </>
   );
 };
