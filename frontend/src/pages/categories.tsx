@@ -12,6 +12,10 @@ const items = [
   { value: 'music', title: 'Музыка', id: 7 },
   { value: 'culture', title: 'Культура', id: 6 },
   { value: 'sports', title: 'Спорт', id: 5 },
+  { value: 'humor', title: 'Юмор', id: 8 },
+  { value: 'education', title: 'Образование', id: 9 },
+  { value: 'charity', title: 'Благотворительность', id: 10 },
+  { value: 'city_holidays', title: 'Городские праздники', id: 11 },
 ];
 
 interface CategoriesModalProps {
@@ -60,7 +64,7 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
       style={{
         overlay: {
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 2,
+          zIndex: 100,
         },
         content: {
           top: '50%',
@@ -94,22 +98,24 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
           Выберите интересующие вас <br />
           категории мероприятий
         </Heading>
-        <Flex wrap="wrap" justify="center" gap={2} mt="20px" >
+        <Flex wrap="wrap" justify="center" gap={5} mt="20px" >
           {items.map(item => (
             <Button
               key={item.value}
               onClick={() => handleCategoryClick(item.value)}
               bg="#FFFFFF"
               color="#22212C"
-              fontSize={{ base: '15px', md:'17px',lg:'17px'}}
+              fontSize={{ base: '15px', md:'17px',lg:'19px'}}
               fontWeight="600"
               padding="15px"
+              px={5}
+              py={6}
               boxShadow={selectedCategories.includes(item.value) ? '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)' : 'none'}
               _hover={{
                 boxShadow: '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)',
               }}
               borderRadius="10px"
-              width={{ base: '100px', md:'150px',lg:'150px'}}
+              width="auto"
             >
               {item.title}
             </Button>
@@ -120,15 +126,15 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
             type="submit"
             bg="#A0B1CC"
             color="white"
-            fontSize="17px"
+            fontSize={{ base: '22px', md: '26px', lg: '23px' }}
             fontWeight="600"
             fontFamily="Unbounded"
-            padding="15px"
+            px={8}
+            py={7}
             boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
             _hover={{ bg: '#7296CC' }}
-            w="100%"
-            width={{ base: '250px', md:'350px',lg:'350px'}}
-            borderRadius="10px"
+            width={{ base: '180px', md: '240px', lg: '260px' }}
+            borderRadius="14px"
             onClick={handleSubmit}
           >
             Готово!

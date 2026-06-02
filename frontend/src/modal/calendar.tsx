@@ -1,4 +1,5 @@
 import { Box, Button, Flex, Grid, Text, Image } from '@chakra-ui/react';
+import { RadioGroup } from "../components/ui/radio";
 import Modal from 'react-modal';
 import { useState } from 'react';
 import { SelectContent, SelectItem, SelectRoot, SelectTrigger } from '../components/ui/select';
@@ -19,69 +20,185 @@ type EventItem = {
     category: string;
     date: string;
     time: string;
+    organizer: string;
 };
 
 const EventCalendarModal = ({ isOpen, onClose }: Props) => {
     const [currentDate, setCurrentDate] = useState(new Date(2026, 4));
+    const [selectedAge, setSelectedAge] = useState('');
+    const [isAgeOpen, setIsAgeOpen] = useState(false);
+
+    const ageRestrictions = createListCollection({
+        items: [
+            { label: '0+', value: '0+' },
+            { label: '6+', value: '6+' },
+            { label: '12+', value: '12+' },
+            { label: '16+', value: '16+' },
+            { label: '18+', value: '18+' },
+        ],
+    });
+
+    const handleAgeChange = (values: string[]) => {
+        setSelectedAge(values[0] || '');
+    };
+
+    const groupByOrganizer = (events: EventItem[]) => {
+        return events.reduce((acc, event) => {
+            if (!acc[event.organizer]) {
+                acc[event.organizer] = [];
+            }
+
+            acc[event.organizer].push(event);
+
+            return acc;
+        }, {} as Record<string, EventItem[]>);
+    };
+
     const events: EventItem[] = [
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-23',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-23',
+            time: '20:30',
+        },{
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-23',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Кинотеатр "Родина"',
             date: '2026-05-23',
             time: '20:30',
         },
                 {
             title: 'На всякого мудреца довольно простоты',
             category: 'theatre', 
+            organizer: 'Кинотеатр "Родина"',
             date: '2026-05-22',
             time: '20:30',
         },
                 {
             title: 'Та сторона, где ветер',
             category: 'museum', 
+            organizer: 'Кинотеатр "Родина"',
             date: '2026-05-22',
             time: '21:30',
         },
         {
             title: 'Волки и овцы',
             category: 'museum', 
+            organizer: 'Театр драмы им. В. Маяковского',
             date: '2026-05-22',
             time: '10:30',
         },
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Кинотеатр "Родина"',
             date: '2026-05-03',
             time: '20:30',
         },
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Кинотеатр "Родина"',
             date: '2026-05-10',
             time: '20:30',
         },
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
             date: '2026-05-17',
             time: '20:30',
         },
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Дворец спорта "Арктика"',
             date: '2026-05-04',
             time: '20:30',
         },
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Дворец спорта "Арктика"',
             date: '2026-05-11',
             time: '20:30',
         },
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
             date: '2026-05-18',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Дворец спорта "Арктика"',
+            date: '2026-05-29',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-29',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Дворец спорта "Арктика"',
+            date: '2026-05-29',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-29',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-19',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-19',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-27',
+            time: '20:30',
+        },
+        {
+            title: 'На всякого мудреца довольно простоты',
+            category: 'cinema', 
+            organizer: 'Театр драмы им. В. Маяковского',
+            date: '2026-05-27',
             time: '20:30',
         },
 
@@ -93,11 +210,6 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
             ? events
             : events.filter(e => selectedCategories.includes(e.category));
 
-    const categoryMap: Record<string, string> = {
-        theatre: 'Театр',
-        cinema: 'Кино',
-        museum: 'Музей',
-    };
     const formatDisplayDate = (dateStr: string) => {
         const [year, month, day] = dateStr.split('-');
             return `${day}.${month}.${year}`;
@@ -170,8 +282,25 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         str = str.replace(' г.', '');
         return str.charAt(0).toUpperCase() + str.slice(1);
     };
-    const handlePrevMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+
+   const handlePrevMonth = () => {
+        const today = new Date();
+
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+
+        const todayMonth = today.getMonth();
+        const todayYear = today.getFullYear();
+
+        const isCurrentMonth =
+            currentMonth === todayMonth &&
+            currentYear === todayYear;
+
+        if (isCurrentMonth) return;
+
+        setCurrentDate(
+            prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+        );
     };
 
     const handleNextMonth = () => {
@@ -191,16 +320,11 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         setSelectedCategories(values);
     };//для фильтра категорий
 
-    const groupByCategory = (events: EventItem[]) => {
-        return events.reduce((acc, event) => {
-            if (!acc[event.category]) {
-                acc[event.category] = [];
-            }
-            acc[event.category].push(event);
-            return acc;
-        }, {} as Record<string, EventItem[]>);
-    };
+    const today = new Date();
 
+    const isPrevDisabled =
+        currentDate.getMonth() === today.getMonth() &&
+        currentDate.getFullYear() === today.getFullYear();
 
     return (
         <Modal
@@ -290,16 +414,20 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                     : '';
                             const today = new Date();
                             const hasEvents = dateStr && eventsByDate[dateStr];
+                            const eventsCount = dateStr && eventsByDate[dateStr]
+                                ? eventsByDate[dateStr].length
+                                : 0;
+                            const groupedEvents =
+                                dateStr && eventsByDate[dateStr]
+                                    ? groupByOrganizer(eventsByDate[dateStr])
+                                    : null;
                             const currentMonth = currentDate.getMonth();
                             const currentYear = currentDate.getFullYear();
 
                             const todayMonth = today.getMonth();
                             const todayYear = today.getFullYear();
-                            const groupedEvents =
-                                dateStr && eventsByDate[dateStr]
-                                    ? groupByCategory(eventsByDate[dateStr])
-                                    : null;
-                            let bgColor = '#E2E8F0';
+                            
+                            let bgColor = '#EAEAEA';
                             let textColor = 'gray.500';
 
                             if (item.type === 'current') {
@@ -321,17 +449,34 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                 }
 
                                 if (isFutureMonth) {
-                                    bgColor = '#4C6BE6';
+                                    if (eventsCount <= 1) {
+                                        bgColor = '#6F8CFF'; // красный
+                                    } else if (eventsCount <= 3) {
+                                        bgColor = '#0021A6'; // желтый
+                                    } else {
+                                        bgColor = '#000E47'; // зеленый
+                                    }
+
                                     textColor = 'white';
                                 }
 
                                 if (isCurrentMonth) {
-                                    bgColor =
-                                        item.day < today.getDate()
-                                            ? '#A3B3F2'
-                                            : '#4C6BE6';
+                                    // прошедшие дни
+                                    if (item.day < today.getDate()) {
+                                        bgColor = '#C9D4FF';
+                                        textColor = 'white';
+                                    } else {
+                                        // будущие дни текущего месяца
+                                        if (eventsCount <= 1) {
+                                            bgColor = '#6F8CFF';
+                                        } else if (eventsCount <= 3) {
+                                            bgColor = '#0021A6';
+                                        } else {
+                                            bgColor = '#000E47';
+                                        }
 
-                                    textColor = 'white';
+                                        textColor = 'white';
+                                    }
                                 }
                             }
 
@@ -375,7 +520,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                         // left="50%"
                                         // transform="translate(-50%, -120%)"
                                         {...tooltipStyle}
-                                        bg="#22212C"
+                                        bg="#34333C"
                                         color="white"
                                         p={3}
                                         borderRadius="xl"
@@ -392,15 +537,19 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                         {/* Белый бокс */}
                                         <Box bg="white" color="black" borderRadius="lg" p={2} textAlign="left">
                                         {groupedEvents &&
-                                            Object.entries(groupedEvents).map(([category, events]) => (
-                                                <Box key={category} mb={2}>
-                                                    {/* Категория ОДИН РАЗ */}
-                                                    <Text fontWeight="bold" fontSize="12px" mb={1}>
-                                                        {categoryMap[category]}
+                                            Object.entries(groupedEvents).map(([organizer, events]) => (
+                                                <Box key={organizer} mb={2}>
+                                                    {/* Организатор */}
+                                                    <Text
+                                                        fontWeight="bold"
+                                                        fontSize="13px"
+                                                        mb={1}
+                                                    >
+                                                        {organizer}
                                                     </Text>
 
-                                                    {/* События внутри категории */}
-                                                    {events.map((e, idx) => (
+                                                    {/* События */}
+                                                    {events.map((event, idx) => (
                                                         <Flex
                                                             key={idx}
                                                             justify="space-between"
@@ -409,17 +558,19 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                                             mb={1}
                                                         >
                                                             <Text fontSize="10px">
-                                                                {e.title}
+                                                                {event.title}
                                                             </Text>
 
-                                                            <Text fontSize="10px" whiteSpace="nowrap">
-                                                                {e.time}
+                                                            <Text
+                                                                fontSize="10px"
+                                                                whiteSpace="nowrap"
+                                                            >
+                                                                {event.time}
                                                             </Text>
                                                         </Flex>
                                                     ))}
                                                 </Box>
-                                            ))
-                                        }
+                                            ))}
                                         </Box>
                                     </Box>
                                 )}
@@ -430,39 +581,118 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                 </Box>
 
                 <Flex justify="space-between" align="center" mt={6}>
-                    <SelectRoot
-                        width="180px"
-                        display="inline-block"
-                        className="light"
-                        size={{ base: 'sm', md: 'md' }}
-                        multiple
-                        collection={categories}
-                        bg="white"
-                        overflow="hidden"
-                        borderRadius="full"
-                        onValueChange={(e) => handleCategoryChange(e.value)}
-                    >
-                        <SelectTrigger>
-                            <Box
-                                textWrap="nowrap"
-                                px={2}
-                                py={2}
-                                fontSize={{ base: '8px', sm: "12px", md: 'sm' }}
-                                color="black"
-                                cursor="pointer"
-                            >
-                                Все события
-                            </Box>
-                        </SelectTrigger>
+                    <Flex gap={3}>
+                        {/* Все события */}
+                        <SelectRoot
+                            width="180px"
+                            display="inline-block"
+                            className="light"
+                            size={{ base: 'sm', md: 'md' }}
+                            multiple
+                            collection={categories}
+                            bg="white"
+                            overflow="hidden"
+                            borderRadius="full"
+                            onValueChange={(e) => handleCategoryChange(e.value)}
+                        >
+                            <SelectTrigger>
+                                <Box
+                                    textWrap="nowrap"
+                                    px={2}
+                                    py={2}
+                                    fontSize={{ base: '8px', sm: "12px", md: 'sm' }}
+                                    color="black"
+                                    cursor="pointer"
+                                >
+                                    Все события
+                                </Box>
+                            </SelectTrigger>
 
-                        <SelectContent borderRadius="xl">
-                            {categories.items.map(category => (
-                                <SelectItem item={category} key={category.value}>
-                                    {category.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </SelectRoot>
+                            <SelectContent borderRadius="xl">
+                                {categories.items.map(category => (
+                                    <SelectItem item={category} key={category.value}>
+                                        {category.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </SelectRoot>
+
+                        {/* Возрастное ограничение */}
+                        <Box position="relative">
+                        {/* Кнопка */}
+                        <Button
+                            bg="white"
+                            color="black"
+                            borderRadius="full"
+                            fontSize={{ base: '8px', sm: '12px', md: 'sm' }}
+                            px={4}
+                            py={2}
+                            onClick={() => setIsAgeOpen(prev => !prev)}
+                            _hover={{ bg: 'white' }}
+                            _active={{ bg: 'white' }}
+                        >
+                            {selectedAge ? `${selectedAge}+` : 'Возраст'}
+                        </Button>
+
+                        {/* Выпадающий список */}
+                        
+                            <Box
+                                position="absolute"
+                                bottom="110%"
+                                left={0}
+                                bg="white"
+                                borderRadius="xl"
+                                p={3}
+                                boxShadow="lg"
+                                zIndex={100}
+                                minW="130px"
+                                opacity={isAgeOpen ? 1 : 0}
+                                transform={isAgeOpen ? 'translateY(0)' : 'translateY(10px)'}
+                                transition="all 0.2s ease"
+                                pointerEvents={isAgeOpen ? 'auto' : 'none'}
+                            >
+                                <Flex direction="column" gap={2}>
+                                    {['0', '6', '12', '16', '18'].map(age => (
+                                        <Flex
+                                            key={age}
+                                            align="center"
+                                            gap={2}
+                                            cursor="pointer"
+                                            onClick={() => {
+                                                setSelectedAge(age);
+                                                setIsAgeOpen(false);
+                                            }}
+                                        >
+                                            <Box
+                                                w="16px"
+                                                h="16px"
+                                                border="2px solid"
+                                                borderColor="gray.400"
+                                                borderRadius="full"
+                                                display="flex"
+                                                alignItems="center"
+                                                justifyContent="center"
+                                            >
+                                                {selectedAge === age && (
+                                                    <Box
+                                                        w="8px"
+                                                        h="8px"
+                                                        bg="blue.500"
+                                                        borderRadius="full"
+                                                    />
+                                                )}
+                                            </Box>
+
+                                            <Text color="black">
+                                                {age}+
+                                            </Text>
+                                        </Flex>
+                                    ))}
+                                </Flex>
+                            </Box>
+                        
+                    </Box>
+                    </Flex>
 
                     {/* 🔹 Правая часть — кнопки */}
                     <Flex gap={2}>
@@ -471,6 +701,8 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                             p={1}
                             borderRadius="full"
                             variant="ghost"
+                            opacity={isPrevDisabled ? 0.4 : 1}
+                            cursor={isPrevDisabled ? 'default' : 'pointer'}
                             _hover={{ bg: "transparent" }}
                             _active={{ bg: "transparent" }}
                         >

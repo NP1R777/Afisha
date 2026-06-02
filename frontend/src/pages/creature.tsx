@@ -1,4 +1,4 @@
-import { Box, Button, createListCollection, Flex, Input, Stack, Text, Textarea, useBreakpointValue } from '@chakra-ui/react';
+import { Box, Button, createListCollection, Flex, Input, Stack, Text, Textarea, useBreakpointValue, Image } from '@chakra-ui/react';
 import { FormEvent, useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import Modal from 'react-modal';
@@ -6,6 +6,9 @@ import { Field } from '../components/ui/field';
 import { SelectContent, SelectItem, SelectRoot, SelectTrigger } from '../components/ui/select';
 import axios from '../shared/lib/axios';
 import { Toaster, toaster } from "../components/ui/toaster"
+import ticket from '../pictures/ticket.png';
+import EventCalendarModal from '../modal/calendar';
+import calendarIcon from '../pictures/calend.png';
 
 interface FormValues {
   name: string;
@@ -39,6 +42,48 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
+  const [selectedCategoryLabel, setSelectedCategoryLabel] = useState('Категория');
+
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedCityLabel, setSelectedCityLabel] = useState('Район мероприятия');
+
+  const [selectedAgeLimit, setSelectedAgeLimit] = useState('');
+  const [selectedAgeLabel, setSelectedAgeLabel] = useState('Возрастное органичен.');
+
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false); //для календаря
+
+  const districts = createListCollection({
+    items: [
+      { label: 'Норильск', value: 'Норильск' },
+      { label: 'Талнах', value: 'Талнах' },
+      { label: 'Кайеркан', value: 'Кайеркан' },
+    ],
+  });
+
+  const ageLimits = createListCollection({
+    items: [
+      { label: '0+', value: '0' },
+      { label: '6+', value: '6' },
+      { label: '12+', value: '12' },
+      { label: '16+', value: '16' },
+      { label: '18+', value: '18' },
+    ],
+  });
+
+  const handleAgeChange = (details: any) => {
+    const value = details.value[0];
+
+    setSelectedAgeLimit(value);
+
+    const selectedItem = ageLimits.items.find(
+      item => item.value === value
+    );
+
+    if (selectedItem) {
+      setSelectedAgeLabel(selectedItem.label);
+    }
+  };
+
   const onSubmit = handleSubmit(async data => {
     try {
       if (!selectedCategoryId) {
@@ -61,21 +106,46 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
     }
   });
 
+  const handleDistrictChange = (details: any) => {
+    const value = details.value[0];
+
+    setSelectedCity(value);
+
+    const selectedItem = districts.items.find(
+      item => item.value === value
+    );
+
+    if (selectedItem) {
+      setSelectedCityLabel(selectedItem.label);
+    }
+  };
   const categories = createListCollection({
-    items: [
-      { label: 'Театр', value: '1' },
-      { label: 'Кино', value: '3' },
-      { label: 'Спорт', value: '5' },
-      { label: 'Культура', value: '6' },
-      { label: 'Музыка', value: '7' },
+  items: [
+    { label: 'Театр', value: '1' },
+    { label: 'Кино', value: '3' },
+    { label: 'Спорт', value: '5' },
+    { label: 'Культура', value: '6' },
+    { label: 'Музыка', value: '7' },
+    { label: 'Юмор', value: '8' },
+    { label: 'Образование', value: '9' },
+    { label: 'Благотворительность', value: '10' },
+    { label: 'Городские праздники', value: '11' },
     ],
   });
 
-  const handleCategoryChange = (event: FormEvent<HTMLDivElement>) => {
-    const value = (event.target as HTMLSelectElement).value;
-    setSelectedCategoryId(value);
-    console.log('Выбранная категория ID:', value);
-  };
+const handleCategoryChange = (details: any) => {
+  const value = details.value[0];
+
+  setSelectedCategoryId(value);
+
+  const selectedItem = categories.items.find(
+    item => item.value === value
+  );
+
+  if (selectedItem) {
+    setSelectedCategoryLabel(selectedItem.label);
+  }
+};
 
   const topValue = useBreakpointValue({ base: '60%', md: '50%' });
   return (
@@ -86,7 +156,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
       style={{
         overlay: {
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 2,
+          zIndex: 100,
         },
         content: {
           top: topValue,
@@ -144,18 +214,22 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
               </Field>
 
               <SelectRoot
-                multiple
                 collection={categories}
-                size={{ base: 'xs', md: 'md'}}
+                size={{ base: 'xs', md: 'md' }}
                 width={{ base: '220px', md: '250px' }}
                 bg="white"
                 overflow="hidden"
                 borderRadius="10px"
-                onChange={handleCategoryChange}
+                onValueChange={handleCategoryChange}
               >
                 <SelectTrigger>
-                  <Box as="span" fontSize={{ base: '13px', md: '15px' }} color="GrayText" cursor="pointer">
-                    Все события
+                  <Box
+                    as="span"
+                    fontSize={{ base: '13px', md: '14px' }}
+                    color={selectedCategoryId ? 'black' : 'GrayText'}
+                    cursor="pointer"
+                  >
+                    {selectedCategoryLabel}
                   </Box>
                 </SelectTrigger>
                 <SelectContent>
@@ -168,12 +242,34 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
               </SelectRoot>
 
               <Field invalid={!!errors.city} errorText={errors.city?.message}>
-                <Input
-                  {...register('city', { required: 'Введите Норилськ, Талнах, Кайеркан и т.д.)' })}
+                <SelectRoot
+                  collection={districts}
+                  size={{ base: 'xs', md: 'md' }}
+                  width={{ base: '220px', md: '250px' }}
                   bg="white"
-                  placeholder="Район мероприятия"
+                  overflow="hidden"
                   borderRadius="10px"
-                />
+                  onValueChange={handleDistrictChange}
+                >
+                  <SelectTrigger>
+                    <Box
+                      as="span"
+                      fontSize={{ base: '13px', md: '14px' }}
+                      color={selectedCity ? 'black' : 'GrayText'}
+                      cursor="pointer"
+                    >
+                      {selectedCityLabel}
+                    </Box>
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {districts.items.map(district => (
+                      <SelectItem item={district} key={district.value}>
+                        {district.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectRoot>
               </Field>
 
               <Field invalid={!!errors.location} errorText={errors.location?.message}>
@@ -196,15 +292,16 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
 
               <Field invalid={!!errors.price} errorText={errors.price?.message}>
                 <Input
-                  {...register('price', {
-                    required: 'Введите цену посещения мероприятия',
+                  {...register('price', 
+                    {
+                    // required: 'Введите цену посещения мероприятия',
                     pattern: {
                       value: /^\d+$/,
                       message: 'Пожалуйста, введите только цифры',
                     },
                   })}
                   bg="white"
-                  placeholder="Цена"
+                  placeholder="Цена на мероприятие от  "
                   borderRadius="10px"
                 />
               </Field>
@@ -213,7 +310,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
             <Stack width={{ base: '100%', md: '46%' }}>
               <Field invalid={!!errors.pictures_url} errorText={errors.pictures_url?.message} flex="0 0 auto">
                 <Input
-                  {...register('pictures_url', { required: 'Введите URL вертикальной картинки' })}
+                  // {...register('pictures_url', { required: 'Введите URL вертикальной картинки' })}
                   bg="white"
                   placeholder="Вертикальная картинка"
                   borderRadius="10px"
@@ -225,65 +322,111 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
 
               <Field invalid={!!errors.external_url} errorText={errors.external_url?.message}>
                 <Input
-                  {...register('external_url', { required: 'Введите ссылку на ваш сервис' })}
+                  // {...register('external_url', { required: 'Введите ссылку на ваш сервис' })}
                   bg="white"
-                  placeholder="Ссылка на источник"
+                  placeholder="Ссылка на организатора"
                   borderRadius="10px"
                 />
               </Field>
               <Field invalid={!!errors.age_limit} errorText={errors.age_limit?.message}>
-                <Input
-                  {...register('age_limit', {
-                    required: 'Введите возрастное ограничение',
-                    pattern: {
-                      value: /^(0|6|12|16|18)$/,
-                      message: 'Возрастное ограничение должно быть одним из следующих значений: 0, 6, 12, 16, 18',
-                    },
-                  })}
+                <SelectRoot
+                  collection={ageLimits}
+                  size={{ base: 'xs', md: 'md' }}
+                  width={{ base: '220px', md: '250px' }}
                   bg="white"
-                  placeholder="Возрастное ограничение"
+                  overflow="hidden"
                   borderRadius="10px"
-                />
+                  onValueChange={handleAgeChange}
+                >
+                  <SelectTrigger>
+                    <Box
+                      as="span"
+                      fontSize={{ base: '13px', md: '14px' }}
+                      color={selectedAgeLimit ? 'black' : 'GrayText'}
+                      cursor="pointer"
+                    >
+                      {selectedAgeLabel}
+                    </Box>
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {ageLimits.items.map(age => (
+                      <SelectItem item={age} key={age.value}>
+                        {age.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </SelectRoot>
               </Field>
 
               <Field invalid={!!errors.duration} errorText={errors.duration?.message}>
                 <Input
+                  type="time"
                   {...register('duration', {
-                    required: 'Введите время начала вашего мероприятия',
-                    pattern: {
-                      value: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/,
-                      message: 'Пожалуйста, введите время в формате ЧЧ:ММ',
-                    },
+                    required: 'Введите время начала мероприятия',
                   })}
                   bg="white"
-                  placeholder="Время начала"
                   borderRadius="10px"
                 />
               </Field>
-
               <Field invalid={!!errors.date_event} errorText={errors.date_event?.message}>
-                <Input
-                  {...register('date_event', {
-                    required: 'Введите дату начала мероприятия',
-                    min: {
-                      value: new Date().toISOString().split('T')[0],
-                      message: 'Дата начала мероприятия должна быть в будущем',
-                    },
-                  })}
-                  bg="white"
-                  type="date"
-                  min={new Date().toISOString().split('T')[0]}
-                  borderRadius="10px"
-                />
+                <Flex gap="2" align="center">
+                  <Input
+                    width="200px"
+                    {...register('date_event', {
+                      required: 'Введите дату начала мероприятия',
+                      min: {
+                        value: new Date().toISOString().split('T')[0],
+                        message: 'Дата начала мероприятия должна быть в будущем',
+                      },
+                    })}
+                    bg="white"
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    borderRadius="10px"
+                  />
+
+                  <Button
+                    minW={{ base: '40px', md: '40px' }}
+                    h={{ base: '40px', md: '40px' }}
+                    p="0"
+                    bg="white"
+                    borderRadius="10px"
+                    _hover={{
+                      bg: '#4C6BE6',
+                    }}
+                    onClick={() => setIsCalendarModalOpen(true)}
+                  >
+                    <Image
+                      src={calendarIcon}
+                      alt="calendar"
+                      boxSize={{ base: '20px', md: '24px' }}
+                      objectFit="contain"
+                    />
+                  </Button>
+                </Flex>
               </Field>
             </Stack>
           </Flex>
+
+          {/* <Flex justify="center" mt={{ base: '2', md: '4' }}>
+            <Box width={{ base: '80%', md: '50%' }}>
+              <Field invalid={!!errors.description} errorText={errors.description?.message}>
+                <Textarea
+                  {...register('description', { required: 'Введите описание мероприятия' })}
+                  bg="white"
+                  placeholder="Описание мероприятия"
+                  borderRadius="10px"
+                />
+              </Field>
+            </Box>
+          </Flex> */}
 
           <Flex justify="center" mt={{ base: '2', md: '4' }}>
             <Box width={{ base: '80%', md: '50%' }}>
               <Field invalid={!!errors.description} errorText={errors.description?.message}>
                 <Textarea
-                  {...register('description', { required: 'Введите описание мероприятия' })}
+                  // {...register('description', { required: 'Введите описание мероприятия' })}
                   bg="white"
                   placeholder="Описание мероприятия"
                   borderRadius="10px"
@@ -311,7 +454,12 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
           </Flex>
         </form>
       </Box>
+      <EventCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+      />
     </Modal>
+    
   );
 };
 

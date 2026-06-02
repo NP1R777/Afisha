@@ -83,7 +83,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openReg
         style={{
           overlay: {
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 2,
+            zIndex: 100,
           },
           content: {
             top: '50%',
@@ -149,7 +149,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openReg
           <Text
             mt="3"
             color="#A0A0A4"
-            _hover={{ cursor: 'pointer' }}
+            _hover={{ textDecoration: 'underline', cursor: 'pointer' }}
             onClick={() => {
               openRegisterModal();
               handleClose();
