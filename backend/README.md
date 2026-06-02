@@ -66,12 +66,121 @@ alembic upgrade head
 alembic downgrade -1  # откат на одну миграцию назад
 ```
 
+## Создание и восстановление дампа БД
+
+Для переноса проекта на другую машину можно сначала восстановить БД из дампа, а затем запускать backend.
+
+### 1) Создание дампа
+
+Скрипт читает `DB_*` переменные из `.env` (или из переменных окружения) и формирует SQL-дамп с командами создания БД.
+
+```bash
+python scripts/create_db_dump.py
+```
+
+По умолчанию дамп сохраняется в `backend/db_dumps/<DB_NAME>_<timestamp>.sql`.
+
+Дополнительно:
+
+```bash
+python scripts/create_db_dump.py --env-file .env --output-dir ./db_dumps --dump-name afisha_prod
+```
+
+### 2) Восстановление БД из дампа
+
+На машине, где нужно поднять проект:
+
+1. Скопируйте файл дампа.
+2. Подготовьте `.env` с корректными `DB_*` параметрами.
+3. Выполните восстановление:
+
+```bash
+python scripts/restore_db_dump.py --dump-file ./db_dumps/afisha_prod.sql
+```
+
+По умолчанию восстановление выполняется через служебную БД `postgres` (`--maintenance-db postgres`).
+
+### 3) Запуск backend после восстановления
+
+```bash
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+`alembic upgrade head` можно оставлять в процессе запуска — если схема уже актуальна, новые миграции просто не применятся.
+
 ## Документация API
 
 После запуска приложения доступна автоматически сгенерированная документация:
 
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+## Парсер мероприятий (staging)
+
+В проект добавлен ручной парсер источников, который сохраняет данные в отдельную таблицу `parsed_event`.
+
+### Миграция
+
+Перед использованием обязательно примените миграции:
+
+```bash
+alembic upgrade head
+```
+
+### Доступные endpoint'ы
+
+- `GET /parser/sources` — список подключенных источников;
+- `POST /parser/run` — запуск парсинга вручную;
+- `GET /parser/events` — просмотр собранных событий из staging-таблицы.
+
+### Подключенные источники
+
+- `northdrama` — Заполярный театр драмы;
+- `gck` — Городской центр культуры;
+- `norilsk_official` — Официальный сайт Норильска;
+- `sg_afisha` — Афиша Северного города (reserve);
+- `cinema_arthall` — Кинотеатр Арт-Холл;
+- `cinema_rodina` — Кинотеатр Родина;
+- `arena_norilsk` — ТРЦ Арена-Норильск;
+- `museum_norilsk_vmuzey` — Музей Норильска (ВМузей);
+- `gallery_norilsk_vmuzey` — Художественная галерея (ВМузей);
+- `talnah_museum_vmuzey` — Талнахский филиал МВК «Музей Норильска» (ВМузей);
+- `norilsk_art_college_vk` — Норильский колледж искусств (VK, первые 20 постов);
+- `talnah_dshi_news` — Талнахская детская школа искусств (раздел Новости);
+- `nordshi_afisha` — Норильская детская школа искусств (разделы Афиша → Концерты и Афиша → События).
+
+### Дополнительно по новым источникам
+
+- `norilsk_art_college_vk` работает в режиме HTML-парсинга (без API-ключа).
+- Если VK отдает динамический shell/anti-bot вместо постов, источник вернет ошибку парсинга.
+- Источники `vmuzey.com` могут быть защищены anti-bot challenge. В таком случае можно передать proxy/cookies через настройки окружения.
+- Для vmuzey-источников добавлен HTML fallback через страницу афиши Музея Норильска (`https://norilskmuseum.ru/afisha/`), если `vmuzey.com` временно недоступен из-за anti-bot.
+
+### Переменные окружения для внешних источников парсинга
+
+```bash
+# vmuzey anti-bot bypass (опционально)
+VMUZEY_PROXY=
+VMUZEY_COOKIES=
+VMUZEY_USER_AGENT=
+```
+
+- `VMUZEY_PROXY` — URL прокси в формате `http://user:pass@host:port`;
+- `VMUZEY_COOKIES` — cookie-строка вида `name=value; name2=value2`;
+- `VMUZEY_USER_AGENT` — пользовательский User-Agent для запросов к vmuzey.
+
+### Пример запуска парсинга
+
+```bash
+curl -X POST "http://localhost:8000/parser/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_keys": ["northdrama", "gck", "norilsk_official"],
+    "include_reserve": false,
+    "max_events_per_source": 100
+  }'
+```
 
 ## Разработка
 
