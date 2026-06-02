@@ -536,11 +536,11 @@ const handleClearDate = () => {
             fontWeight={500}
             lineHeight={1}
             
-            fontSize={{ xl: '64px', lg: '32px', sm:"30px", base: '16px' }}
+            fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
             alignSelf="center"
             fontFamily="Unbounded"
           >
-            Мероприятий
+            Норильска
           </Heading>
           <Text
             fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
