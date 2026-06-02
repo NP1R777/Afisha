@@ -3,6 +3,7 @@ annotated-types==0.7.0
 anyio==4.4.0
 async-timeout==4.0.3
 asyncpg==0.29.0
+beautifulsoup4==4.14.3
 click==8.1.7
 databases==0.9.0
 dnspython==2.7.0
@@ -22,6 +23,7 @@ pydantic==2.9.1
 pydantic-settings==2.5.2
 pydantic_core==2.23.3
 python-dotenv==1.0.1
+requests==2.33.1
 python-jose==3.3.0
 rsa==4.9
 six==1.16.0

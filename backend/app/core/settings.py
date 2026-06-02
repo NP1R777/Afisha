@@ -20,7 +20,12 @@ class AppSettings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire: int = 5
     refresh_token_expire: int = 30
-    
+
+    # Настройки внешних источников парсинга
+    vmuzey_proxy: Optional[str] = None
+    vmuzey_cookies: Optional[str] = None
+    vmuzey_user_agent: Optional[str] = None
+
     root_path: str = ''
 
     class Config:
