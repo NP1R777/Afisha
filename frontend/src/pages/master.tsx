@@ -1,6 +1,6 @@
 import { Box, Button, createListCollection, Flex, Grid, Heading, HStack, Image, Text, useMediaQuery, VStack} from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
@@ -111,6 +111,17 @@ const Frame = () => {
       Math.max(prev - itemsPerPage, 0)
     );
   };
+
+  const filteredEventsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+  if (selectedCategories.length > 0 && filteredEventsRef.current) {
+    filteredEventsRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+}, [selectedCategories]);
   // const fetchCategories = async () => {
   //   try {
   //     const response = await axios.get('/event/event_list');
@@ -419,7 +430,7 @@ const handleClearDate = () => {
                     color="black"
                     cursor="pointer"
                   >
-                    Все события
+                    Категории
                   </Box>
                 </SelectTrigger>
                 <SelectContent borderRadius="xl">
@@ -773,7 +784,14 @@ const handleClearDate = () => {
             }
             console.log(`Rendering category ${category.name} with events:`, filteredEvents);
             return (
-              <Box mt={4} key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+              <Box ref={
+                    selectedCategories.length > 0 &&
+                    selectedCategories.includes(category.id.toString())
+                      ? filteredEventsRef
+                      : null
+                  }
+                  scrollMarginTop="110px"
+                  mt={4} key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
                 <Heading
                   lineHeight={1}
                   fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
