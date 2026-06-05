@@ -1,13 +1,26 @@
 from datetime import date
 from core.session import get_db
 from typing import Optional, List
-from sqlalchemy import select, and_
-from src.event.schemas import EventIn
-from database.models import Events, GroupsEvent
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
+from src.event.schemas import EventIn, EventTimeIn
+from database.models import CityEnum, EventGroupsEvent, Events, GroupsEvent, TimesEvent
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 router = APIRouter()
+
+
+def _parse_city(raw_city: Optional[str]) -> Optional[CityEnum]:
+    if raw_city is None:
+        return None
+    try:
+        return CityEnum(raw_city)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"city должен быть одним из: {', '.join(item.value for item in CityEnum)}",
+        )
 
 @router.post(
     '/event/create_event',
@@ -24,38 +37,66 @@ async def create_event(
         db_connect: AsyncSession = Depends(get_db)
 ):
     event_data = event.dict()
+    group_ids = sorted(set(event_data.get("group_ids") or []))
+    if not group_ids:
+        raise HTTPException(status_code=422, detail="Нужно передать минимум одну категорию в group_ids")
+
+    existing_group_ids = set(
+        (
+            await db_connect.execute(
+                select(GroupsEvent.id).where(GroupsEvent.id.in_(group_ids))
+            )
+        ).scalars().all()
+    )
+    missing_group_ids = sorted(set(group_ids) - existing_group_ids)
+    if missing_group_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Не найдены категории: {missing_group_ids}",
+        )
+
     event_add = Events(
         name=event_data['name'],
         description=event_data['description'],
-        location=event_data['location'],
-        group_id=event_data['group_id'],
-        external_url=event_data['external_url'],
-        date_event=event_data['date_event'],
-        duration=event_data['duration'],
+        organization=event_data['organization'],
+        city=_parse_city(event_data['city']),
         price=event_data['price'],
         address=event_data['address'],
-        city=event_data['city'],
         age_limit=event_data['age_limit'],
-        picture_url=event_data['picture_url'],
-        horizontal_picture_url=event_data['horizontal_picture_url']
+        pictures_main=event_data['pictures_main'],
+        pictures_two=event_data['pictures_two'],
+        external_url=event_data['external_url'],
     )
     db_connect.add(event_add)
     await db_connect.flush()
-    await db_connect.refresh(event_add)
+
+    for group_id in group_ids:
+        db_connect.add(EventGroupsEvent(event_id=event_add.id, groups_id=group_id))
+
+    times_payload = event_data.get("times") or []
+    for item in times_payload:
+        db_connect.add(
+            TimesEvent(
+                event_id=event_add.id,
+                date_event=item["date_event"],
+                start_time=item["start_time"],
+            )
+        )
+
+    await db_connect.flush()
     return EventIn(
         name=event_add.name,
         description=event_add.description,
-        location=event_add.location,
-        group_id=event_add.group_id,
-        external_url=event_add.external_url,
-        date_event=event_add.date_event,
-        duration=event_add.duration,
+        organization=event_add.organization,
+        city=event_add.city.value if event_add.city else None,
         price=event_add.price,
         address=event_add.address,
-        city=event_add.city,
         age_limit=event_add.age_limit,
-        picture_url=event_add.picture_url,
-        horizontal_picture_url=event_add.horizontal_picture_url
+        pictures_main=event_add.pictures_main,
+        pictures_two=event_add.pictures_two,
+        external_url=event_add.external_url,
+        group_ids=group_ids,
+        times=[EventTimeIn(**item) for item in times_payload],
     )
 
 
@@ -72,64 +113,35 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
                          group_id: Optional[List[int]] = Query(None),
                          date_event: Optional[List[date]] = Query(None),
                          city: Optional[List[str]] = Query(None)):
-    events = (await db_connect.execute(select(Events))).scalars().all()
+    query = (
+        select(Events)
+        .where(Events.deleted_at.is_(None))
+        .options(
+            selectinload(Events.group_links),
+            selectinload(Events.time_slots),
+        )
+    )
+
+    if group_id:
+        query = query.join(EventGroupsEvent).where(EventGroupsEvent.groups_id.in_(group_id))
+
+    if date_event:
+        query = query.join(TimesEvent).where(func.date(TimesEvent.date_event).in_(date_event))
+
+    if city:
+        city_values = [_parse_city(item) for item in city]
+        query = query.where(Events.city.in_(city_values))
+
+    events = (
+        await db_connect.execute(
+            query.distinct().order_by(Events.id.desc())
+        )
+    ).scalars().all()
 
     if not events:
         raise HTTPException(status_code=404, detail="Мероприятия не были найдены!")
-    else:
-        if group_id is None and date_event is None and city is None:
-            return events
 
-        elif group_id is not None and date_event is None and city is None:
-            return (await db_connect.execute(select(Events).filter(
-                Events.group_id.in_(group_id)
-            ))).scalars().all()
-
-        elif date_event is not None and city is None and group_id is None:
-            return (await db_connect.execute(select(Events).filter(
-                Events.date_event.in_(date_event)
-            ))).scalars().all()
-
-        elif city is not None and date_event is None and group_id is None:
-            return (await db_connect.execute(select(Events).filter(
-                Events.city.in_(city)
-            ))).scalars().all()
-
-        else:
-            if group_id is not None and date_event is not None and city is None:
-                filtered_events = (await db_connect.execute(select(Events).filter(
-                    and_(
-                        Events.group_id.in_(group_id),
-                        Events.date_event.in_(date_event)
-                    )
-                ))).scalars().all()
-
-            elif group_id is not None and city is not None and date_event is None:
-                filtered_events = (await db_connect.execute(select(Events).filter(
-                    and_(
-                        Events.group_id.in_(group_id),
-                        Events.city.in_(city)
-                    )
-                ))).scalars().all()
-
-            elif date_event is not None and city is not None and group_id is None:
-                filtered_events = (await db_connect.execute(select(Events).filter(
-                    and_(
-                        Events.date_event.in_(date_event),
-                        Events.city.in_(city)
-                    )
-                ))).scalars().all()
-
-            else:
-                filtered_events = (await db_connect.execute(select(Events).filter(
-                    and_(
-                        Events.date_event.in_(date_event),
-                        Events.city.in_(city),
-                        Events.group_id.in_(group_id)
-                    )
-                ))).scalars().all()
-
-        return filtered_events
+    return events
 
 
 @router.get(
@@ -161,13 +173,20 @@ async def get_event_by_id(event_id: int,
 )
 async def get_event_category_by_id(event_id: int,
                                    db_connect: AsyncSession = Depends(get_db)):
-    event = (await db_connect.execute(select(Events).filter(Events.id == event_id))).scalar()
+    event = (await db_connect.execute(select(Events).filter(Events.id == event_id))).scalar_one_or_none()
     if event is None:
         raise HTTPException(status_code=404,  detail="Нет такого мероприятия!")
-    else:
-        category_event = (await db_connect.execute(select(GroupsEvent).filter(
-            GroupsEvent.id == event.group_id))).scalar()
-        if category_event is None:
-            raise HTTPException(status_code=404, detail="Данные не были получены!")
-        else:
-            return category_event.name
+
+    categories = (
+        await db_connect.execute(
+            select(GroupsEvent.name)
+            .join(EventGroupsEvent, EventGroupsEvent.groups_id == GroupsEvent.id)
+            .where(EventGroupsEvent.event_id == event_id)
+            .order_by(GroupsEvent.name.asc())
+        )
+    ).scalars().all()
+
+    if not categories:
+        raise HTTPException(status_code=404, detail="Данные не были получены!")
+
+    return categories
