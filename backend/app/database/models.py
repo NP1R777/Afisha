@@ -30,14 +30,13 @@ class User(Base):
     update_at: datetime = Column(TIMESTAMP(timezone=False), server_default=NOW_AT_UTC,
                                                 nullable=True, onupdate=NOW_AT_UTC, autoincrement=True)
     deleted_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
-    username: str = Column(VARCHAR, nullable=False, unique=True)
-    password_hash: str = Column(VARCHAR, nullable=False)
-    preferences: list = Column(ARRAY(Integer), nullable=True)
+    username: str = Column(String, nullable=False, unique=True)
+    password_hash: str = Column(String, nullable=False)
+    preferences: list = Column(ARRAY(Integer), nullable=True) # Предпочтения пользователей по категориям.
     refresh_token: str = Column(String, nullable=True)
     email: str = Column(String, nullable=True)
-    is_org: bool = Column(Boolean, nullable=True)
     date_of_birth: str = Column(String, nullable=True)
-    like_events: list = Column(ARRAY(Integer), default=list)
+    like_events: list = Column(ARRAY(Integer), default=list) # id мероприятий в избранном.
 
 
 class Events(Base):
@@ -48,19 +47,20 @@ class Events(Base):
     update_at: datetime = Column(TIMESTAMP(timezone=False), server_default=NOW_AT_UTC,
                                             nullable=True, autoincrement=True)
     deleted_at: datetime = Column(TIMESTAMP, nullable=True)
-    name: str = Column(VARCHAR, nullable=False)
-    description: str = Column(VARCHAR)
-    group_id: int = Column(Integer, ForeignKey("group_event.id"), nullable=True)
-    external_url: str = Column(VARCHAR)
-    date_event: date = Column(DATE, nullable=True)
-    location: str = Column(String, nullable=True)
-    duration: time = Column(TIME, nullable=True)
+    name: str = Column(String, nullable=False)
+    description: str = Column(String)
     city: str = Column(String, nullable=True)
     price: int = Column(Integer, nullable=True)
-    address: str = Column(VARCHAR, nullable=True)
-    age_limit: str = Column(VARCHAR, nullable=True)
-    picture_url: str = Column(VARCHAR, nullable=True)
-    horizontal_picture_url: str = Column(VARCHAR, nullable=True)
+    address: str = Column(String, nullable=True)
+    organization: str = Column(String, nullable=True)
+    age_limit: str = Column(String, nullable=True)
+    main_picture_url: str = Column(String, nullable=True)
+    second_picture_url: str = Column(String, nullable=True)
+    horizontal_picture_url: str = Column(String, nullable=True)
+    event_external_url: str = Column(String, nullable=True)
+
+    #group_id: int = Column(Integer, ForeignKey("group_event.id"), nullable=True) # Связь для получения категории мероприятия.
+    #times_event_id: int = Column(Integer, ForeignKey("times_event.id"), nullable=True) # Связь для получения даты и времени мероприятия.
 
 
 class GroupsEvent(Base):
@@ -73,7 +73,7 @@ class GroupsEvent(Base):
     deleted_at: datetime = Column(TIMESTAMP, nullable=True)
     name: str = Column(VARCHAR, nullable=False)
     description: str = Column(VARCHAR, nullable=True)
-    # event_id: int = Column(Integer, ForeignKey("event.id"), nullable=True)
+    list_events: list = Column(ARRAY(Integer), default=list)
 
 
 class UserToEvent(Base):
@@ -82,17 +82,24 @@ class UserToEvent(Base):
     created_at: datetime = Column(TIMESTAMP, nullable=False, autoincrement=True)
     update_at: datetime = Column(TIMESTAMP, nullable=False, autoincrement=True)
     deleted_at: datetime = Column(TIMESTAMP)
+
     user_id: int = Column(Integer, ForeignKey("user.id"), nullable=True)
     event_id: int = Column(Integer, ForeignKey("event.id"), nullable=True)
-    date_event: date = Column(DATE, nullable=True)
 
 
-class InfoOrg(Base):
-    __tablename__ = "info_org"
-    id: int = Column(Integer, primary_key=True)
-    user_id: int = Column(Integer, ForeignKey("user.id"), nullable=True)
-    organization: str = Column(String, nullable=True)
-    phone_number: str = Column(String, nullable=True)
+class InfoOrganization(Base):
+    __tablename__ = "info_organization"
+    id: int = Column(Integer, ForeignKey("event.organization"), primary_key=True)
+    created_at: datetime = Column(TIMESTAMP(timezone=False), server_default=NOW_AT_UTC,
+                                                 nullable=True, autoincrement=True)
+    update_at: datetime = Column(TIMESTAMP(timezone=False), server_default=NOW_AT_UTC,
+                                                nullable=True, onupdate=NOW_AT_UTC, autoincrement=True)
+    deleted_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
+    name_org: str = Column(String, nullable=True)
+    address: str = Column(String, nullable=True)
+    list_events_org: list = Column(ARRAY(Integer), default=list)
+    list_news: list = Column(ARRAY(Integer), default=list)
+
 
 
 class ParsedEvent(Base):
