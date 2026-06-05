@@ -7,7 +7,6 @@ import RegisterModal from '../pages/registration';
 import fon from '../pictures/fon2.png';
 import axios from '../shared/lib/axios';
 import { Toaster, toaster } from "../components/ui/toaster"
-import EVENTS from '../shared/config/mock.json';
 import EventImage from '../pictures/picture1.png';
 import star_empty from '../pictures/Star1.png';
 import star_full from '../pictures/Star2.png';
@@ -39,43 +38,95 @@ const Events = () => {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
 
-  const toggleFavorite = (index: number) => {
-    setFavorites((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  };
+  const toggleFavorite = async (index: number) => {
 
-  // useEffect(() => {
-  //   const fetchEventDetails = async () => {
-  //     try {
-  //       const response = await axios.get(`/event/event{id}/?event_id=${eventId}`);
-  //       setEventDetails(response.data);
-  //     } catch (error) {
-  //       console.error('Error fetching event details:', error);
-  //     }
-  //   };
-
-  //   if (eventId) {
-  //     fetchEventDetails();
-  //   }
-  // }, [eventId]);
-useEffect(() => {
-  if (eventId) {
-    const event = EVENTS.events.find((e) => e.id === Number(eventId));
-    if (event) {
-      // Преобразуем данные из мок-файла в EventDetails
-      const eventDetails: EventDetails = {
-        ...event,
-        picture_url: event.pictures_url, // переименование
-        group_id: String(event.group_id), // или Number, если нужно
-      };
-      setEventDetails(eventDetails);
-    } else {
-      console.error('Мероприятие не найдено');
-    }
+  if (!userId) {
+    setIsLoginOpen(true);
+    return;
   }
-}, [eventId]);
+
+  setFavorites((prev) => ({
+    ...prev,
+    [index]: !prev[index],
+  }));
+
+  try {
+
+    await axios.patch(
+      `/user/add_like_events`,
+      null,
+      {
+        params: {
+          user_id: userId,
+          event_id: eventId,
+        },
+      }
+    );
+
+    toaster.success({
+      title: 'Мероприятие добавлено в избранное',
+      duration: 3000,
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Ошибка добавления в избранное:',
+      error
+    );
+
+    toaster.error({
+      title: 'Ошибка добавления в избранное',
+      duration: 3000,
+    });
+  }
+};
+
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      try {
+
+        const response = await axios.get(
+          `/event/event{id}/?event_id=${eventId}`
+        );
+
+        console.log('EVENT DETAILS:', response.data);
+
+        const data = response.data;
+
+        const normalizedEvent: EventDetails = {
+          ...data,
+
+          picture_url:
+            data.picture_url ||
+            data.pictures_url ||
+            '',
+
+          horizontal_picture_url:
+            data.horizontal_picture_url || '',
+
+          group_id: String(data.group_id),
+
+          date_event: Array.isArray(data.date_event)
+            ? data.date_event
+            : [data.date_event],
+        };
+
+        setEventDetails(normalizedEvent);
+
+      } catch (error) {
+        console.error(
+          'Ошибка загрузки мероприятия:',
+          error
+        );
+      }
+    };
+
+    if (eventId) {
+      fetchEventDetails();
+    }
+
+  }, [eventId]);
 
   if (!eventDetails) {
     return <Text>Loading...</Text>;
@@ -119,7 +170,6 @@ useEffect(() => {
     }
   }
   };
-
 
   const formattedAgeLimit = eventDetails.age_limit.endsWith('+') ? eventDetails.age_limit : `${eventDetails.age_limit}+`;
 
