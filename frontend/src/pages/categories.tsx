@@ -1,23 +1,15 @@
 import { Box, Flex, Heading, Button, Image } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from '../shared/lib/axios';
 import icon from '../pictures/icon.png';
 import Modal from 'react-modal';
 import { useUser } from '../addition/context';
 import { useNavigate } from 'react-router-dom';
 
-const items = [
-  { value: 'theatre', title: 'Театр', id: 1 },
-  { value: 'cinema', title: 'Кино', id: 3 },
-  { value: 'music', title: 'Музыка', id: 7 },
-  { value: 'culture', title: 'Культура', id: 6 },
-  { value: 'sports', title: 'Спорт', id: 5 },
-  { value: 'humor', title: 'Юмор', id: 8 },
-  { value: 'education', title: 'Образование', id: 9 },
-  { value: 'charity', title: 'Благотворительность', id: 10 },
-  { value: 'city_holidays', title: 'Городские праздники', id: 11 },
-];
-
+interface Category {
+  id: number;
+  name: string;
+}
 interface CategoriesModalProps {
   isOpen: boolean;
   onRequestClose: () => void;
@@ -27,32 +19,79 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
   const { userId } = useUser();
   const navigate = useNavigate();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const handleCategoryClick = (value: string) => {
     setSelectedCategories(prev => (prev.includes(value) ? prev.filter(category => category !== value) : [...prev, value]));
   };
 
+  useEffect(() => {
+
+    const fetchCategories = async () => {
+
+      try {
+
+        const response = await axios.get(
+          '/event/event_list'
+        );
+
+        console.log(
+          'CATEGORIES:',
+          response.data
+        );
+
+        setCategories(response.data);
+
+      } catch (error) {
+
+        console.error(
+          'Ошибка загрузки категорий:',
+          error
+        );
+      }
+    };
+
+    fetchCategories();
+
+  }, []);
+
   const handleSubmit = async () => {
+
     if (!userId) {
       console.error('User ID not found');
       return;
     }
 
     const selectedCategoryIds = selectedCategories
-      .map(category => {
-        const item = items.find(item => item.value === category);
+      .map(categoryName => {
+
+        const item = categories.find(
+          item => item.name === categoryName
+        );
+
         return item ? item.id : null;
       })
       .filter(id => id !== null);
 
     try {
-      await axios.patch(`/user/update_preferences?user_id=${userId}`, {
-        preferences: selectedCategoryIds,
-      });
+
+      await axios.patch(
+        `/user/update_preferences?user_id=${userId}`,
+        {
+          preferences: selectedCategoryIds,
+        }
+      );
+
       onRequestClose();
+
       navigate('/account');
+
     } catch (error) {
-      console.error('Ошибка при обновлении категорий:', error);
+
+      console.error(
+        'Ошибка при обновлении категорий:',
+        error
+      );
     }
   };
 
@@ -99,10 +138,10 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
           категории мероприятий
         </Heading>
         <Flex wrap="wrap" justify="center" gap={5} mt="20px" >
-          {items.map(item => (
+          {categories.map(item => (
             <Button
-              key={item.value}
-              onClick={() => handleCategoryClick(item.value)}
+              key={item.id}
+              onClick={() => handleCategoryClick(item.name)}
               bg="#FFFFFF"
               color="#22212C"
               fontSize={{ base: '15px', md:'17px',lg:'19px'}}
@@ -110,14 +149,14 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
               padding="15px"
               px={5}
               py={6}
-              boxShadow={selectedCategories.includes(item.value) ? '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)' : 'none'}
+              boxShadow={selectedCategories.includes(item.name) ? '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)' : 'none'}
               _hover={{
                 boxShadow: '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)',
               }}
               borderRadius="10px"
               width="auto"
             >
-              {item.title}
+              {item.name}
             </Button>
           ))}
         </Flex>

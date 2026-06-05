@@ -34,13 +34,20 @@ interface Event {
   horizontal_picture_url: string | null;
 }
 
+interface Category {
+  id: number;
+  name: string;
+}
+
 const Account = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { username, userId, setEmail, setBirthdate, categories, setCategories,setUsername } = useUser();
   const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
+  const [isOrganizer, setIsOrganizer] = useState(false);
   const [isOrganizerRegisterOpen, setIsOrganizerRegisterOpen] = useState(false);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => {
@@ -73,209 +80,105 @@ const Account = () => {
 
   
   const fetchUserData = async () => {
-    if (userId) {
-      try {
-        const response = await axios.get(`/user/get_user?user_id=${userId}`);
-        const data = await response.data;
-        setCategories(data.preferences);
-        if (data.email) {
-          setEmail(data.email);
-        }
 
-        if (data.date_of_birth) {
-          setBirthdate(data.date_of_birth);
-        }
-      } catch (error) {
-        console.error('Ошибка при получении данных пользователя:', error);
+    if (!userId) return;
+
+    try {
+
+      const response = await axios.get(
+        `/user/get_user?user_id=${userId}`
+      );
+
+      const data = response.data;
+
+      console.log('USER DATA:', data);
+
+      if (data.username) {
+        setUsername(data.username);
       }
+
+      if (data.email) {
+        setEmail(data.email);
+      }
+
+      if (data.date_of_birth) {
+        setBirthdate(data.date_of_birth);
+      }
+
+      setCategories(data.preferences || []);
+
+      setIsOrganizer(data.is_organizer || false);
+
+    } catch (error) {
+
+      console.error(
+        'Ошибка при получении данных пользователя:',
+        error
+      );
     }
   };
 
   const fetchEvents = async () => {
-    if (userId) {
-      try {
-        const response = await axios.get(`/user/get_like_events?user_id=${userId}`);
-        const data = await response.data;
-        const flattenedEvents = data.flat();
-        setEvents(flattenedEvents);
-      } catch (error) {
-        console.error('Ошибка при получении данных о мероприятиях:', error);
-      }
+
+    if (!userId) return;
+
+    try {
+
+      const response = await axios.get(
+        `/user/get_like_events?user_id=${userId}`
+      );
+
+      const data = response.data;
+
+      console.log('LIKED EVENTS:', data);
+
+      const flattenedEvents = Array.isArray(data[0])
+        ? data.flat()
+        : data;
+
+      setEvents(flattenedEvents);
+
+    } catch (error) {
+
+      console.error(
+        'Ошибка при получении мероприятий:',
+        error
+      );
     }
   };
 
-  // useEffect(() => { временно мок данные заменяют 
-  //   fetchUserData();
-  //   fetchEvents();
-  // }, [userId]);
+  useEffect(() => {
+    fetchUserData();
+    fetchEvents();
+  }, [userId]);
 
-  const mockUser = {
-  username: 'Lada',
-  email: 'vlada@gmail.com',
-  birthdate: '2004-03-29',
-  isOrganizer: true,
-};
+  const fetchCategories = async () => {
+    try {
 
-const isOrganizer = mockUser.isOrganizer;
+      const response = await axios.get(
+        '/event/event_list'
+      );
 
-useEffect(() => {
-  setUsername(mockUser.username);
-  setEmail(mockUser.email);
-  setBirthdate(mockUser.birthdate);
+      setAllCategories(response.data);
 
-  setCategories([
-    '1', // Театр
-    '3', // Кино
-    '7', // Музыка
-    '6', // Культура
-    '5', // Спорт
-    '8', // Юмор
-    '9', // Образование
-    '10', // Благотворительность
-    '11', // Городские праздники
-  ]);
+    } catch (error) {
 
-  // MOCK EVENTS
-  setEvents([
-    {
-      id: 1,
-      name: 'Большой симфонический концерт',
-      created_at: '2026-05-01',
-      update_at: '2026-05-01',
-      group_id: 1,
-      date_event: '2026-06-15T18:00:00',
-      duration: '19:00:00',
-      price: 2500,
-      address: 'г. Москва, ул. Тверская, 12',
-      picture_url:
-        'https://images.unsplash.com/photo-1507838153414-b4b713384a76?q=80&w=1200&auto=format&fit=crop',
-      deleted_at: null,
-      description: 'Лучшие произведения мировой классики.',
-      external_url: 'https://example.com',
-      location: 'Концертный зал "Россия"',
-      city: 'Москва',
-      age_limit: '12',
-      horizontal_picture_url: null,
-    },
-    {
-      id: 9,
-      name: "Волки и овцы",
-      description: "«Разве кругом нас люди живут?.. Волки да овцы. Волки кушают овец, а овцы смиренно позволяют себе кушать…» - так рассуждает один из героев комедии А.Н. Островского, созданной в далеком 1875-м. Время идет, и мораль тех, кто живет в поисках успеха и богатства, становится только изощреннее. Зная, что граница между хищниками и их жертвами все менее известна, так что они смотрят, как они друг на друга, как в зеркало, наслаждаясь крайне опасным общением. Страсти вокруг молодой богатой вдовушки Евлампии Купавиной – это и комедия, и мелодрама, и детектив. Охота за рождает множество плутовских планов и сюжетов, но когда в расчеты вмешиваются еще и «нежные чувства» - трудно разобрать, где волки, где овцы… Так что правда в народе говорят: «любит волка, ловят и волка» или «волки умерли, но и волков умерли» … Постановка спектакля проводится в рамках партийного проекта Культура малой Родины.",
-      location: "Норильский Заполярный театр драмы им. В. Маяковского",
-      group_id: 1,
-      external_url: "https://www.northdrama.ru/repertuar/volki-i-ovczy",
-      date_event: '2026-01-29T19:00:00',
-      duration: "19:00:00",
-      address: "Ленинский пр., 34",
-      city: "Норильск",
-      age_limit: "12",
-      picture_url: "https://www.northdrama.ru/wp-content/uploads/2023/10/afisha_volki-i-ovczy_sajt-543x768.png",
-      horizontal_picture_url: "https://www.northdrama.ru/wp-content/uploads/2023/10/dsc_6706-1024x681.jpg",
-      created_at: '2026-05-01',
-      update_at: '2026-05-01',
-      price: 2500,
-      deleted_at: null,
-    },
-    {
-    id: 1,
-    name: 'Призрак в доспехах (дубляж Студийная Банда) ',
-    description:
-      'Культовое аниме о будущем, кибернетике и искусственном интеллекте.',
-    location: 'КДЦ им. Вл. Высоцкого',
-    group_id: 2,
-    external_url:
-      'https://xn----dtbdb3ad1abbz6ce6d.xn--p1ai',
-    date_event: '2026-06-15T21:30:00',
-    duration: '21:30:00',
-    price: 200,
-    address: 'ул. Строителей, 17',
-    city: 'Талнах',
-    age_limit: '18',
-    picture_url:
-      'https://avatars.mds.yandex.net/get-kinopoisk-image/10768063/5a1103cf-1e9f-4e90-9113-81f0961c969c/600x900',
-    horizontal_picture_url:
-      'https://avatars.mds.yandex.net/get-kinopoisk-post-img/4964913/b3e8cb9fd6cdfbe43addae212e4071f3/1920x1080',
-    created_at: '2026-05-01',
-    update_at: '2026-05-01',
-    deleted_at: null,
-  },
+      console.error(error);
+    }
+  };
 
-  {
-    id: 2,
-    name: 'Щелкунчик',
-    description:
-      'Знаменитая рождественская история о Мари и волшебном мире.',
-    location: 'Норильский театр драмы',
-    group_id: 1,
-    external_url:
-      'https://www.northdrama.ru/repertuar/shhelkunchik',
-    date_event: '2026-07-03T11:00:00',
-    duration: '11:00:00',
-    price: 350,
-    address: 'Ленинский пр., 34',
-    city: 'Норильск',
-    age_limit: '6',
-    picture_url:
-      'https://www.northdrama.ru/wp-content/uploads/2022/04/shhelkunchik.png',
-    horizontal_picture_url:
-      'https://www.northdrama.ru/wp-content/uploads/2022/04/21_0.jpg',
-    created_at: '2026-05-01',
-    update_at: '2026-05-01',
-    deleted_at: null,
-  },
-
-  {
-    id: 3,
-    name: 'Волки и овцы',
-    description:
-      'Комедия Островского о человеческой жадности, хитрости и любви.',
-    location: 'Норильский театр драмы',
-    group_id: 1,
-    external_url:
-      'https://www.northdrama.ru/repertuar/volki-i-ovczy',
-    date_event: '2026-08-20T19:00:00',
-    duration: '19:00:00',
-    price: 500,
-    address: 'Ленинский пр., 34',
-    city: 'Норильск',
-    age_limit: '12',
-    picture_url:
-      'https://www.northdrama.ru/wp-content/uploads/2023/10/afisha_volki-i-ovczy_sajt-543x768.png',
-    horizontal_picture_url:
-      'https://www.northdrama.ru/wp-content/uploads/2023/10/dsc_6706-1024x681.jpg',
-    created_at: '2026-05-01',
-    update_at: '2026-05-01',
-    deleted_at: null,
-  },
-  ]);
-}, []);
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   const imageSrc = useBreakpointValue({ base: com2, lg: com });
 
-const getPreferenceText = (preferenceId: number): string => {
-  switch (preferenceId) {
-    case 1:
-      return 'Театр';
-    case 3:
-      return 'Кино';
-    case 5:
-      return 'Спорт';
-    case 6:
-      return 'Культура';
-    case 7:
-      return 'Музыка';
-    case 8:
-      return 'Юмор';
-    case 9:
-      return 'Образование';
-    case 10:
-      return 'Благотворительность';
-    case 11:
-      return 'Городские праздники';
-    default:
-      return 'Неизвестное предпочтение';
-  }
-};
+  const getPreferenceText = (id: number) => {
+
+    return allCategories.find(
+      (category) => category.id === id
+    )?.name || 'Неизвестно';
+  };
 
   const formatTime = (time: string) => {
     return time.substring(0, 5);
@@ -292,6 +195,7 @@ const getPreferenceText = (preferenceId: number): string => {
     }
     return name;
   };
+
   return (
     <ContainerFluid>
       <Toaster />

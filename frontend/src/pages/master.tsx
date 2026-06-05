@@ -417,7 +417,7 @@ const handleClearDate = () => {
                     color="black"
                     cursor="pointer"
                   >
-                    Все события
+                    Категории
                   </Box>
                 </SelectTrigger>
                 <SelectContent borderRadius="xl">
