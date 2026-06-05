@@ -29,6 +29,11 @@ class ParseLaunchRequest(BaseModel):
     max_events_per_source: int = Field(default=100, ge=1, le=500)
 
 
+class ParseDistributeRequest(BaseModel):
+    limit: int = Field(default=200, ge=1, le=1000)
+    source_key: Optional[str] = None
+
+
 class ParseRunStats(BaseModel):
     source_key: str
     source_name: str
@@ -74,6 +79,16 @@ class ParseLaunchResponse(BaseModel):
     total_duplicates: int
     total_errors: int
     stats: list[ParseRunStats]
+
+
+class ParseDistributeResponse(BaseModel):
+    requested: int
+    processed_events: int
+    processed_news: int
+    unknown: int
+    duplicates_deleted: int
+    errors: int
+    cleaned_deleted: int
 
 
 class ParsedEventListResponse(BaseModel):
