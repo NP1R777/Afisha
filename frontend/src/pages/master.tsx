@@ -17,7 +17,6 @@ import wave from '../pictures/wave31.png';
 import axios from '../shared/lib/axios';
 import { ContainerFluid } from '../components/ui/container';
 import cross from '../pictures/cross.png';
-import EVENTS from '../shared/config/mock.json';
 import EventImage from '../pictures/picture.png';
 import EventCalendarModal from '../modal/calendar';
 
@@ -49,7 +48,14 @@ interface EventCategory {
 }
 
 const Frame = () => {
-  const { userId, categories: userCategories, setUsername, searchQuery } = useUser();
+    const {
+      userId,
+      categories: userCategories,
+      setUsername,
+      searchQuery,
+      isAuthenticated
+    } = useUser();
+
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [categoriesFromBackend, setCategoriesFromBackend] = useState<EventCategory[]>([]);
   const [eventsByCategory, setEventsByCategory] = useState<Record<number, Event[]>>({});
@@ -111,68 +117,60 @@ const Frame = () => {
       Math.max(prev - itemsPerPage, 0)
     );
   };
-  // const fetchCategories = async () => {
-  //   try {
-  //     const response = await axios.get('/event/event_list');
-  //     const categories = response.data;
-  //     setCategoriesFromBackend(categories);
 
-  //     const eventsMap: Record<number, Event[]> = {};
-  //     await Promise.all(
-  //       categories.map(async (category: EventCategory) => {
-  //         try {
-  //           const selectedLabels = selectedDistricts
-  //             .filter((value): value is string => value !== undefined)
-  //             .map(value => districtItems.find(item => item.value === value)?.label)
-  //             .filter(label => label !== undefined);
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/event/event_list');
 
-  //           const districtFilter = selectedLabels.length
-  //             ? selectedLabels.map(district => `city=${district}`).join('&')
-  //             : '';
+      console.log('CATEGORIES:', response.data);
 
-  //           const dateFilter = formattedDate ? `date_event=${formattedDate}` : '';
+      const categories = response.data;
 
-  //           const filters = [districtFilter, dateFilter].filter(Boolean).join('&');
+      setCategoriesFromBackend(categories);
 
-  //           const url = filters
-  //             ? `/event/events?group_id=${category.id}&${filters}`
-  //             : `/event/events?group_id=${category.id}`;
+      const eventsMap: Record<number, Event[]> = {};
 
-  //           const res = await axios.get(url);
-  //           const events = res.data;
+      await Promise.all(
+        categories.map(async (category: EventCategory) => {
+          try {
+            const res = await axios.get(
+              `/event/events?group_id=${category.id}`
+            );
 
-  //           events.sort((a: Event, b: Event) => new Date(a.date_event).getTime() - new Date(b.date_event).getTime());
-  //           eventsMap[category.id] = res.data;
-  //         } catch (error) {
-  //           console.error(`Ошибка при загрузке мероприятий для категории ${category.name}:`, error);
-  //         }
-  //       })
-  //     );
-  //     setEventsByCategory(eventsMap);
-  //   } catch (error) {
-  //     console.error('Ошибка при загрузке категорий:', error);
-  //   }
-  // };
+            console.log(
+              `EVENTS FOR CATEGORY ${category.name}:`,
+              res.data
+            );
 
-  // useEffect(() => {
-  //   Modal.setAppElement('#root');
-  //   fetchCategories();
-  // }, [selectedDistricts, formattedDate]);
+            const events = res.data;
+
+            events.sort(
+              (a: Event, b: Event) =>
+                new Date(a.date_event[0]).getTime() -
+                new Date(b.date_event[0]).getTime()
+            );
+
+            eventsMap[category.id] = events;
+          } catch (error) {
+            console.error(
+              `Ошибка загрузки событий категории ${category.name}:`,
+              error
+            );
+          }
+        })
+      );
+
+      setEventsByCategory(eventsMap);
+
+    } catch (error) {
+      console.error('Ошибка загрузки категорий:', error);
+    }
+  };
 
   useEffect(() => {
     Modal.setAppElement('#root');
-    setCategoriesFromBackend(EVENTS.categories);
-    const eventsMap: Record<number, Event[]> = {};
-    EVENTS.categories.forEach((category) => {
-      const filteredEvents = EVENTS.events
-        .filter((event) => event.group_id === category.id)
-        .map((event) => ({
-          ...event,
-          picture_url: event.pictures_url, 
-        }));
-      eventsMap[category.id] = filteredEvents;
-    });
-    setEventsByCategory(eventsMap);
+
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -290,9 +288,10 @@ const handleClearDate = () => {
     }
   });
 
-  const personalizedEvents = EVENTS.events
+  const personalizedEvents = Object.values(eventsByCategory)
+    .flat()
     .filter(event => {
-      const category = EVENTS.categories.find(
+      const category = categoriesFromBackend.find(
         category => category.id === event.group_id
       );
 
@@ -304,7 +303,6 @@ const handleClearDate = () => {
         new Date(b.date_event[0]).getTime()
     )
     .slice(0, 12);
-
 
   return (
     <ContainerFluid>
@@ -620,7 +618,7 @@ const handleClearDate = () => {
             города
           </Box>
         </Grid>
-        {personalizedEvents.length > 0 && (
+        {isAuthenticated && personalizedEvents.length > 0 && (
           <Box mt={9} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
             <Heading
               lineHeight={1}

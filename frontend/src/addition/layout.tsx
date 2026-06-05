@@ -1,5 +1,5 @@
 import { Button, Flex, HStack, Image, Input, Separator, Stack, Text,Box } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LuSearch } from 'react-icons/lu';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useUser } from '../addition/context';
@@ -17,6 +17,12 @@ const Layout = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
+    useEffect(() => {
+      console.log('===== AUTH DEBUG =====');
+      console.log('isAuthenticated:', isAuthenticated);
+      console.log('username from localStorage:', localStorage.getItem('username'));
+      console.log('======================');
+    }, [isAuthenticated]);
     const openModal = () => {
         setIsOpen(true);
     };
@@ -60,7 +66,6 @@ const Layout = () => {
     const value = event.target.value;
     setSearchQuery(value);
   };
-
 
   return (
     <>
