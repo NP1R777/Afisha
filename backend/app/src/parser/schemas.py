@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,10 @@ class ParsedEventCreate(BaseModel):
     organization: Optional[str] = None
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
+    target_type: Optional[Literal["event", "news", "unknown"]] = None
+    process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
+    processed_at: Optional[datetime] = None
+    error_text: Optional[str] = None
 
 
 class ParseLaunchRequest(BaseModel):
@@ -56,6 +60,10 @@ class ParsedEventOut(BaseModel):
     organization: Optional[str] = None
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
+    target_type: Optional[Literal["event", "news", "unknown"]] = None
+    process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
+    processed_at: Optional[datetime] = None
+    error_text: Optional[str] = None
     created_at: Optional[datetime] = None
 
 

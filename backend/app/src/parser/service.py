@@ -83,6 +83,10 @@ async def run_parse_and_store(
                     organization=parsed_item.organization,
                     age_limit=parsed_item.age_limit,
                     external_url=parsed_item.external_url,
+                    target_type=parsed_item.target_type or "unknown",
+                    process_status=parsed_item.process_status or "new",
+                    processed_at=parsed_item.processed_at,
+                    error_text=parsed_item.error_text,
                 )
             )
             inserted += 1
@@ -147,6 +151,10 @@ async def list_parsed_events(
                 organization=item.organization,
                 age_limit=item.age_limit,
                 external_url=item.external_url,
+                target_type=item.target_type.value if item.target_type else None,
+                process_status=item.process_status.value if item.process_status else None,
+                processed_at=item.processed_at,
+                error_text=item.error_text,
                 created_at=item.created_at,
             )
             for item in rows
