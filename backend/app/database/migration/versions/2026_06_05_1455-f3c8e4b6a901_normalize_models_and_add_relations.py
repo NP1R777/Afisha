@@ -230,6 +230,12 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("news_pkey")),
     )
 
+    # Legacy schemas may already contain old link tables with the same names.
+    # Recreate them in normalized form to avoid DuplicateTable errors.
+    op.execute("DROP TABLE IF EXISTS event_groups_event CASCADE")
+    op.execute("DROP TABLE IF EXISTS user_groups_event CASCADE")
+    op.execute("DROP TABLE IF EXISTS user_to_event CASCADE")
+
     op.create_table(
         "user_to_event",
         sa.Column("user_id", sa.Integer(), nullable=False),
