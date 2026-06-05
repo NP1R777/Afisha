@@ -25,6 +25,31 @@ def upgrade() -> None:
     parsed_process_status_enum = sa.Enum(
         "new", "processed", "rejected", "error", name="parsed_process_status_enum"
     )
+    role_enum_ref = sa.Enum("user", "admin", "organizator", name="role_enum", create_type=False)
+    city_enum_ref = sa.Enum(
+        "norilsk",
+        "talnah",
+        "kayerkan",
+        "oganeer",
+        "dudinka",
+        name="city_enum",
+        create_type=False,
+    )
+    parsed_target_type_enum_ref = sa.Enum(
+        "event",
+        "news",
+        "unknown",
+        name="parsed_target_type_enum",
+        create_type=False,
+    )
+    parsed_process_status_enum_ref = sa.Enum(
+        "new",
+        "processed",
+        "rejected",
+        "error",
+        name="parsed_process_status_enum",
+        create_type=False,
+    )
 
     bind = op.get_bind()
     role_enum.create(bind, checkfirst=True)
@@ -75,7 +100,7 @@ def upgrade() -> None:
         ),
         sa.Column("deleted_at", sa.TIMESTAMP(timezone=False), nullable=True),
         sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("role", role_enum, server_default="user", nullable=False),
+        sa.Column("role", role_enum_ref, server_default="user", nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("roles_user_id_fkey")),
         sa.PrimaryKeyConstraint("id", name=op.f("roles_pkey")),
         sa.UniqueConstraint("user_id", name=op.f("roles_user_id_key")),
@@ -144,7 +169,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
         sa.Column("organization", sa.Integer(), nullable=True),
-        sa.Column("city", city_enum, nullable=True),
+        sa.Column("city", city_enum_ref, nullable=True),
         sa.Column("price", sa.Float(), nullable=True),
         sa.Column("address", sa.String(), nullable=True),
         sa.Column("age_limit", sa.String(), nullable=True),
@@ -237,11 +262,16 @@ def upgrade() -> None:
 
     op.add_column(
         "parsed_event",
-        sa.Column("target_type", parsed_target_type_enum, server_default="unknown", nullable=False),
+        sa.Column("target_type", parsed_target_type_enum_ref, server_default="unknown", nullable=False),
     )
     op.add_column(
         "parsed_event",
-        sa.Column("process_status", parsed_process_status_enum, server_default="new", nullable=False),
+        sa.Column(
+            "process_status",
+            parsed_process_status_enum_ref,
+            server_default="new",
+            nullable=False,
+        ),
     )
     op.add_column("parsed_event", sa.Column("processed_at", sa.TIMESTAMP(timezone=False), nullable=True))
     op.add_column("parsed_event", sa.Column("error_text", sa.Text(), nullable=True))
