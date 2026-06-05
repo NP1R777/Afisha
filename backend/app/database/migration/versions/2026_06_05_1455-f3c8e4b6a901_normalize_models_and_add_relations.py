@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -19,14 +20,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    role_enum = sa.Enum("user", "admin", "organizator", name="role_enum")
-    city_enum = sa.Enum("norilsk", "talnah", "kayerkan", "oganeer", "dudinka", name="city_enum")
-    parsed_target_type_enum = sa.Enum("event", "news", "unknown", name="parsed_target_type_enum")
-    parsed_process_status_enum = sa.Enum(
-        "new", "processed", "rejected", "error", name="parsed_process_status_enum"
+    role_enum_ref = postgresql.ENUM(
+        "user",
+        "admin",
+        "organizator",
+        name="role_enum",
+        create_type=False,
     )
-    role_enum_ref = sa.Enum("user", "admin", "organizator", name="role_enum", create_type=False)
-    city_enum_ref = sa.Enum(
+    city_enum_ref = postgresql.ENUM(
         "norilsk",
         "talnah",
         "kayerkan",
@@ -35,14 +36,14 @@ def upgrade() -> None:
         name="city_enum",
         create_type=False,
     )
-    parsed_target_type_enum_ref = sa.Enum(
+    parsed_target_type_enum_ref = postgresql.ENUM(
         "event",
         "news",
         "unknown",
         name="parsed_target_type_enum",
         create_type=False,
     )
-    parsed_process_status_enum_ref = sa.Enum(
+    parsed_process_status_enum_ref = postgresql.ENUM(
         "new",
         "processed",
         "rejected",
@@ -51,11 +52,26 @@ def upgrade() -> None:
         create_type=False,
     )
 
-    bind = op.get_bind()
-    role_enum.create(bind, checkfirst=True)
-    city_enum.create(bind, checkfirst=True)
-    parsed_target_type_enum.create(bind, checkfirst=True)
-    parsed_process_status_enum.create(bind, checkfirst=True)
+    op.execute(
+        "DO $$ BEGIN "
+        "CREATE TYPE role_enum AS ENUM ('user', 'admin', 'organizator'); "
+        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+    )
+    op.execute(
+        "DO $$ BEGIN "
+        "CREATE TYPE city_enum AS ENUM ('norilsk', 'talnah', 'kayerkan', 'oganeer', 'dudinka'); "
+        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+    )
+    op.execute(
+        "DO $$ BEGIN "
+        "CREATE TYPE parsed_target_type_enum AS ENUM ('event', 'news', 'unknown'); "
+        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+    )
+    op.execute(
+        "DO $$ BEGIN "
+        "CREATE TYPE parsed_process_status_enum AS ENUM ('new', 'processed', 'rejected', 'error'); "
+        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+    )
 
     op.create_table(
         "users",
