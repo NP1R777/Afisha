@@ -4,12 +4,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.session import get_db, get_settings
 from core.settings import AppSettings
 from src.parser.schemas import (
+    ParseDistributeRequest,
+    ParseDistributeResponse,
     ParseLaunchRequest,
     ParseLaunchResponse,
     ParseSourceInfo,
     ParsedEventListResponse,
 )
-from src.parser.service import list_parsed_events, list_sources, run_parse_and_store
+from src.parser.service import (
+    distribute_parsed_events,
+    list_parsed_events,
+    list_sources,
+    run_parse_and_store,
+)
 
 router = APIRouter(prefix="/parser")
 
@@ -38,6 +45,18 @@ async def run_parser(
         request=payload,
         settings=settings,
     )
+
+
+@router.post(
+    "/distribute",
+    response_model=ParseDistributeResponse,
+    summary="Ручной перенос staging-данных в events/news",
+)
+async def distribute_parser_events(
+    payload: ParseDistributeRequest,
+    db_connect: AsyncSession = Depends(get_db),
+) -> ParseDistributeResponse:
+    return await distribute_parsed_events(db_connect=db_connect, request=payload)
 
 
 @router.get(

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,12 +17,21 @@ class ParsedEventCreate(BaseModel):
     organization: Optional[str] = None
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
+    target_type: Optional[Literal["event", "news", "unknown"]] = None
+    process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
+    processed_at: Optional[datetime] = None
+    error_text: Optional[str] = None
 
 
 class ParseLaunchRequest(BaseModel):
     source_keys: Optional[list[str]] = None
     include_reserve: bool = False
     max_events_per_source: int = Field(default=100, ge=1, le=500)
+
+
+class ParseDistributeRequest(BaseModel):
+    limit: int = Field(default=200, ge=1, le=1000)
+    source_key: Optional[str] = None
 
 
 class ParseRunStats(BaseModel):
@@ -56,6 +65,10 @@ class ParsedEventOut(BaseModel):
     organization: Optional[str] = None
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
+    target_type: Optional[Literal["event", "news", "unknown"]] = None
+    process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
+    processed_at: Optional[datetime] = None
+    error_text: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
@@ -66,6 +79,16 @@ class ParseLaunchResponse(BaseModel):
     total_duplicates: int
     total_errors: int
     stats: list[ParseRunStats]
+
+
+class ParseDistributeResponse(BaseModel):
+    requested: int
+    processed_events: int
+    processed_news: int
+    unknown: int
+    duplicates_deleted: int
+    errors: int
+    cleaned_deleted: int
 
 
 class ParsedEventListResponse(BaseModel):
