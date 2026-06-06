@@ -4,11 +4,14 @@ from typing import Optional
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from core.settings import AppSettings
 from database.models import (
     CityEnum,
+    EventGroupsEvent,
     Events,
+    GroupsEvent,
     InfoOrganization,
     News,
     ParsedEvent,
@@ -17,6 +20,8 @@ from database.models import (
     TimesEvent,
 )
 from src.parser.schemas import (
+    ParseCategoryBackfillRequest,
+    ParseCategoryBackfillResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
     ParseLaunchRequest,
@@ -48,6 +53,12 @@ NEWS_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 DATE_TIME_PATTERN = re.compile(r"\b(\d{1,2}\.\d{1,2}\.\d{4})(?:[,\s]+(\d{1,2}:\d{2}))?\b")
+THEATER_PATTERN = re.compile(r"театр|спектак|драма|постановк|сцена|труппа", flags=re.IGNORECASE)
+CINEMA_PATTERN = re.compile(r"кино|фильм|сеанс|кинопоказ|кинозал|мультфильм", flags=re.IGNORECASE)
+SPORT_PATTERN = re.compile(
+    r"спорт|матч|турнир|соревн|чемпионат|кубок|хоккей|футбол|волейбол|баскетбол",
+    flags=re.IGNORECASE,
+)
 
 
 async def run_parse_and_store(
@@ -153,6 +164,7 @@ async def distribute_parsed_events(
     request: ParseDistributeRequest,
 ) -> ParseDistributeResponse:
     cleaned_deleted = await _cleanup_soft_deleted_parsed(db_connect)
+    group_lookup = await _load_group_lookup(db_connect)
 
     query = (
         select(ParsedEvent)
@@ -193,7 +205,7 @@ async def distribute_parsed_events(
                     duplicates_deleted += 1
                     continue
 
-                await _insert_event_from_parsed(db_connect, item)
+                await _insert_event_from_parsed(db_connect, item, group_lookup=group_lookup)
                 item.target_type = ParsedTargetType.event
                 item.process_status = ParsedProcessStatus.processed
                 item.processed_at = now_utc
@@ -230,6 +242,79 @@ async def distribute_parsed_events(
         duplicates_deleted=duplicates_deleted,
         errors=errors,
         cleaned_deleted=cleaned_deleted,
+    )
+
+
+async def backfill_event_categories(
+    db_connect: AsyncSession,
+    request: ParseCategoryBackfillRequest,
+) -> ParseCategoryBackfillResponse:
+    group_lookup = await _load_group_lookup(db_connect)
+    if not any(group_lookup.values()):
+        return ParseCategoryBackfillResponse(
+            requested=0,
+            linked=0,
+            without_match=0,
+            errors=0,
+        )
+
+    query = (
+        select(Events)
+        .outerjoin(EventGroupsEvent, EventGroupsEvent.event_id == Events.id)
+        .where(
+            Events.deleted_at.is_(None),
+            EventGroupsEvent.event_id.is_(None),
+        )
+        .options(selectinload(Events.organization_rel))
+        .order_by(Events.created_at.asc(), Events.id.asc())
+        .limit(request.limit)
+    )
+    rows = (await db_connect.execute(query)).scalars().all()
+
+    linked = 0
+    without_match = 0
+    errors = 0
+
+    for event in rows:
+        try:
+            category_keys = _detect_category_keys(
+                source_key=None,
+                text_blob=" ".join(
+                    filter(
+                        None,
+                        [
+                            event.name,
+                            event.description,
+                            event.address,
+                            event.external_url,
+                            event.organization_rel.name_org if event.organization_rel else None,
+                        ],
+                    )
+                ),
+            )
+            if not category_keys:
+                without_match += 1
+                continue
+
+            added = await _link_event_categories(
+                db_connect=db_connect,
+                event_id=event.id,
+                category_keys=category_keys,
+                group_lookup=group_lookup,
+            )
+            if added:
+                linked += 1
+            else:
+                without_match += 1
+        except Exception:
+            errors += 1
+
+    await db_connect.flush()
+    return ParseCategoryBackfillResponse(
+        requested=len(rows),
+        linked=linked,
+        without_match=without_match,
+        errors=errors,
     )
 
 
@@ -291,6 +376,86 @@ async def _cleanup_soft_deleted_parsed(db_connect: AsyncSession) -> int:
 
 def _normalize_text(value: Optional[str]) -> str:
     return " ".join((value or "").strip().split()).lower()
+
+
+def _normalize_category_key(name: str) -> Optional[str]:
+    lowered = _normalize_text(name)
+    if not lowered:
+        return None
+    if "театр" in lowered or "спектак" in lowered:
+        return "theater"
+    if "кино" in lowered or "фильм" in lowered:
+        return "cinema"
+    if "спорт" in lowered or "турнир" in lowered or "соревн" in lowered:
+        return "sport"
+    return None
+
+
+async def _load_group_lookup(db_connect: AsyncSession) -> dict[str, list[int]]:
+    rows = (
+        await db_connect.execute(
+            select(GroupsEvent.id, GroupsEvent.name).where(GroupsEvent.deleted_at.is_(None))
+        )
+    ).all()
+    lookup: dict[str, list[int]] = {"theater": [], "cinema": [], "sport": []}
+    for group_id, group_name in rows:
+        key = _normalize_category_key(group_name)
+        if key:
+            lookup[key].append(group_id)
+    return lookup
+
+
+def _detect_category_keys(*, source_key: Optional[str], text_blob: str) -> set[str]:
+    keys: set[str] = set()
+    source = _normalize_text(source_key)
+    text = _normalize_text(text_blob)
+
+    if source:
+        if source in {"northdrama"} or "drama" in source:
+            keys.add("theater")
+        if source in {"cinema_arthall", "cinema_rodina"} or "cinema" in source:
+            keys.add("cinema")
+        if source == "arena_norilsk" or "arena" in source:
+            keys.add("sport")
+
+    if THEATER_PATTERN.search(text):
+        keys.add("theater")
+    if CINEMA_PATTERN.search(text):
+        keys.add("cinema")
+    if SPORT_PATTERN.search(text):
+        keys.add("sport")
+
+    return keys
+
+
+async def _link_event_categories(
+    *,
+    db_connect: AsyncSession,
+    event_id: int,
+    category_keys: set[str],
+    group_lookup: dict[str, list[int]],
+) -> bool:
+    group_ids: set[int] = set()
+    for category_key in category_keys:
+        group_ids.update(group_lookup.get(category_key, []))
+
+    if not group_ids:
+        return False
+
+    existing = (
+        await db_connect.execute(
+            select(EventGroupsEvent.groups_id).where(EventGroupsEvent.event_id == event_id)
+        )
+    ).scalars().all()
+    existing_set = set(existing)
+
+    added = False
+    for group_id in sorted(group_ids):
+        if group_id in existing_set:
+            continue
+        db_connect.add(EventGroupsEvent(event_id=event_id, groups_id=group_id))
+        added = True
+    return added
 
 
 def _classify_target_type(item: ParsedEvent) -> ParsedTargetType:
@@ -484,7 +649,12 @@ async def _is_news_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> boo
     return duplicate is not None
 
 
-async def _insert_event_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> None:
+async def _insert_event_from_parsed(
+    db_connect: AsyncSession,
+    item: ParsedEvent,
+    *,
+    group_lookup: dict[str, list[int]],
+) -> None:
     organization_id = await _get_or_create_organization_id(
         db_connect,
         name=item.organization,
@@ -502,6 +672,28 @@ async def _insert_event_from_parsed(db_connect: AsyncSession, item: ParsedEvent)
     )
     db_connect.add(event)
     await db_connect.flush()
+
+    category_keys = _detect_category_keys(
+        source_key=item.source_key,
+        text_blob=" ".join(
+            filter(
+                None,
+                [
+                    item.name,
+                    item.description,
+                    item.address,
+                    item.external_url,
+                    item.organization,
+                ],
+            )
+        ),
+    )
+    await _link_event_categories(
+        db_connect=db_connect,
+        event_id=event.id,
+        category_keys=category_keys,
+        group_lookup=group_lookup,
+    )
 
     for event_dt, start_time in _extract_schedule(item):
         db_connect.add(

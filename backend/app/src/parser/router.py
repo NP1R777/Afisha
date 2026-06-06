@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.session import get_db, get_settings
 from core.settings import AppSettings
 from src.parser.schemas import (
+    ParseCategoryBackfillRequest,
+    ParseCategoryBackfillResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
     ParseLaunchRequest,
@@ -12,6 +14,7 @@ from src.parser.schemas import (
     ParsedEventListResponse,
 )
 from src.parser.service import (
+    backfill_event_categories,
     distribute_parsed_events,
     list_parsed_events,
     list_sources,
@@ -57,6 +60,18 @@ async def distribute_parser_events(
     db_connect: AsyncSession = Depends(get_db),
 ) -> ParseDistributeResponse:
     return await distribute_parsed_events(db_connect=db_connect, request=payload)
+
+
+@router.post(
+    "/categories/backfill",
+    response_model=ParseCategoryBackfillResponse,
+    summary="Ручная привязка категорий к events без категорий",
+)
+async def backfill_parser_event_categories(
+    payload: ParseCategoryBackfillRequest,
+    db_connect: AsyncSession = Depends(get_db),
+) -> ParseCategoryBackfillResponse:
+    return await backfill_event_categories(db_connect=db_connect, request=payload)
 
 
 @router.get(

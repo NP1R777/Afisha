@@ -34,6 +34,10 @@ class ParseDistributeRequest(BaseModel):
     source_key: Optional[str] = None
 
 
+class ParseCategoryBackfillRequest(BaseModel):
+    limit: int = Field(default=1000, ge=1, le=10000)
+
+
 class ParseRunStats(BaseModel):
     source_key: str
     source_name: str
@@ -89,6 +93,13 @@ class ParseDistributeResponse(BaseModel):
     duplicates_deleted: int
     errors: int
     cleaned_deleted: int
+
+
+class ParseCategoryBackfillResponse(BaseModel):
+    requested: int
+    linked: int
+    without_match: int
+    errors: int
 
 
 class ParsedEventListResponse(BaseModel):
