@@ -133,12 +133,14 @@ alembic upgrade head
 - `GET /parser/sources` — список подключенных источников;
 - `POST /parser/run` — запуск парсинга вручную;
 - `POST /parser/distribute` — перенос записей из `parsed_event` в `events/news` по rule-based классификации;
+- `POST /parser/categories/backfill` — ручная автопривязка категорий для `events` без категорий;
 - `GET /parser/events` — просмотр собранных событий из staging-таблицы.
 
 При переносе:
 - `unknown` остаются в `parsed_event` со статусом `new`;
 - успешно перенесенные записи помечаются `deleted_at`, и удаляются физически после 3 дней при следующем запуске переноса;
 - дубли в целевых таблицах удаляются из `parsed_event` сразу (без soft delete).
+- при переносе в `events` автоматически создаются связи в `event_groups_event`, если по правилам удалось определить категорию.
 
 ### Подключенные источники
 
