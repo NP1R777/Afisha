@@ -11,6 +11,18 @@ from src.news.schemas import NewsOut, NewsUpdate
 router = APIRouter()
 
 
+def _to_news_out(news_item: News) -> NewsOut:
+    return NewsOut(
+        id=news_item.id,
+        created_at=news_item.created_at,
+        update_at=news_item.update_at,
+        deleted_at=news_item.deleted_at,
+        name=news_item.name,
+        address=news_item.address,
+        organizator=news_item.organizator,
+    )
+
+
 @router.get(
     "/news/all",
     response_model=list[NewsOut],
@@ -31,7 +43,7 @@ async def get_all_news(
             .order_by(News.id.desc())
         )
     ).scalars().all()
-    return news_rows
+    return [_to_news_out(item) for item in news_rows]
 
 
 @router.get(
@@ -58,7 +70,7 @@ async def get_news_by_id(
     ).scalar_one_or_none()
     if news_item is None:
         raise HTTPException(status_code=404, detail="Новость не найдена")
-    return news_item
+    return _to_news_out(news_item)
 
 
 @router.patch(
@@ -97,7 +109,7 @@ async def update_news_by_id(
 
     await db_connect.commit()
     await db_connect.refresh(news_item)
-    return news_item
+    return _to_news_out(news_item)
 
 
 @router.delete(
