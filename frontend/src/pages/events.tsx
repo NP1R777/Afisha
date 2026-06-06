@@ -39,48 +39,99 @@ const Events = () => {
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
 
   const toggleFavorite = async (index: number) => {
+    if (!userId) {
+      setIsLoginOpen(true);
+      return;
+    }
 
-  if (!userId) {
-    setIsLoginOpen(true);
-    return;
-  }
+    try {
+      const response = await axios.patch(
+        `/user/add_like_events`,
+        null,
+        {
+          params: {
+            user_id: userId,
+            event_id: eventId,
+          },
+        }
+      );
 
-  setFavorites((prev) => ({
-    ...prev,
-    [index]: !prev[index],
-  }));
+      if (response.status === 200) {
+        setFavorites((prev) => ({
+          ...prev,
+          [index]: true,
+        }));
 
-  try {
-
-    await axios.patch(
-      `/user/add_like_events`,
-      null,
-      {
-        params: {
-          user_id: userId,
-          event_id: eventId,
-        },
+        toaster.success({
+          title: 'Мероприятие добавлено в избранное',
+          duration: 3000,
+        });
       }
-    );
 
-    toaster.success({
-      title: 'Мероприятие добавлено в избранное',
-      duration: 3000,
-    });
+    } catch (error: any) {
 
-  } catch (error) {
+      if (error.response?.status === 409) {
 
-    console.error(
-      'Ошибка добавления в избранное:',
-      error
-    );
+        toaster.create({
+          title: 'Мероприятие уже добавлено в избранное.',
+          description:
+            'Чтобы посмотреть все избранные мероприятия, перейдите в аккаунт пользователя',
+          duration: 4000,
+        });
 
-    toaster.error({
-      title: 'Ошибка добавления в избранное',
-      duration: 3000,
-    });
-  }
-};
+        return;
+      }
+
+      console.error(
+        'Ошибка добавления в избранное:',
+        error
+      );
+
+      toaster.error({
+        title: 'Ошибка добавления в избранное',
+        duration: 3000,
+      });
+    }
+  };
+
+  useEffect(() => {
+    const fetchFavorites = async () => {
+
+      if (!userId || !eventId) return;
+
+      try {
+
+        const response = await axios.get(
+          `/user/get_like_events?user_id=${userId}`
+        );
+
+        const data = response.data;
+
+        const flattenedEvents = Array.isArray(data[0])
+          ? data.flat()
+          : data;
+
+        const isFavorite = flattenedEvents.some(
+          (event: any) => String(event.id) === String(eventId)
+        );
+
+        if (isFavorite) {
+          setFavorites({
+            0: true,
+          });
+        }
+
+      } catch (error) {
+        console.error(
+          'Ошибка загрузки избранных мероприятий:',
+          error
+        );
+      }
+    };
+
+    fetchFavorites();
+
+  }, [userId, eventId]);
 
   useEffect(() => {
     const fetchEventDetails = async () => {
@@ -139,36 +190,17 @@ const Events = () => {
     }
   };
 
-  const handleBookTicket = async () => {
-    if (!userId) {
-      setIsLoginOpen(true);
+  const handleBookTicket = () => {
+    if (!eventDetails.external_url) {
+      toaster.error({
+        title: 'Ссылка на покупку билета отсутствует',
+        duration: 3000,
+      });
+
       return;
     }
 
-    try {
-      const response = await axios.patch(`/user/add_like_events`, null, {
-        params: {
-          user_id: userId,
-          event_id: eventId,
-        },
-      });
-
-      if (response.status === 200) {
-        toaster.success({
-          title: 'Мероприятие успешно добавлено в избранное!',
-          description: 'Чтобы посмотреть все избранные мероприятия, перейдите в аккаунт пользователя',
-          duration: 5000
-        });
-      }
-    } catch (error: any) {
-      if (error.response?.status === 409) {
-        toaster.create({
-          title: 'Мероприятие уже добавлено в избранное.',
-          description: 'Чтобы посмотреть все избранные мероприятия, перейдите в аккаунт пользователя',
-          duration: 5000
-        });
-    }
-  }
+    window.open(eventDetails.external_url, '_blank');
   };
 
   const formattedAgeLimit = `${eventDetails.age_limit || '0'}+`;

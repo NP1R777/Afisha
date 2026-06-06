@@ -1,6 +1,7 @@
 import { Box, Button, createListCollection, Flex, Grid, Heading, HStack, Image, Text, useMediaQuery, VStack} from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState, useRef  } from 'react';
+import { useLocation } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
@@ -80,6 +81,35 @@ const Frame = () => {
   const [isMd, isXl] = useMediaQuery(['(min-width: 768px)', '(min-width: 1280px)'], {
     fallback: [false, false, true],
   });
+  const eventsRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const categoriesRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!searchQuery) return;
+
+    const timer = setTimeout(() => {
+      categoriesRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    if (params.get('scrollToEvents') === 'true') {
+      setTimeout(() => {
+        eventsRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 100);
+    }
+  }, [location]);
 
   const itemsPerPage = (() => {
     if (isXl) return 4;
@@ -295,7 +325,11 @@ const handleClearDate = () => {
           ?.toLowerCase()
           .includes(searchQuery.toLowerCase());
 
-      return matchesSearchQuery;
+      const matchesDistrict =
+        selectedDistricts.length === 0 ||
+        selectedDistricts.includes(event.city?.toLowerCase());
+
+      return matchesSearchQuery && matchesDistrict;
     });
   };
 
@@ -319,6 +353,21 @@ const handleClearDate = () => {
     } else {
       return isCategoryInUserCategories && filteredEvents.length > 0;
     }
+  });
+
+  const hasVisibleEvents = filteredCategories.some(category => {
+    const filteredEvents = filterEventsBySearchQuery(
+      eventsByCategory[category.id] || []
+    );
+
+    if (
+      selectedCategories.length > 0 &&
+      !selectedCategories.includes(category.id.toString())
+    ) {
+      return false;
+    }
+
+    return filteredEvents.length > 0;
   });
 
   const personalizedEvents = Object.values(eventsByCategory)
@@ -764,7 +813,7 @@ const handleClearDate = () => {
                   </motion.div>
                 ))}
             </Flex>
-              {personalizedEvents.length > itemsPerPage && (
+            {personalizedEvents.length > itemsPerPage && (
             <HStack justify="flex-end" w={{ xl: '92%', lg: '88%' }} mt={4}>
               <Button
                 onClick={handlePersonalizedPrev}
@@ -799,7 +848,8 @@ const handleClearDate = () => {
           )}
           </Box>
         )}
-        {filteredCategories.length > 0 ? (
+        <Box ref={categoriesRef}>
+        {hasVisibleEvents ? (
           filteredCategories.map(category => {
             const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
             
@@ -811,7 +861,7 @@ const handleClearDate = () => {
             }
             console.log(`Rendering category ${category.name} with events:`, filteredEvents);
             return (
-              <Box mt={4} id={`category-${category.id}`} scrollMarginTop="120px" key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+              <Box mt={4} id={`category-${category.id}`}  scrollMarginTop="120px" key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
                 <Heading
                   lineHeight={1}
                   fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
@@ -909,7 +959,7 @@ const handleClearDate = () => {
                   )}
                 </Flex>
                 {filteredEvents.length > 0 && (
-                  <HStack justify="flex-end" w={{ xl: '92%', lg: '88%' }} mt={4}>
+                  <HStack justify="flex-end" w={{ xl: '105%', lg: '88%' }} mt={4}>
                     <Button
                       onClick={() => handlePrev(category.id)}
                       disabled={(categoryIndexes[category.id] || 0) === 0}
@@ -953,7 +1003,7 @@ const handleClearDate = () => {
           >
             Упс, ничего не найдено
           </Text>
-        )}
+        )}</Box>
       </Flex>
       <LoginModal
         isOpen={isLoginOpen}

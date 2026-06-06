@@ -180,13 +180,22 @@ const Account = () => {
     )?.name || 'Неизвестно';
   };
 
-  const formatTime = (time: string) => {
+  const formatTime = (time?: string) => {
+    if (!time) return '—';
+
     return time.substring(0, 5);
   };
 
-  const formatAgeLimit = (ageLimit: string) => {
+  const formatAgeLimit = (ageLimit?: string | null) => {
+    if (!ageLimit) {
+      return '0+';
+    }
+
     const trimmedAgeLimit = ageLimit.trim();
-    return /^\d+$/.test(trimmedAgeLimit) ? `${trimmedAgeLimit}+` : ageLimit;
+
+    return /^\d+$/.test(trimmedAgeLimit)
+      ? `${trimmedAgeLimit}+`
+      : trimmedAgeLimit;
   };
 
   const getTruncatedUsername = (name: string) => {
