@@ -171,13 +171,18 @@ const Events = () => {
   }
   };
 
-  const formattedAgeLimit = eventDetails.age_limit.endsWith('+') ? eventDetails.age_limit : `${eventDetails.age_limit}+`;
+  const formattedAgeLimit = `${eventDetails.age_limit || '0'}+`;
 
-  const parsedDates = eventDetails.date_event.map(date => {
-  const [year, month, day] = date.split('-');
+  const parsedDates = (eventDetails.date_event || []).map((date) => {
+    if (!date) {
+      return { day: 0, month: 0 };
+    }
+
+    const [year, month, day] = date.split('-');
+
     return {
-      day: parseInt(day, 10),
-      month: parseInt(month, 10),
+      day: parseInt(day || '0', 10),
+      month: parseInt(month || '0', 10),
     };
   });
 
@@ -358,7 +363,7 @@ const Events = () => {
       <HStack >
 
         <Text color="white" fontSize={{ "2xl": '20px'}} transform="translateX(-340px)">
-          {eventDetails.duration.substring(0, 5)}
+          {eventDetails.duration?.substring(0, 5) || '—'}
         </Text>
 
         <Box

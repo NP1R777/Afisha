@@ -27,7 +27,12 @@ interface Event {
   description: string;
   location: string;
   group_id: number;
-  date_event: string[];
+  time_slots: {
+    id: number;
+    date_event: string;
+    start_time: string;
+    event_id: number;
+  }[];
   duration: string;
   price: string;
   address: string;
@@ -144,11 +149,17 @@ const Frame = () => {
 
             const events = res.data;
 
-            events.sort(
-              (a: Event, b: Event) =>
-                new Date(a.date_event[0]).getTime() -
-                new Date(b.date_event[0]).getTime()
-            );
+            events.sort((a: Event, b: Event) => {
+              const dateA = a.time_slots?.[0]?.date_event
+                ? new Date(a.time_slots[0].date_event).getTime()
+                : 0;
+
+              const dateB = b.time_slots?.[0]?.date_event
+                ? new Date(b.time_slots[0].date_event).getTime()
+                : 0;
+
+              return dateA - dateB;
+            });
 
             eventsMap[category.id] = events;
           } catch (error) {
@@ -198,8 +209,28 @@ const Frame = () => {
   });
 
   const handleCategoryChange = (event: FormEvent<HTMLDivElement>) => {
-    const selectedValues = Array.from((event.target as HTMLSelectElement).selectedOptions, option => option.value);
+    const selectedValues = Array.from(
+      (event.target as HTMLSelectElement).selectedOptions,
+      option => option.value
+    );
+
     setSelectedCategories(selectedValues);
+
+    // скролл к первой выбранной категории
+    if (selectedValues.length > 0) {
+      const categoryId = selectedValues[0];
+
+      setTimeout(() => {
+        const element = document.getElementById(`category-${categoryId}`);
+
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      }, 100);
+    }
   };
 
   const handleDistrictChange = (event: FormEvent<HTMLDivElement>) => {
@@ -257,12 +288,14 @@ const handleClearDate = () => {
   };
   
   const filterEventsBySearchQuery = (events: Event[]) => {
-    if (!searchQuery && selectedCategories.length === 0) return events;
-  
     return events.filter(event => {
-      const matchesSearchQuery = !searchQuery || event.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesSelectedCategories = selectedCategories.length === 0 || selectedCategories.includes(event.group_id.toString());
-      return matchesSearchQuery && matchesSelectedCategories;
+      const matchesSearchQuery =
+        !searchQuery ||
+        event.name
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase());
+
+      return matchesSearchQuery;
     });
   };
 
@@ -297,11 +330,18 @@ const handleClearDate = () => {
 
       return category?.name.toLowerCase() === 'театр';
     })
-    .sort(
-      (a, b) =>
-        new Date(a.date_event[0]).getTime() -
-        new Date(b.date_event[0]).getTime()
-    )
+
+    .sort((a, b) => {
+      const dateA = a.time_slots?.[0]?.date_event
+        ? new Date(a.time_slots[0].date_event).getTime()
+        : 0;
+
+      const dateB = b.time_slots?.[0]?.date_event
+        ? new Date(b.time_slots[0].date_event).getTime()
+        : 0;
+
+      return dateA - dateB;
+    })
     .slice(0, 12);
 
   return (
@@ -771,7 +811,7 @@ const handleClearDate = () => {
             }
             console.log(`Rendering category ${category.name} with events:`, filteredEvents);
             return (
-              <Box mt={4} key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+              <Box mt={4} id={`category-${category.id}`} scrollMarginTop="120px" key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
                 <Heading
                   lineHeight={1}
                   fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
