@@ -143,7 +143,7 @@ const Layout = () => {
               fontSize={{ base: '13px', lg: '15px', xl: '18px' }}
               textAlign="left"
             >
-              © {new Date().getFullYear()} "Афиша мероприятий" – сайт создан студентами 4 курса Сологубовой Владой и Захаровым Ильёй
+              © {new Date().getFullYear()} "Афиша Норильска" – сайт создан студентами 4 курса Сологубовой Владой и Захаровым Ильёй
             </Text>
             <Image
               src="/icons/logo-outlined.svg"
