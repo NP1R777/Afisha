@@ -9,6 +9,7 @@ import LoginModal from '../pages/authorization';
 import RegisterModal from '../pages/registration';
 import assistant from '../pictures/assistant.png';
 import AiAssistantModal from '../modal/assistant';
+import { useLocation } from 'react-router-dom';
 
 const Layout = () => {
   const { isAuthenticated, setUsername, setSearchQuery } = useUser();
@@ -16,6 +17,7 @@ const Layout = () => {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
 
     useEffect(() => {
       console.log('===== AUTH DEBUG =====');
@@ -57,14 +59,22 @@ const Layout = () => {
   };
 
   const handleSearchFocus = () => {
-    if (location.pathname === '/account' || location.pathname.startsWith('/event/')) {
-      navigate('/');
+    if (
+      location.pathname === '/account' ||
+      location.pathname.startsWith('/event/')
+    ) {
+      navigate('/?scrollToEvents=true');
     }
   };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
+
     setSearchQuery(value);
+
+    if (location.pathname !== '/') {
+      navigate('/');
+    }
   };
 
   return (
