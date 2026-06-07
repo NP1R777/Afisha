@@ -100,7 +100,29 @@ python scripts/restore_db_dump.py --dump-file ./db_dumps/afisha_prod.sql
 
 По умолчанию восстановление выполняется через служебную БД `postgres` (`--maintenance-db postgres`).
 
-### 3) Запуск backend после восстановления
+### 3) Очистка выбранных таблиц
+
+Если нужно быстро очистить только часть таблиц в БД, используйте скрипт:
+
+```bash
+python scripts/clear_db_tables.py --tables parsed_event events news
+```
+
+По умолчанию применяется режим `truncate` (`RESTART IDENTITY CASCADE`).
+
+Для безопасной проверки SQL без выполнения:
+
+```bash
+python scripts/clear_db_tables.py --tables parsed_event events --dry-run
+```
+
+Для режима `DELETE FROM`:
+
+```bash
+python scripts/clear_db_tables.py --tables parsed_event --mode delete --yes
+```
+
+### 4) Запуск backend после восстановления
 
 ```bash
 alembic upgrade head
