@@ -267,6 +267,7 @@ class ParsedEvent(Base):
     organization: str = Column(String, nullable=True)
     age_limit: str = Column(String, nullable=True)
     external_url: str = Column(String, nullable=True)
+    pictures_main: str = Column(String, nullable=True)
     target_type: ParsedTargetType = Column(
         Enum(ParsedTargetType, name="parsed_target_type_enum"),
         nullable=False,

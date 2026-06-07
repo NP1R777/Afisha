@@ -215,6 +215,7 @@ def _event_payload(
     address: Optional[str] = None,
     age_limit: Optional[str] = None,
     external_url: Optional[str] = None,
+    pictures_main: Optional[str] = None,
 ) -> Optional[ParsedEventCreate]:
     normalized_name = clean_text(name)
     if not normalized_name:
@@ -233,6 +234,7 @@ def _event_payload(
         organization=config.organization,
         age_limit=normalize_age_limit(age_limit),
         external_url=clean_text(external_url),
+        pictures_main=clean_text(pictures_main),
     )
 
 
@@ -276,7 +278,161 @@ def parse_source(
         events = _parse_nordshi_afisha(config, max_events=max_events)
     else:
         raise SourceParseError(f"Неизвестный источник: {config.key}")
+    events = _enrich_events_with_main_images(
+        config=config,
+        events=events,
+        runtime_config=runtime_config,
+    )
     return events[:max_events]
+
+
+def _enrich_events_with_main_images(
+    *,
+    config: SourceConfig,
+    events: list[ParsedEventCreate],
+    runtime_config: ParserRuntimeConfig,
+) -> list[ParsedEventCreate]:
+    if not events:
+        return events
+
+    is_vmuzey = "vmuzey.com" in (config.url or "").lower()
+    session = _build_session(
+        user_agent=runtime_config.vmuzey_user_agent if is_vmuzey else None,
+        proxy_url=runtime_config.vmuzey_proxy if is_vmuzey else None,
+        cookies_raw=runtime_config.vmuzey_cookies if is_vmuzey else None,
+    )
+    session.headers.update({"Accept-Language": "ru-RU,ru;q=0.9"})
+
+    image_cache: dict[str, Optional[str]] = {}
+    for item in events:
+        source_page_url = item.external_url or config.url
+
+        normalized_existing = _normalize_image_url(item.pictures_main, base_url=source_page_url)
+        if normalized_existing:
+            item.pictures_main = normalized_existing
+            continue
+
+        if not source_page_url:
+            continue
+
+        if source_page_url in image_cache:
+            item.pictures_main = image_cache[source_page_url]
+            continue
+
+        extracted_image = _extract_main_image_from_page(
+            session=session,
+            page_url=source_page_url,
+            verify_ssl=config.verify_ssl,
+        )
+        image_cache[source_page_url] = extracted_image
+        if extracted_image:
+            item.pictures_main = extracted_image
+
+    return events
+
+
+def _extract_main_image_from_page(
+    *,
+    session: requests.Session,
+    page_url: str,
+    verify_ssl: bool,
+) -> Optional[str]:
+    try:
+        response = session.get(page_url, timeout=30, verify=verify_ssl)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    return _extract_main_image_from_soup(soup, base_url=page_url)
+
+
+def _extract_main_image_from_soup(soup: BeautifulSoup, *, base_url: str) -> Optional[str]:
+    metadata_sources: tuple[tuple[str, str], ...] = (
+        ("meta[property='og:image']", "content"),
+        ("meta[property='og:image:url']", "content"),
+        ("meta[name='twitter:image']", "content"),
+        ("meta[property='twitter:image']", "content"),
+        ("meta[itemprop='image']", "content"),
+        ("link[rel='image_src']", "href"),
+    )
+
+    seen: set[str] = set()
+    for selector, attr in metadata_sources:
+        for node in soup.select(selector):
+            candidate = _normalize_image_url(node.get(attr), base_url=base_url)
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            if _looks_like_main_poster(candidate):
+                return candidate
+
+    image_selectors = (
+        ".event img",
+        ".afisha img",
+        ".poster img",
+        ".event-content img",
+        ".entry-content img",
+        ".news-detail img",
+        "article img",
+        "img",
+    )
+    for selector in image_selectors:
+        for node in soup.select(selector):
+            if _is_small_image(node):
+                continue
+            for attr in ("data-src", "data-lazy-src", "data-original", "srcset", "src"):
+                candidate = _normalize_image_url(node.get(attr), base_url=base_url)
+                if not candidate or candidate in seen:
+                    continue
+                seen.add(candidate)
+                if _looks_like_main_poster(candidate):
+                    return candidate
+
+    return None
+
+
+def _normalize_image_url(raw_value: Optional[str], *, base_url: Optional[str]) -> Optional[str]:
+    value = clean_text(raw_value)
+    if not value:
+        return None
+
+    first_part = value.split(",")[0].strip()
+    first_url = first_part.split(" ")[0].strip()
+    if not first_url or first_url.startswith("data:"):
+        return None
+
+    if first_url.startswith("//"):
+        first_url = f"https:{first_url}"
+
+    normalized = absolute_url(base_url, first_url) if base_url else first_url
+    if not normalized:
+        return None
+
+    lowered = normalized.lower()
+    if lowered.endswith(".svg"):
+        return None
+    return normalized
+
+
+def _looks_like_main_poster(image_url: str) -> bool:
+    lowered = image_url.lower()
+    bad_parts = ("logo", "icon", "sprite", "avatar", "favicon")
+    if any(part in lowered for part in bad_parts):
+        # Keep typical event poster words even if path contains one of bad parts.
+        if not any(part in lowered for part in ("afisha", "poster", "event", "news")):
+            return False
+    return True
+
+
+def _is_small_image(node) -> bool:
+    width_raw = clean_text(node.get("width"))
+    height_raw = clean_text(node.get("height"))
+    if not width_raw or not height_raw:
+        return False
+    if not width_raw.isdigit() or not height_raw.isdigit():
+        return False
+    return int(width_raw) < 160 or int(height_raw) < 160
 
 
 def _parse_northdrama(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:
