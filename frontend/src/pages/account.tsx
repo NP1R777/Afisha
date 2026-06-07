@@ -23,15 +23,15 @@ interface Event {
   duration: string;
   price: number;
   address: string;
-  picture_url: string;
+  pictures_main: string;
   deleted_at: string | null;
   id: number;
   description: string;
   external_url: string;
-  location: string;
+  organization: string;
   city: string;
   age_limit: string;
-  horizontal_picture_url: string | null;
+  pictures_two: string | null;
 }
 
 interface Category {
@@ -387,7 +387,7 @@ const Account = () => {
                     >
                       <Flex direction={{ base: 'column', md: 'row' }} align="center" height="100%" gap={4}>
                         <Image
-                          src={event.picture_url}
+                          src={event.pictures_main}
                           alt={event.name}
                           height={{ base: '260px', md: '195px' }}
                           width={{ base: '180px', md: '130px' }}
@@ -419,7 +419,7 @@ const Account = () => {
                               alignItems="flex-start"
                               mt={{ base: 2, md: 1, lg: 2 }}
                             >
-                              {event.location}
+                              {event.organization}
                             </Text>
                           </Flex>
                           <Flex

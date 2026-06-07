@@ -26,7 +26,7 @@ interface Event {
   external_url: string;
   name: string;
   description: string;
-  location: string;
+  organization: string;
   group_id: number;
   time_slots: {
     id: number;
@@ -39,8 +39,8 @@ interface Event {
   address: string;
   city: string;
   age_limit: string;
-  pictures_url: string;
-  horizontal_picture_url: string | null;
+  pictures_main: string;
+  pictures_two: string | null;
 }
 
 interface EventCategory {
@@ -747,7 +747,7 @@ const handleClearDate = () => {
                         position="relative"
                       >
                         <Image
-                          src={event.pictures_url}
+                          src={event.pictures_main}
                           alt={event.name}
                           width="100%"
                           height={{ xl: '360px', md: '300px', sm: '290px', base: '200px' }}
@@ -787,7 +787,7 @@ const handleClearDate = () => {
                           </Text>
 
                           <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
-                            {event.location}
+                            {event.organization}
                           </Text>
                         </Box>
 
@@ -894,7 +894,7 @@ const handleClearDate = () => {
                               position="relative"
                             >
                               <Image
-                                src={event.pictures_url}
+                                src={event.pictures_main}
                                 alt={event.name}
                                 width="100%"
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
@@ -932,7 +932,7 @@ const handleClearDate = () => {
                                   {event.name}
                                 </Text>
                                 <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
-                                  {event.location}
+                                  {event.organization}
                                 </Text>
                               </Box>
                               <Box
