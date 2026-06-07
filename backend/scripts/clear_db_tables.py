@@ -113,9 +113,6 @@ def _format_table_list(table_refs: list[tuple[str, str]]) -> str:
 
 def main() -> None:
     args = parse_args()
-    ensure_binary_exists("psql")
-    config = resolve_db_config(args.env_file)
-
     default_schema = _validate_identifier(args.schema, label="схемы")
     table_refs = _unique_preserve_order(
         [_parse_table_ref(raw_table, default_schema=default_schema) for raw_table in args.tables]
@@ -123,7 +120,6 @@ def main() -> None:
     cleanup_sql = _build_cleanup_sql(mode=args.mode, table_refs=table_refs)
 
     print(f"Режим очистки: {args.mode}")
-    print(f"База данных: {config.name}")
     print(f"Таблицы: {_format_table_list(table_refs)}")
     print("SQL:")
     print(cleanup_sql)
@@ -131,6 +127,10 @@ def main() -> None:
     if args.dry_run:
         print("Dry-run включен, SQL не выполнялся.")
         return
+
+    ensure_binary_exists("psql")
+    config = resolve_db_config(args.env_file)
+    print(f"База данных: {config.name}")
 
     if not args.yes:
         confirmation = input("Введите YES для подтверждения очистки: ").strip()
