@@ -20,6 +20,7 @@ from src.parser.service import (
     list_sources,
     run_parse_and_store,
 )
+from src.assistant.service import sync_events_vector_index
 
 router = APIRouter(prefix="/parser")
 
@@ -58,8 +59,18 @@ async def run_parser(
 async def distribute_parser_events(
     payload: ParseDistributeRequest,
     db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
 ) -> ParseDistributeResponse:
-    return await distribute_parsed_events(db_connect=db_connect, request=payload)
+    result = await distribute_parsed_events(db_connect=db_connect, request=payload)
+    try:
+        await sync_events_vector_index(
+            db_connect=db_connect,
+            settings=settings,
+        )
+    except Exception:
+        # Ошибка обновления векторного индекса не должна отменять перенос данных.
+        pass
+    return result
 
 
 @router.post(
