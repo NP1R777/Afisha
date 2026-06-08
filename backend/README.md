@@ -212,6 +212,61 @@ curl -X POST "http://localhost:8000/parser/run" \
   }'
 ```
 
+## AI-ассистент (Mistral + Milvus)
+
+В backend добавлен модуль ассистента:
+
+- `POST /assistant/chat` — диалог с ассистентом (строгий JSON-ответ);
+- `POST /assistant/reindex` — ручная переиндексация `events` в Milvus.
+
+Основная логика:
+
+1. Ассистент через Mistral определяет intent (`afisha_search` или `general_chat`).
+2. Для запросов по афише выполняется семантический поиск по Milvus.
+3. Затем применяются фильтры (категория, дата, время суток, город, цена, организация, возраст).
+4. Возвращается строгий JSON с полями `intent`, `filters`, `matches`, `fallback_level`, `warnings`.
+
+### Автообновление индекса
+
+После каждого вызова `POST /parser/distribute` backend автоматически запускает синхронизацию `events` в Milvus.
+
+### Переменные окружения
+
+```bash
+# Mistral
+MISTRAL_API_KEY=
+MISTRAL_API_BASE_URL=https://api.mistral.ai/v1
+MISTRAL_CHAT_MODEL=mistral-large-latest
+MISTRAL_EMBEDDING_MODEL=mistral-embed
+
+# Assistant
+ASSISTANT_EMBEDDING_DIM=1024
+ASSISTANT_EMBEDDING_BATCH_SIZE=32
+ASSISTANT_SEMANTIC_LIMIT=80
+
+# Milvus
+MILVUS_URI=
+MILVUS_HOST=localhost
+MILVUS_PORT=19530
+MILVUS_USER=
+MILVUS_PASSWORD=
+MILVUS_DB_NAME=default
+MILVUS_COLLECTION_NAME=afisha_events
+```
+
+### Запуск Milvus и Attu (отдельный compose)
+
+Для векторной БД используйте новый compose (основной `docker-compose.yml` не изменяется):
+
+```bash
+docker compose -f docker-compose.milvus.yml up -d
+```
+
+После старта:
+
+- Milvus gRPC: `localhost:19530`
+- Attu UI: `http://localhost:8001`
+
 ## Разработка
 
 1. Создайте новую ветку для разработки
