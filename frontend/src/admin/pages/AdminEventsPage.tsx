@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Flex,
@@ -12,7 +11,13 @@ import {
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import type { AdminCategory, AdminEvent } from '../types/models';
-import { createEvent, fetchEventCategories, fetchEvents } from '../services/adminApi';
+import {
+  createEvent,
+  deleteEvent,
+  fetchEventCategories,
+  fetchEvents,
+  updateEvent,
+} from '../services/adminApi';
 import { useAdminAuth } from '../app/AdminAuthContext';
 
 const MotionBox = motion(Box);
@@ -56,6 +61,7 @@ const AdminEventsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [createForm, setCreateForm] = useState<CreateEventForm>(initialCreateForm);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -86,6 +92,70 @@ const AdminEventsPage: React.FC = () => {
     return events.filter((item) => item.name.toLowerCase().includes(query.toLowerCase().trim()));
   }, [events, query]);
 
+  const toDateInputValue = (rawValue?: string): string => {
+    if (!rawValue) return '';
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  };
+
+  const toTimeInputValue = (rawValue?: string): string => {
+    if (!rawValue) return '';
+    return rawValue.slice(0, 5);
+  };
+
+  const resetEditor = (): void => {
+    setCreateForm(initialCreateForm);
+    setSelectedCategoryIds([]);
+    setEditingEventId(null);
+  };
+
+  const startEditEvent = (event: AdminEvent): void => {
+    const firstSlot = event.time_slots?.[0];
+    setEditingEventId(event.id);
+    setCreateForm({
+      name: event.name || '',
+      description: event.description || '',
+      organization:
+        event.organization !== null && event.organization !== undefined
+          ? String(event.organization)
+          : '',
+      city: event.city || '',
+      price: event.price !== null && event.price !== undefined ? String(event.price) : '',
+      address: event.address || '',
+      age_limit: event.age_limit || '',
+      pictures_main: event.pictures_main || '',
+      pictures_two: event.pictures_two || '',
+      external_url: event.external_url || '',
+      date_event: toDateInputValue(firstSlot?.date_event),
+      start_time: toTimeInputValue(firstSlot?.start_time),
+    });
+    setSelectedCategoryIds(event.group_ids || []);
+    setShowCreate(true);
+    setSuccess(null);
+    setError(null);
+  };
+
+  const buildEventPayload = () => ({
+    name: createForm.name.trim(),
+    description: createForm.description || undefined,
+    organization: createForm.organization ? Number(createForm.organization) : null,
+    city: createForm.city || null,
+    price: createForm.price ? Number(createForm.price) : null,
+    address: createForm.address || null,
+    age_limit: createForm.age_limit || null,
+    pictures_main: createForm.pictures_main || null,
+    pictures_two: createForm.pictures_two || null,
+    external_url: createForm.external_url || null,
+    group_ids: selectedCategoryIds,
+    times: [
+      {
+        date_event: new Date(createForm.date_event).toISOString(),
+        start_time: createForm.start_time,
+      },
+    ],
+  });
+
   const handleCreateSubmit = async () => {
     setSuccess(null);
     setError(null);
@@ -104,37 +174,43 @@ const AdminEventsPage: React.FC = () => {
 
     setCreating(true);
     try {
-      await createEvent(
-        {
-          name: createForm.name.trim(),
-          description: createForm.description || undefined,
-          organization: createForm.organization ? Number(createForm.organization) : null,
-          city: createForm.city || null,
-          price: createForm.price ? Number(createForm.price) : null,
-          address: createForm.address || null,
-          age_limit: createForm.age_limit || null,
-          pictures_main: createForm.pictures_main || null,
-          pictures_two: createForm.pictures_two || null,
-          external_url: createForm.external_url || null,
-          group_ids: selectedCategoryIds,
-          times: [
-            {
-              date_event: new Date(createForm.date_event).toISOString(),
-              start_time: createForm.start_time,
-            },
-          ],
-        },
-        session
-      );
-      setSuccess('Мероприятие успешно создано.');
-      setCreateForm(initialCreateForm);
-      setSelectedCategoryIds([]);
+      if (editingEventId) {
+        await updateEvent(editingEventId, buildEventPayload(), session);
+        setSuccess('Мероприятие успешно обновлено.');
+      } else {
+        await createEvent(buildEventPayload(), session);
+        setSuccess('Мероприятие успешно создано.');
+      }
+      resetEditor();
       setShowCreate(false);
       await loadData();
     } catch (err: any) {
-      setError(err?.message || 'Не удалось создать мероприятие');
+      setError(
+        err?.message ||
+          (editingEventId
+            ? 'Не удалось обновить мероприятие'
+            : 'Не удалось создать мероприятие')
+      );
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: number): Promise<void> => {
+    if (!window.confirm('Удалить мероприятие полностью?')) {
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    try {
+      await deleteEvent(eventId, session);
+      if (editingEventId === eventId) {
+        resetEditor();
+      }
+      setSuccess('Мероприятие удалено.');
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || 'Не удалось удалить мероприятие');
     }
   };
 
@@ -151,10 +227,18 @@ const AdminEventsPage: React.FC = () => {
         />
         <Flex gap={2}>
           <Button onClick={() => setShowCreate((prev) => !prev)} bg="#4C6BE6" color="white">
-            {showCreate ? 'Скрыть форму' : 'Создать мероприятие'}
+            {showCreate ? 'Скрыть редактор' : 'Создать мероприятие'}
           </Button>
-          <Button disabled bg="gray.600" color="gray.200" title="Endpoint update/delete пока отсутствует">
-            Edit/Delete (скоро)
+          <Button
+            variant="outline"
+            borderColor="gray.500"
+            color="gray.200"
+            onClick={() => {
+              resetEditor();
+              setShowCreate(true);
+            }}
+          >
+            Новый объект
           </Button>
         </Flex>
       </Flex>
@@ -180,7 +264,9 @@ const AdminEventsPage: React.FC = () => {
           p={5}
         >
           <Text color="white" fontSize="17px" fontWeight="700" mb={4}>
-            Создание мероприятия (по существующей ручке `/event/create_event`)
+            {editingEventId
+              ? `Редактирование мероприятия #${editingEventId}`
+              : 'Создание мероприятия (по существующей ручке `/event/create_event`)'}
           </Text>
           <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={3}>
             {(
@@ -254,15 +340,14 @@ const AdminEventsPage: React.FC = () => {
 
           <Flex mt={4} gap={2}>
             <Button onClick={handleCreateSubmit} bg="#4C6BE6" color="white" loading={creating}>
-              Создать
+              {editingEventId ? 'Сохранить изменения' : 'Создать'}
             </Button>
             <Button
               variant="outline"
               borderColor="gray.500"
               color="gray.200"
               onClick={() => {
-                setCreateForm(initialCreateForm);
-                setSelectedCategoryIds([]);
+                resetEditor();
               }}
             >
               Очистить
@@ -290,7 +375,7 @@ const AdminEventsPage: React.FC = () => {
             <Box as="table" w="100%" fontSize="13px" borderCollapse="collapse">
               <Box as="thead">
                 <Box as="tr">
-                  {['ID', 'Название', 'Город', 'Цена', 'Дата/время', 'Статус'].map((title) => (
+                  {['ID', 'Название', 'Город', 'Цена', 'Дата/время', 'Действия'].map((title) => (
                     <Box as="th" key={title} textAlign="left" color="gray.300" py={2} pr={3}>
                       {title}
                     </Box>
@@ -318,9 +403,24 @@ const AdminEventsPage: React.FC = () => {
                         {firstSlot ? `${new Date(firstSlot.date_event).toLocaleDateString()} ${firstSlot.start_time}` : '—'}
                       </Box>
                       <Box as="td" py={2} pr={3}>
-                        <Badge colorPalette="orange" variant="subtle">
-                          edit/delete недоступно
-                        </Badge>
+                        <Flex gap={2}>
+                          <Button
+                            size="xs"
+                            bg="#4C6BE6"
+                            color="white"
+                            onClick={() => startEditEvent(item)}
+                          >
+                            Ред.
+                          </Button>
+                          <Button
+                            size="xs"
+                            bg="#C84E4E"
+                            color="white"
+                            onClick={() => handleDeleteEvent(item.id)}
+                          >
+                            Удалить
+                          </Button>
+                        </Flex>
                       </Box>
                     </Box>
                   );

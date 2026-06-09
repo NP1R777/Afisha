@@ -6,7 +6,6 @@ import { useAdminAuth } from '../app/AdminAuthContext';
 const AdminAiPage: React.FC = () => {
   const { session } = useAdminAuth();
   const [loading, setLoading] = useState(false);
-  const [blocked, setBlocked] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,17 +15,8 @@ const AdminAiPage: React.FC = () => {
     try {
       const response = await triggerAssistantReindex(session);
       setResult(response);
-      setBlocked(false);
     } catch (err: any) {
-      const status = err?.response?.status;
-      if (status === 404 || status === 405) {
-        setBlocked(true);
-        setError(
-          'Ручка /assistant/reindex пока недоступна в текущем backend. Кнопка будет активирована после добавления endpoint.'
-        );
-      } else {
-        setError(err?.message || 'Не удалось запустить reindex');
-      }
+      setError(err?.message || 'Не удалось запустить reindex');
     } finally {
       setLoading(false);
     }
@@ -49,8 +39,7 @@ const AdminAiPage: React.FC = () => {
           Обновление embeddings (`POST /assistant/reindex`)
         </Text>
         <Text color="gray.300" fontSize="13px" mb={4}>
-          Раздел запускает существующую ручку переиндексации векторной базы. Если endpoint отсутствует,
-          кнопка остаётся заблокированной до доработки backend.
+          Раздел запускает существующую ручку переиндексации векторной базы и показывает сырой ответ API.
         </Text>
         <Flex gap={2}>
           <Button
@@ -58,7 +47,6 @@ const AdminAiPage: React.FC = () => {
             color="white"
               loading={loading}
             onClick={runReindex}
-            disabled={blocked}
           >
             Обновить embeddings
           </Button>
