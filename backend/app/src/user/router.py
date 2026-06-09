@@ -1,4 +1,5 @@
 import hashlib
+from collections import defaultdict
 from datetime import date, datetime
 from jose import jwt, JWTError
 from database.models import Events, RoleEnum, Roles, User, UserGroupsEvent, UserToEvent
@@ -11,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from src.dependencies.autentification import get_token_payload, get_current_user
 from src.user.schemas import (UserIn, UserOut, TokenResponse, UserUpdate,
                               UserUpdatePreferences, UserUpdateLikeEvents,
-                              UserOutLikeEvents)
+                              UserOutLikeEvents, UserUpdateRole, UserAdminOut)
 
 
 router = APIRouter()
@@ -58,6 +59,25 @@ async def _get_user_liked_event_ids(db_connect: AsyncSession, user_id: int) -> l
         )
     ).scalars().all()
     return sorted(rows)
+
+
+def _serialize_user_admin_payload(
+    user: User,
+    *,
+    role: str | None,
+    preferences: list[int],
+) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "date_of_birth": str(user.date_of_birth) if user.date_of_birth else None,
+        "role": role,
+        "preferences": preferences,
+        "created_at": user.created_at,
+        "update_at": user.update_at,
+        "deleted_at": user.deleted_at,
+    }
 
 @router.post(
     '/user/registration',
@@ -258,7 +278,7 @@ async def delete_user(
     user_data: User = (await db_connect.execute(select(User).filter(User.id == user_id,
                                                                     User.deleted_at.is_(None)))).scalar()
     if not user_data:
-        return HTTPException(status_code=404, detail="Пользователь с таким id не найден или уже удалён")
+        raise HTTPException(status_code=404, detail="Пользователь с таким id не найден или уже удалён")
     else:
         user_data.deleted_at = datetime.now()
         return {"message": "Пользователь успешно удалён!"}
@@ -334,7 +354,19 @@ async def get_user(user_id: int,
     elif user_data.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Пользователь удалён из базы")
     else:
-        return user_data
+        role = (
+            await db_connect.execute(
+                select(Roles.role).where(
+                    Roles.user_id == user_data.id,
+                    Roles.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        return _serialize_user_admin_payload(
+            user_data,
+            role=role.value if role else None,
+            preferences=await _get_user_preference_ids(db_connect, user_data.id),
+        )
 
 
 @router.patch(
@@ -453,4 +485,82 @@ async def get_all_user(db_connect: AsyncSession = Depends(get_db)):
     if not users_data:
         raise HTTPException(status_code=404, detail='В базе данных нет пользователей!')
     else:
-        return users_data
+        user_ids = [item.id for item in users_data]
+
+        role_rows = (
+            await db_connect.execute(
+                select(Roles.user_id, Roles.role).where(
+                    Roles.user_id.in_(user_ids),
+                    Roles.deleted_at.is_(None),
+                )
+            )
+        ).all()
+        role_map = {user_id: role.value for user_id, role in role_rows}
+
+        preference_rows = (
+            await db_connect.execute(
+                select(UserGroupsEvent.user_id, UserGroupsEvent.groups_id).where(
+                    UserGroupsEvent.user_id.in_(user_ids)
+                )
+            )
+        ).all()
+        preference_map: dict[int, list[int]] = defaultdict(list)
+        for uid, group_id in preference_rows:
+            preference_map[uid].append(group_id)
+
+        return [
+            UserAdminOut(
+                **_serialize_user_admin_payload(
+                    user,
+                    role=role_map.get(user.id),
+                    preferences=sorted(preference_map.get(user.id, [])),
+                )
+            )
+            for user in users_data
+        ]
+
+
+@router.patch(
+    "/user/change_role",
+    description="Смена роли пользователя",
+    summary="Смена роли пользователя",
+    responses={
+        200: {"description": "Роль пользователя успешно обновлена"},
+        404: {"description": "Пользователь не найден"},
+    },
+)
+async def change_user_role(
+    user_id: int,
+    payload: UserUpdateRole,
+    db_connect: AsyncSession = Depends(get_db),
+):
+    user = (
+        await db_connect.execute(
+            select(User).where(
+                User.id == user_id,
+                User.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    role_row = (
+        await db_connect.execute(
+            select(Roles).where(
+                Roles.user_id == user_id,
+                Roles.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    next_role = RoleEnum(payload.role)
+    if role_row is None:
+        role_row = Roles(user_id=user_id, role=next_role)
+        db_connect.add(role_row)
+    else:
+        role_row.role = next_role
+        role_row.update_at = datetime.utcnow()
+
+    user.update_at = datetime.utcnow()
+    await db_connect.flush()
+    return {"message": "Роль пользователя обновлена", "user_id": user_id, "role": next_role.value}
