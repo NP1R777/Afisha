@@ -10,8 +10,14 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { useEffect, useMemo, useState } from 'react';
-import type { AdminCategory, AdminUser } from '../types/models';
-import { deleteUser, fetchEventCategories, fetchUsers, updateUser } from '../services/adminApi';
+import type { AdminCategory, AdminUser, UserRole } from '../types/models';
+import {
+  changeUserRole,
+  deleteUser,
+  fetchEventCategories,
+  fetchUsers,
+  updateUser,
+} from '../services/adminApi';
 import { useAdminAuth } from '../app/AdminAuthContext';
 
 interface EditForm {
@@ -21,6 +27,7 @@ interface EditForm {
   password: string;
   date_of_birth: string;
   preferences: number[];
+  role: UserRole;
 }
 
 const initialEditForm: EditForm = {
@@ -30,6 +37,7 @@ const initialEditForm: EditForm = {
   password: '',
   date_of_birth: '',
   preferences: [],
+  role: 'user',
 };
 
 const AdminUsersPage: React.FC = () => {
@@ -89,6 +97,7 @@ const AdminUsersPage: React.FC = () => {
       password: '',
       date_of_birth: user.date_of_birth || '',
       preferences: Array.isArray(user.preferences) ? user.preferences : [],
+      role: user.role || 'user',
     });
   };
 
@@ -113,6 +122,7 @@ const AdminUsersPage: React.FC = () => {
         },
         session
       );
+      await changeUserRole(editForm.userId, editForm.role, session);
       setSuccess('Данные пользователя обновлены.');
       setEditForm((prev) => ({ ...prev, password: '' }));
       await loadData();
@@ -287,15 +297,28 @@ const AdminUsersPage: React.FC = () => {
           </Flex>
         </Box>
 
-        <Box
-          bg="rgba(255, 196, 0, 0.12)"
-          border="1px solid rgba(255, 196, 0, 0.5)"
-          borderRadius="10px"
-          p={3}
-        >
-          <Text color="#ffe3aa" fontSize="13px">
-            Смена роли (user/admin/organizator) временно заблокирована: backend endpoint ещё не реализован.
+        <Box>
+          <Text color="gray.300" fontSize="13px" mb={2}>
+            Роль пользователя
           </Text>
+          <Flex gap={2} wrap="wrap">
+            {(['user', 'admin', 'organizator'] as UserRole[]).map((role) => {
+              const checked = editForm.role === role;
+              return (
+                <Button
+                  key={role}
+                  size="sm"
+                  variant={checked ? 'solid' : 'outline'}
+                  bg={checked ? '#4C6BE6' : 'transparent'}
+                  color={checked ? 'white' : 'gray.200'}
+                  borderColor="rgba(183, 197, 255, 0.35)"
+                  onClick={() => setEditForm((prev) => ({ ...prev, role }))}
+                >
+                  {role}
+                </Button>
+              );
+            })}
+          </Flex>
         </Box>
 
         {error ? (
