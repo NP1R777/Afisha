@@ -7,6 +7,7 @@ import Account from './pages/account';
 import Events from './pages/events';
 import Frame from './pages/master';
 import Organizer from './pages/organizer';
+import AdminApp from './admin/app/AdminApp';
 import { setDefaultOptions } from 'date-fns';
 import { ru } from 'date-fns/locale/ru';
 
@@ -19,6 +20,7 @@ function App() {
     <UserProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/admin/*" element={<AdminApp />} />
           <Route path="/" element={<Layout />}>
             <Route path="/" element={<Frame />} />
             <Route path="/event/:eventId" element={<Events />} />
