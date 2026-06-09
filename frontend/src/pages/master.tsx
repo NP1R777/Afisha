@@ -497,7 +497,7 @@ const handleClearDate = () => {
                 borderRadius="full"
                 onChange={handleCategoryChange}
               >
-                <SelectTrigger>
+                <SelectTrigger width="185px">
                   <Box
                     textWrap="nowrap"
                     as="span"
