@@ -26,6 +26,26 @@ class AppSettings(BaseSettings):
     vmuzey_cookies: Optional[str] = None
     vmuzey_user_agent: Optional[str] = None
 
+    # Mistral AI
+    mistral_api_key: Optional[str] = None
+    mistral_api_base_url: str = "https://api.mistral.ai/v1"
+    mistral_chat_model: str = "mistral-large-latest"
+    mistral_embedding_model: str = "mistral-embed"
+
+    # Assistant search/index settings
+    assistant_embedding_dim: int = 1024
+    assistant_embedding_batch_size: int = 32
+    assistant_semantic_limit: int = 80
+
+    # Milvus
+    milvus_uri: Optional[str] = None
+    milvus_host: str = "localhost"
+    milvus_port: int = 19530
+    milvus_user: Optional[str] = None
+    milvus_password: Optional[str] = None
+    milvus_db_name: str = "default"
+    milvus_collection_name: str = "afisha_events"
+
     root_path: str = ''
 
     class Config:
