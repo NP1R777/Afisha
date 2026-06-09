@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime
 from typing_extensions import List
 from pydantic import BaseModel, Field, EmailStr
+from typing import Literal
 
 
 class UserRole(str, Enum):
@@ -67,6 +68,22 @@ class UserUpdate(BaseModel):
 
 class UserUpdatePreferences(BaseModel):
     preferences: List[int] | None
+
+
+class UserUpdateRole(BaseModel):
+    role: Literal["user", "admin", "organizator"]
+
+
+class UserAdminOut(BaseModel):
+    id: int
+    username: str
+    email: EmailStr | None = None
+    date_of_birth: str | None = None
+    role: Literal["user", "admin", "organizator"] | None = None
+    preferences: list[int] = Field(default_factory=list)
+    created_at: datetime | None = None
+    update_at: datetime | None = None
+    deleted_at: datetime | None = None
 
 
 class UserOutLikeEvents(BaseModel):
