@@ -65,6 +65,14 @@ function parseUser(item: unknown): AdminUser {
 function parseEvent(item: unknown): AdminEvent {
   const raw = (item || {}) as UnknownRecord;
   const slots = Array.isArray(raw.time_slots) ? raw.time_slots : [];
+  const groupLinks = Array.isArray(raw.group_links) ? raw.group_links : [];
+  const derivedGroupIds = groupLinks
+    .map((value) => Number((value as UnknownRecord).groups_id))
+    .filter((value) => Number.isFinite(value));
+  const rawGroupIds = Array.isArray(raw.group_ids)
+    ? raw.group_ids.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : [];
+
   return {
     id: Number(raw.id || 0),
     name: String(raw.name || ''),
@@ -80,9 +88,7 @@ function parseEvent(item: unknown): AdminEvent {
     pictures_main: raw.pictures_main ? String(raw.pictures_main) : null,
     pictures_two: raw.pictures_two ? String(raw.pictures_two) : null,
     external_url: raw.external_url ? String(raw.external_url) : null,
-    group_ids: Array.isArray(raw.group_ids)
-      ? raw.group_ids.map((value) => Number(value)).filter((value) => Number.isFinite(value))
-      : [],
+    group_ids: Array.from(new Set([...rawGroupIds, ...derivedGroupIds])),
     time_slots: slots.map((slot) => {
       const rawSlot = slot as UnknownRecord;
       return {
@@ -213,6 +219,49 @@ export async function createEvent(
   await axios.post('/event/create_event', payload, {
     headers: buildAuthHeaders(session),
   });
+}
+
+export async function updateEvent(
+  eventId: number,
+  payload: {
+    name?: string;
+    description?: string;
+    organization?: number | null;
+    city?: string | null;
+    price?: number | null;
+    address?: string | null;
+    age_limit?: string | null;
+    pictures_main?: string | null;
+    pictures_two?: string | null;
+    external_url?: string | null;
+    group_ids?: number[];
+    times?: Array<{ date_event: string; start_time: string }>;
+  },
+  session: AdminSession | null = null
+): Promise<void> {
+  await axios.patch(`/event/${eventId}`, payload, {
+    headers: buildAuthHeaders(session),
+  });
+}
+
+export async function deleteEvent(eventId: number, session: AdminSession | null = null): Promise<void> {
+  await axios.delete(`/event/${eventId}`, {
+    headers: buildAuthHeaders(session),
+  });
+}
+
+export async function changeUserRole(
+  userId: number,
+  role: UserRole,
+  session: AdminSession | null = null
+): Promise<void> {
+  await axios.patch(
+    `/user/change_role?user_id=${userId}`,
+    { role },
+    {
+      headers: buildAuthHeaders(session),
+    }
+  );
 }
 
 export async function fetchEventCategories(
