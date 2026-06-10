@@ -340,7 +340,7 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
 
 
 @router.get(
-    '/event/event{id}/',
+    '/event/event{id:int}/',
     description="Получение мероприятия по id",
     summary="Получение мероприятия по id",
     responses={
@@ -349,7 +349,7 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
     }
 )
 @router.get(
-    '/event/{event_id}',
+    '/event/{event_id:int}',
     description="Получение мероприятия по id (новый маршрут)",
     summary="Получение мероприятия по id (новый маршрут)",
     responses={
