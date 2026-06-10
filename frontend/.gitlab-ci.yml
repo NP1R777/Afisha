@@ -1,0 +1,51 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+  DOCKER_TLS_CERTDIR: ""
+
+build:
+  stage: build
+  image: docker:latest
+  before_script:
+    - echo "🔑 Логинимся в GitLab Registry..."
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - echo "🐳 Собираем образ..."
+    - docker build -t "$IMAGE_TAG" .
+    - echo "📦 Пушим образ..."
+    - docker push "$IMAGE_TAG"
+  tags:
+    - dev-runner
+  only:
+    - prod
+
+deploy:
+  stage: deploy
+  image: docker:latest
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - apk add --no-cache docker-compose
+  script:
+    - echo "📥 Пуллим свежий образ..."
+    - docker pull "$IMAGE_TAG"
+    - docker images
+    - echo "📦 Применяем docker-compose из /compose/afisha"
+    - cd /compose/afisha
+    - export CI_REGISTRY_IMAGE="$CI_REGISTRY_IMAGE"
+    - export CI_COMMIT_REF_SLUG="$CI_COMMIT_REF_SLUG"
+    - docker-compose -p afisha-front -f docker-compose.afisha-front.yml up -d --remove-orphans
+
+    - echo "🩺 Проверяем контейнеры:"
+    - docker ps
+  tags:
+    - dev-runner
+  only:
+    - prod
+

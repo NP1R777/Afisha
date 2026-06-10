@@ -1,9 +1,16 @@
 import uuid
+from enum import Enum
 from typing import Optional
 from datetime import datetime
 from typing_extensions import List
 from pydantic import BaseModel, Field, EmailStr
 from typing import Literal
+
+
+class UserRole(str, Enum):
+    user = "user"
+    admin = "admin"
+    organizator = "organizator"
 
 
 class UserIn:
@@ -13,6 +20,13 @@ class UserIn:
         email: EmailStr
         date_of_birth: str
         preferences: List[int]
+
+        # Поле для Swagger (будет выпадающий список)
+        role: UserRole = Field(
+            default=UserRole.user,
+            description="Роль пользователя: user/admin/organizator",
+        )
+
 
     class Login(BaseModel):
         username: str
