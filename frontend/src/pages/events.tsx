@@ -295,25 +295,25 @@ const Events = () => {
 
   return (
     <Flex w="100%">
-        <LoginModal
-          isOpen={isLoginOpen}
-          onRequestClose={() => setIsLoginOpen(false)}
-          openRegisterModal={openRegisterModal}
-          onLoginSuccess={handleLoginSuccess}
-        />
-        <Toaster />
-        <RegisterModal isOpen={isRegisterOpen} onRequestClose={() => setIsRegisterOpen(false)} openLoginModal={openLoginModal} />
+      <LoginModal
+        isOpen={isLoginOpen}
+        onRequestClose={() => setIsLoginOpen(false)}
+        openRegisterModal={openRegisterModal}
+        onLoginSuccess={handleLoginSuccess}
+      />
+      <Toaster />
+      <RegisterModal isOpen={isRegisterOpen} onRequestClose={() => setIsRegisterOpen(false)} openLoginModal={openLoginModal} />
 
       {eventDetails.horizontal_picture_url && (
         <Box position="absolute" top={0} left={0} width="100%" height='100%' maxWidth="1960px"
-          >
+        >
           <Image
             src={eventDetails.horizontal_picture_url}
             alt="Изображение мероприятия"
             objectFit="cover"
             objectPosition="top center"
             width="100%"
-            height={{ base: '275px', sm:"320px", md: '430px', lg: '430px', xl: '540px', "2xl":'735px'}}
+            height={{ base: '275px', sm: "320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
             position="absolute"
             top={0}
             left={0}
@@ -328,7 +328,7 @@ const Events = () => {
             alt="Overlay Image"
             objectFit="cover"
             width="100%"
-            height={{ base: '275px', sm:"320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px'}}
+            height={{ base: '275px', sm: "320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
             position="absolute"
             top={0}
             left={0}
@@ -344,26 +344,26 @@ const Events = () => {
         zIndex={1}
         fontFamily="Unbounded" userSelect="none"
       >
-        <Flex wrap="wrap" mt={{ "2xl": 25}} align="flex-end"
+        <Flex wrap="wrap" mt={{ "2xl": 25 }} align="flex-end"
         >
-          <VStack w={{ "2xl": '380px', xl: '280px', lg: '200px', md: "190px", sm:"125px", base: "100px" }}>
+          <VStack w={{ "2xl": '380px', xl: '280px', lg: '200px', md: "190px", sm: "125px", base: "100px" }}>
             <Image src={eventDetails.picture_url} alt={eventDetails.name} objectFit="cover" width="100%"
-              height={{ "2xl": '550px',xl: '410px', md: '300px', sm: '200px', base: '150px' }} borderRadius="6px" 
+              height={{ "2xl": '550px', xl: '410px', md: '300px', sm: '200px', base: '150px' }} borderRadius="6px"
               onError={(e) => {
-                                (e.target as HTMLImageElement).src = EventImage;
-                              }}/>
+                (e.target as HTMLImageElement).src = EventImage;
+              }} />
           </VStack>
-          <VStack align="start" gap="4"  ml={{ xl: 8, base: 3 }} justifyContent="flex-end" height="full">
+          <VStack align="start" gap="4" ml={{ xl: 8, base: 3 }} justifyContent="flex-end" height="full">
             <Heading
               as="h1"
               color="white"
-              fontSize={{ "2xl": '60px', lg: '40px', md: "30px", sm:"17px", base: "18px" }}
+              fontSize={{ "2xl": '60px', lg: '40px', md: "30px", sm: "17px", base: "18px" }}
               fontWeight="700"
               fontFamily="Unbounded"
               lineHeight="1"
               whiteSpace="normal"
               textAlign="start"
-              maxWidth={{ "2xl": '800px',lg: '500px', md: "400px", sm: "300px", base: "200px" }}
+              maxWidth={{ "2xl": '800px', lg: '500px', md: "400px", sm: "300px", base: "200px" }}
               overflow="hidden"
               textOverflow="ellipsis"
               lineClamp={4}
@@ -391,12 +391,12 @@ const Events = () => {
               Добавить в избранное
             </Button> */}
           </VStack>
-      </Flex>
+        </Flex>
         <Stack >
           <Text mt={{ "2xl": '20', base: "8" }} fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold">
             Расписание
           </Text>
-          <Separator mt={{ "2xl": '5', base: "1" }} borderColor="white"/>
+          <Separator mt={{ "2xl": '5', base: "1" }} borderColor="white" />
         </Stack>
 
         <Flex direction={{ base: "column", "sm": "row" }} align="start" justify="space-between" mt={{ "2xl": '6', base: "2" }}>
@@ -438,72 +438,71 @@ const Events = () => {
               <Box key={`${d.day}-${d.month}-${index}`} w="100%">
                 <HStack w="100%" justify="space-between" >
 
-      {/* ЛЕВАЯ ЧАСТЬ — дата */}
-      <HStack gap="15px">
-        <Text
-          fontSize={{ "2xl": '60px', lg: '47px', md: "35px", base: "30px" }}
-          fontWeight="bold"
-          color="white"
-        >
-          {d.day}
-        </Text>
+                  {/* ЛЕВАЯ ЧАСТЬ — дата */}
+                  <HStack gap="15px">
+                    <Text
+                      fontSize={{ "2xl": '60px', lg: '47px', md: "35px", base: "30px" }}
+                      fontWeight="bold"
+                      color="white"
+                    >
+                      {d.day}
+                    </Text>
 
-        <Text
-          fontSize={{ "2xl": '25px', lg: '20px', md: "15px", base: "11px" }}
-          fontWeight="bold"
-          color="#0E3EA0"
-        >
-          {monthNames[d.month - 1]}
-        </Text>
-      </HStack>
+                    <Text
+                      fontSize={{ "2xl": '25px', lg: '20px', md: "15px", base: "11px" }}
+                      fontWeight="bold"
+                      color="#0E3EA0"
+                    >
+                      {monthNames[d.month - 1]}
+                    </Text>
+                  </HStack>
 
-      <HStack >
+                  <HStack >
 
                     <Text color="white" fontSize={{ "2xl": '20px' }} transform="translateX(-340px)">
                       {d.startTime}
                     </Text>
 
-        <Box
-        as="button"
-        onClick={() => toggleFavorite(index)}
-        transition="0.2s"
-        _hover={{
-          transform: "scale(1.08)",
-        }}
+                    <Box
+                      as="button"
+                      onClick={() => toggleFavorite(index)}
+                      transition="0.2s"
+                      _hover={{
+                        transform: "scale(1.08)",
+                      }}
 
-      >
-        <Image
-          src={favorites[index] ? star_full : star_empty}
-          alt="favorite"
-          boxSize={{
-            "2xl": "50px",
-            xl: "50px",
-            lg: "45px",
-            md: "40px",
-            sm: "32px",
-          }}
-          objectFit="contain"
-          
-        />
-      </Box>
+                    >
+                      <Image
+                        src={favorites[index] ? star_full : star_empty}
+                        alt="favorite"
+                        boxSize={{
+                          "2xl": "50px",
+                          xl: "50px",
+                          lg: "45px",
+                          md: "40px",
+                          sm: "32px",
+                        }}
+                        objectFit="contain"
 
-        <Button
-          bg="white"
-          color="black"
-          fontSize={{ "2xl": '25px', xl: '30px', md: "25px", lg: '25px', sm: "14px"}}
-          fontWeight="800"
-          ml="20px"
-          padding={{ "2xl": '33px', xl: '20px', md: "20px", lg:"10px"}}
-          borderRadius="xl"
-          boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
-          _hover={{ bg: 'black', color: 'white' }}
-          onClick={handleBookTicket}
-        >
-          Купить билет
-        </Button>
+                      />
+                    </Box>
 
-      </HStack>
+                    <Button
+                      bg="white"
+                      color="black"
+                      fontSize={{ "2xl": '25px', xl: '30px', md: "25px", lg: '25px', sm: "14px" }}
+                      fontWeight="800"
+                      ml="20px"
+                      padding={{ "2xl": '33px', xl: '20px', md: "20px", lg: "10px" }}
+                      borderRadius="xl"
+                      boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
+                      _hover={{ bg: 'black', color: 'white' }}
+                      onClick={handleBookTicket}
+                    >
+                      Купить билет
+                    </Button>
 
+                  </HStack>
                 </HStack>
                 {index !== scheduleRows.length - 1 && (
                   <Box w="100%" >
@@ -532,7 +531,7 @@ const Events = () => {
           </Box> */}
         </Flex>
         <Stack w="100%" >
-          <Separator mt={5} borderColor="white"/>
+          <Separator mt={5} borderColor="white" />
         </Stack>
         <Text fontSize={{ "2xl": '50px', xl: '1px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="8">
           О событии
