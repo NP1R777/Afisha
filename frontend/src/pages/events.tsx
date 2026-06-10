@@ -26,6 +26,12 @@ interface EventDetails {
   age_limit: string;
   picture_url: string;
   horizontal_picture_url?: string;
+  time_slots: {
+    id?: number;
+    event_id?: number;
+    date_event: string;
+    start_time: string;
+  }[];
 }
 
 const Events = () => {
@@ -44,6 +50,15 @@ const Events = () => {
       return;
     }
 
+    const parsedEventId = Number(eventId);
+    if (!Number.isInteger(parsedEventId) || parsedEventId <= 0) {
+      toaster.error({
+        title: 'Некорректный идентификатор мероприятия',
+        duration: 3000,
+      });
+      return;
+    }
+
     try {
       const response = await axios.patch(
         `/user/add_like_events`,
@@ -51,7 +66,7 @@ const Events = () => {
         {
           params: {
             user_id: userId,
-            event_id: eventId,
+            event_id: parsedEventId,
           },
         }
       );
@@ -135,32 +150,67 @@ const Events = () => {
 
   useEffect(() => {
     const fetchEventDetails = async () => {
+      const parsedEventId = Number(eventId);
+      if (!Number.isInteger(parsedEventId) || parsedEventId <= 0) {
+        toaster.error({
+          title: 'Некорректная ссылка на мероприятие',
+          duration: 3000,
+        });
+        navigate('/');
+        return;
+      }
+
       try {
 
         const response = await axios.get(
-          `/event/event{id}/?event_id=${eventId}`
+          `/event/${parsedEventId}`
         );
 
         console.log('EVENT DETAILS:', response.data);
 
         const data = response.data;
+        const normalizedTimeSlots = Array.isArray(data.time_slots)
+          ? data.time_slots
+          : [];
+        const legacyDates = Array.isArray(data.date_event)
+          ? data.date_event
+          : data.date_event
+            ? [data.date_event]
+            : [];
 
         const normalizedEvent: EventDetails = {
           ...data,
 
           picture_url:
             data.picture_url ||
+            data.pictures_main ||
             data.pictures_url ||
             '',
 
           horizontal_picture_url:
-            data.horizontal_picture_url || '',
+            data.horizontal_picture_url ||
+            data.pictures_two ||
+            '',
 
-          group_id: String(data.group_id),
+          group_id: String(
+            data.group_id ??
+            data.group_ids?.[0] ??
+            ''
+          ),
 
-          date_event: Array.isArray(data.date_event)
-            ? data.date_event
-            : [data.date_event],
+          location:
+            data.location ||
+            data.address ||
+            data.city ||
+            '',
+
+          date_event: normalizedTimeSlots.length
+            ? normalizedTimeSlots.map((slot: { date_event: string }) => slot.date_event)
+            : legacyDates,
+
+          duration: data.duration || '',
+
+          time_slots: normalizedTimeSlots,
         };
 
         setEventDetails(normalizedEvent);
@@ -170,6 +220,10 @@ const Events = () => {
           'Ошибка загрузки мероприятия:',
           error
         );
+        toaster.error({
+          title: 'Не удалось загрузить мероприятие',
+          duration: 3000,
+        });
       }
     };
 
@@ -205,16 +259,27 @@ const Events = () => {
 
   const formattedAgeLimit = `${eventDetails.age_limit || '0'}+`;
 
-  const parsedDates = (eventDetails.date_event || []).map((date) => {
+  const scheduleRows = (
+    eventDetails.time_slots?.length
+      ? eventDetails.time_slots
+      : (eventDetails.date_event || []).map((date) => ({
+        date_event: date,
+        start_time: eventDetails.duration || '',
+      }))
+  ).map((slot) => {
+    const date = slot.date_event;
     if (!date) {
-      return { day: 0, month: 0 };
+      return { day: 0, month: 0, startTime: '—' };
     }
 
-    const [year, month, day] = date.split('-');
+    const [, month, day] = date.split('-');
 
     return {
       day: parseInt(day || '0', 10),
       month: parseInt(month || '0', 10),
+      startTime: slot.start_time
+        ? String(slot.start_time).substring(0, 5)
+        : '—',
     };
   });
 
@@ -369,9 +434,9 @@ const Events = () => {
             
           </VStack> */}
           <VStack align="start" w="100%">
-            {parsedDates.map((d, index) => (
-              <>
-                <HStack key={index} w="100%" justify="space-between" >
+            {scheduleRows.map((d, index) => (
+              <Box key={`${d.day}-${d.month}-${index}`} w="100%">
+                <HStack w="100%" justify="space-between" >
 
                   {/* ЛЕВАЯ ЧАСТЬ — дата */}
                   <HStack gap="15px">
@@ -395,7 +460,7 @@ const Events = () => {
                   <HStack >
 
                     <Text color="white" fontSize={{ "2xl": '20px' }} transform="translateX(-340px)">
-                      {eventDetails.duration?.substring(0, 5) || '—'}
+                      {d.startTime}
                     </Text>
 
                     <Box
@@ -440,12 +505,12 @@ const Events = () => {
                   </HStack>
 
                 </HStack>
-                {index !== parsedDates.length - 1 && (
+                {index !== scheduleRows.length - 1 && (
                   <Box w="100%" >
                     <Separator borderColor="white" my={3} />
                   </Box>
                 )}
-              </>
+              </Box>
             ))}
           </VStack>
 
