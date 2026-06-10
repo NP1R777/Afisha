@@ -90,6 +90,22 @@ async def _load_event_with_relations(
     ).scalars().first()
 
 
+async def _get_event_payload_by_id(
+    db_connect: AsyncSession,
+    *,
+    event_id: int,
+) -> dict:
+    event = await _load_event_with_relations(
+        db_connect=db_connect,
+        event_id=event_id,
+    )
+    if not event:
+        raise HTTPException(status_code=404, detail="Мероприятие не найдено!")
+    if event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Мероприятие удалено из базы")
+    return _serialize_event(event)
+
+
 def _serialize_event(event: Events) -> dict:
     return {
         "id": event.id,
@@ -197,7 +213,7 @@ async def create_event(
 
 
 @router.patch(
-    "/event/{event_id}",
+    "/event/{event_id:int}",
     description="Обновление существующего мероприятия по id",
     summary="Обновление существующего мероприятия по id",
     responses={
@@ -266,7 +282,7 @@ async def update_event_by_id(
 
 
 @router.delete(
-    "/event/{event_id}",
+    "/event/{event_id:int}",
     description="Полное удаление мероприятия по id",
     summary="Удаление мероприятия по id",
     responses={
@@ -340,7 +356,7 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
 
 
 @router.get(
-    '/event/event{event_id}/',
+    '/event/event{event_id:int}/',
     description="Получение мероприятия по id",
     summary="Получение мероприятия по id",
     responses={
@@ -359,19 +375,42 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
 )
 async def get_event_by_id(event_id: int,
                           db_connect: AsyncSession = Depends(get_db)):
-    event = await _load_event_with_relations(
+    return await _get_event_payload_by_id(
         db_connect=db_connect,
         event_id=event_id,
     )
-    if not event:
-        raise HTTPException(status_code=404, detail="Мероприятие не найдено!")
-    if event.deleted_at is not None:
-        raise HTTPException(status_code=404, detail="Мероприятие удалено из базы")
-    return _serialize_event(event)
 
 
 @router.get(
-    '/event/event_category{event_id}/',
+    '/event/event%7Bid%7D',
+    description="Legacy-совместимость: получение мероприятия по id через query-параметр",
+    summary="Legacy-совместимость: получение мероприятия по id через query-параметр",
+    responses={
+        200: {"description": "Мероприятие успешно получено!"},
+        500: {"description": "При получении мероприятия произошла ошибка"}
+    }
+)
+@router.get(
+    '/event/event%7Bid%7D/',
+    description="Legacy-совместимость: получение мероприятия по id через query-параметр",
+    summary="Legacy-совместимость: получение мероприятия по id через query-параметр",
+    responses={
+        200: {"description": "Мероприятие успешно получено!"},
+        500: {"description": "При получении мероприятия произошла ошибка"}
+    }
+)
+async def get_event_by_id_legacy(
+    event_id: int = Query(..., ge=1),
+    db_connect: AsyncSession = Depends(get_db),
+):
+    return await _get_event_payload_by_id(
+        db_connect=db_connect,
+        event_id=event_id,
+    )
+
+
+@router.get(
+    '/event/event_category{event_id:int}/',
     description="Получение категории мероприятия по id мероприятия",
     summary="Получение категории мероприятия по id мероприятия",
     responses={
