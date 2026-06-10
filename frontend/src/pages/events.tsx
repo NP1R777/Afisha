@@ -503,7 +503,6 @@ const Events = () => {
                     </Button>
 
                   </HStack>
-
                 </HStack>
                 {index !== scheduleRows.length - 1 && (
                   <Box w="100%" >
