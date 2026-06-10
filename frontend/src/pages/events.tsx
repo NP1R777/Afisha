@@ -8,7 +8,7 @@ import fon from '../pictures/fon2.png';
 import axios from '../shared/lib/axios';
 import { Toaster, toaster } from "../components/ui/toaster"
 import EventImage from '../pictures/picture1.png';
-import star_empty from '../pictures/Star1.png';
+import star_empty from '../pictures/star1.png';
 import star_full from '../pictures/Star2.png';
 
 interface EventDetails {
