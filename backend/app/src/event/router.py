@@ -348,13 +348,26 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
         500: {"description": "При получении мероприятия произошла ошибка"}
     }
 )
+@router.get(
+    '/event/{event_id}',
+    description="Получение мероприятия по id (новый маршрут)",
+    summary="Получение мероприятия по id (новый маршрут)",
+    responses={
+        200: {"description": "Мероприятие успешно получено!"},
+        500: {"description": "При получении мероприятия произошла ошибка"}
+    }
+)
 async def get_event_by_id(event_id: int,
                           db_connect: AsyncSession = Depends(get_db)):
-    event = (await db_connect.execute(select(Events).filter(Events.id == event_id))).scalar()
+    event = await _load_event_with_relations(
+        db_connect=db_connect,
+        event_id=event_id,
+    )
     if not event:
         raise HTTPException(status_code=404, detail="Мероприятие не найдено!")
-    else:
-        return event
+    if event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Мероприятие удалено из базы")
+    return _serialize_event(event)
 
 
 @router.get(
