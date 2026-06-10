@@ -15,7 +15,7 @@ interface EventDetails {
   id: number;
   name: string;
   description: string;
-  organization: string;
+  organization: number;
   group_id: string;
   external_url: string;
   date_event: string[];
@@ -37,6 +37,16 @@ const Events = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
+
+  const organizationsMap: Record<number, string> = {
+    1: 'Заполярный театр драмы',
+    2: 'Администрация города Норильска',
+    3: 'Кинотеатр Родина',
+    4: 'Городской центр культуры',
+    5: 'Талнахская детская школа искусств',
+    6: 'Норильская детская школа искусств',
+    7: 'Норильский колледж искусств',
+  };
 
   const toggleFavorite = async (index: number) => {
     if (!userId) {
@@ -380,7 +390,8 @@ const Events = () => {
                       fontWeight="bold"
                       color="white"
                     >
-                      {d.day}
+                      {/* {d.day} */}
+                      20
                     </Text>
 
                     <Text
@@ -388,14 +399,16 @@ const Events = () => {
                       fontWeight="bold"
                       color="#0E3EA0"
                     >
-                      {monthNames[d.month - 1]}
+                      {/* {monthNames[d.month - 1]} */}
+                      ИЮНЯ
                     </Text>
                   </HStack>
 
                   <HStack >
 
                     <Text color="white" fontSize={{ "2xl": '20px' }} transform="translateX(-340px)">
-                      {eventDetails.duration?.substring(0, 5) || '—'}
+                      {/* {eventDetails.duration?.substring(0, 5) || '—'} */}
+                      18:00
                     </Text>
 
                     <Box
@@ -479,7 +492,11 @@ const Events = () => {
           Адрес
         </Text>
         <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-          {eventDetails.organization}
+          {
+            organizationsMap[
+              Number(eventDetails.organization)
+            ] || 'Неизвестная организация'
+          }
         </Text>
         <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
           {eventDetails.address}

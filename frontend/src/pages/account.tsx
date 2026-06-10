@@ -49,6 +49,16 @@ const Account = () => {
   const [isOrganizerRegisterOpen, setIsOrganizerRegisterOpen] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
+  const organizationsMap: Record<number, string> = {
+  1: 'Заполярный театр драмы',
+  2: 'Администрация города Норильска',
+  3: 'Кинотеатр Родина',
+  4: 'Городской центр культуры',
+  5: 'Талнахская детская школа искусств',
+  6: 'Норильская детская школа искусств',
+  7: 'Норильский колледж искусств',
+};
+
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => {
     setIsModalOpen(false);
@@ -419,7 +429,8 @@ const Account = () => {
                               alignItems="flex-start"
                               mt={{ base: 2, md: 1, lg: 2 }}
                             >
-                              {event.organization}
+                              {/* {event.organization} */}
+                              {organizationsMap[Number(event.organization)] || event.organization || 'Неизвестная организация'}
                             </Text>
                           </Flex>
                           <Flex
@@ -430,15 +441,18 @@ const Account = () => {
                           >
                             <Flex align="center">
                               <Text fontSize="50px" mr={1}>
-                                {new Date(event.date_event).getDate()}
+                                {/* {new Date(event.date_event).getDate()} */}
+                                20
                               </Text>
                               <Text fontSize="15px" color="#0E3EA0">
-                                {new Date(event.date_event).toLocaleString('default', { month: 'long' }).toUpperCase()}
+                                {/* {new Date(event.date_event).toLocaleString('default', { month: 'long' }).toUpperCase()} */}
+                                ИЮНЯ
                               </Text>
                             </Flex>
                             <Flex mt={5}>
                               <Text fontSize="20px" textAlign="center" mb={2}>
-                                {formatTime(event.duration)}
+                                {/* {formatTime(event.duration)} */}
+                                18:00
                               </Text>
                               <Text
                                 fontSize="15px"
