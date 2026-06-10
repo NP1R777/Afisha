@@ -261,13 +261,14 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                                                             </Text>
                                                         ) : null}
                                                         <Button
-                                                            as="a"
-                                                            href={`/event/${match.event_id}`}
                                                             size="xs"
                                                             mt={2}
                                                             bg="#0C0066"
                                                             color="white"
                                                             _hover={{ bg: '#171173' }}
+                                                            onClick={() => {
+                                                                window.location.href = `/event/${match.event_id}`;
+                                                            }}
                                                         >
                                                             Открыть
                                                         </Button>
