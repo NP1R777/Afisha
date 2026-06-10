@@ -3,16 +3,30 @@ import Modal from 'react-modal';
 import { useRef, useEffect, useState } from 'react';
 import assistant from '../pictures/assistant2.png';
 import background from '../pictures/background2.png';
+import axios from '../shared/lib/axios';
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
 }
 
+type MatchEvent = {
+    event_id: number;
+    name: string;
+    description: string;
+    organization: string;
+    city: string;
+    price: number | null;
+    pictures_main: string | null;
+    external_url: string;
+    date_event: string | null;
+};
+
 type Message = {
     id: number;
     type: 'assistant' | 'user';
-    text: string;
+    text?: string;
+    matches?: MatchEvent[];
 };
 
 const AiAssistantModal = ({ isOpen, onClose }: Props) => {
@@ -21,11 +35,6 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
             id: 1,
             type: 'assistant',
             text: 'Привет. Я твой ИИ помощник. Могу рассказать о мероприятиях, которые сейчас проходят в городе, найти интересное событие и ответить на вопросы. Чем могу помочь?',
-        },
-        {
-            id: 2,
-            type: 'user',
-            text: 'Какие концерты пройдут на этих выходных?',
         },
     ]);
 
@@ -39,19 +48,55 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
         chatRef.current.scrollTop = chatRef.current.scrollHeight;
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!value.trim()) return;
+
+        const userMessage = value;
 
         setMessages(prev => [
             ...prev,
             {
                 id: Date.now(),
                 type: 'user',
-                text: value,
+                text: userMessage,
             },
         ]);
 
         setValue('');
+
+        try {
+            const response = await axios.post(
+                '/assistant/chat',
+                {
+                    message: userMessage,
+                    top_k: 5,
+                }
+            );
+            console.log('AI RESPONSE:', response.data);
+            const data = response.data;
+
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: Date.now() + 1,
+                    type: 'assistant',
+                    text: data.message,
+                    matches: data.matches || [],
+                },
+            ]);
+
+        } catch (error) {
+            console.error('Ошибка AI assistant:', error);
+
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: Date.now() + 1,
+                    type: 'assistant',
+                    text: 'Произошла ошибка при обращении к ИИ.',
+                },
+            ]);
+        }
     };
 
     useEffect(() => {
@@ -127,24 +172,46 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                         overflowY="auto"
                     >
                     {messages.map(message => (
-                        <Flex
-                            key={message.id}
-                            justify={message.type === 'user' ? 'flex-end' : 'flex-start'}
-                            mb={4}
-                            fontSize="15px"
-                        >
-                            <Box
-                                maxW="55%"
-                                px={5}
-                                py={4}
-                                borderRadius="16px"
-                                bg={message.type === 'user' ? '#0C0066' : 'rgb(255, 255, 255)'}
-                                color={message.type === 'user' ? 'white' : 'black'}
-                            >
-                                {message.text}
-                            </Box>
-                        </Flex>
-                    ))}
+    <Flex
+        key={message.id}
+        justify={
+            message.type === 'user'
+                ? 'flex-end'
+                : 'flex-start'
+        }
+        mb={4}
+        fontSize="15px"
+    >
+        <Box
+            maxW="75%"
+            px={5}
+            py={4}
+            borderRadius="16px"
+            bg={
+                message.type === 'user'
+                    ? '#0C0066'
+                    : 'rgb(255, 255, 255)'
+            }
+            color={
+                message.type === 'user'
+                    ? 'white'
+                    : 'black'
+            }
+        >
+            {message.text && (
+                <Text mb={message.matches?.length ? 4 : 0}>
+                    {message.text}
+                </Text>
+            )}
+
+            {message.matches?.map(event => (
+                <Text key={event.event_id}>
+                    • {event.name}
+                </Text>
+            ))}
+            </Box>
+        </Flex>
+    ))}
                     </Flex>
 
                     {/* INPUT */}

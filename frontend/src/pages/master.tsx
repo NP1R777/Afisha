@@ -26,7 +26,7 @@ interface Event {
   external_url: string;
   name: string;
   description: string;
-  location: string;
+  organization: string;
   group_id: number;
   time_slots: {
     id: number;
@@ -39,8 +39,8 @@ interface Event {
   address: string;
   city: string;
   age_limit: string;
-  pictures_url: string;
-  horizontal_picture_url: string | null;
+  pictures_main: string;
+  pictures_two: string | null;
 }
 
 interface EventCategory {
@@ -230,9 +230,22 @@ const Frame = () => {
 
   const districtItems = [
     { label: 'Норильск', value: 'norilsk' },
-    { label: 'Талнах', value: 'talnakx' },
+    { label: 'Талнах', value: 'talnah' },
     { label: 'Кайеркан', value: 'kayerkan' },
+    { label: 'Оганер', value: 'oganeer' },
+    { label: 'Дудинка', value: 'dudinka' }
   ];
+
+  const organizationsMap: Record<number, string> = {
+    1: 'Заполярный театр драмы',
+    2: 'Администрация города Норильска',
+    3: 'Кинотеатр Родина',
+    4: 'Городской центр культуры',
+    5: 'Талнахская детская школа искусств',
+    6: 'Норильская детская школа искусств',
+    7: 'Норильский колледж искусств',
+    8: 'Культурно-досуговый центр имени В. Высоцкого',
+  };
 
   const districts = createListCollection({
     items: districtItems,
@@ -341,18 +354,19 @@ const handleClearDate = () => {
   endDate !== null;
 
   const filteredCategories = categoriesFromBackend.filter(category => {
-    const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
-    if (!userId || !userCategories || userCategories.length === 0) {
-      return true;
+    const filteredEvents =
+      filterEventsBySearchQuery(
+        eventsByCategory[category.id] || []
+      );
+
+    if (
+      selectedCategories.length > 0 &&
+      !selectedCategories.includes(category.id.toString())
+    ) {
+      return false;
     }
-    const userCategoriesStr = userCategories?.map(String) || [];
-    const isCategoryInUserCategories = userCategoriesStr.includes(category.id.toString());
-  
-    if (areFiltersApplied) {
-      return filteredEvents.length > 0;
-    } else {
-      return isCategoryInUserCategories && filteredEvents.length > 0;
-    }
+
+    return filteredEvents.length > 0;
   });
 
   const hasVisibleEvents = filteredCategories.some(category => {
@@ -370,28 +384,47 @@ const handleClearDate = () => {
     return filteredEvents.length > 0;
   });
 
-  const personalizedEvents = Object.values(eventsByCategory)
-    .flat()
-    .filter(event => {
-      const category = categoriesFromBackend.find(
-        category => category.id === event.group_id
+const personalizedEvents = Object.values(eventsByCategory)
+  .flat()
+  .filter(event => {
+    if (!userCategories?.length) return false;
+
+    const matchesUserCategory =
+      event.group_id != null &&
+      userCategoriesStr.includes(
+        event.group_id.toString()
       );
 
-      return category?.name.toLowerCase() === 'театр';
-    })
+    const matchesSearch =
+      !searchQuery ||
+      event.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
 
-    .sort((a, b) => {
-      const dateA = a.time_slots?.[0]?.date_event
-        ? new Date(a.time_slots[0].date_event).getTime()
-        : 0;
+    const matchesDistrict =
+      selectedDistricts.length === 0 ||
+      selectedDistricts.includes(
+        event.city?.toLowerCase()
+      );
 
-      const dateB = b.time_slots?.[0]?.date_event
-        ? new Date(b.time_slots[0].date_event).getTime()
-        : 0;
+    return (
+      matchesUserCategory &&
+      matchesSearch &&
+      matchesDistrict
+    );
+  })
+  .sort((a, b) => {
+    const dateA = a.time_slots?.[0]?.date_event
+      ? new Date(a.time_slots[0].date_event).getTime()
+      : 0;
 
-      return dateA - dateB;
-    })
-    .slice(0, 12);
+    const dateB = b.time_slots?.[0]?.date_event
+      ? new Date(b.time_slots[0].date_event).getTime()
+      : 0;
+
+    return dateA - dateB;
+  })
+  .slice(0, 12);
 
   return (
     <ContainerFluid>
@@ -497,7 +530,7 @@ const handleClearDate = () => {
                 borderRadius="full"
                 onChange={handleCategoryChange}
               >
-                <SelectTrigger>
+                <SelectTrigger width="185px">
                   <Box
                     textWrap="nowrap"
                     as="span"
@@ -747,7 +780,7 @@ const handleClearDate = () => {
                         position="relative"
                       >
                         <Image
-                          src={event.pictures_url}
+                          src={event.pictures_main}
                           alt={event.name}
                           width="100%"
                           height={{ xl: '360px', md: '300px', sm: '290px', base: '200px' }}
@@ -787,7 +820,10 @@ const handleClearDate = () => {
                           </Text>
 
                           <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
-                            {event.location}
+                            {
+                                organizationsMap[event.organization] ||
+                                'Неизвестная организация'
+                              }
                           </Text>
                         </Box>
 
@@ -894,7 +930,7 @@ const handleClearDate = () => {
                               position="relative"
                             >
                               <Image
-                                src={event.pictures_url}
+                                src={event.pictures_main}
                                 alt={event.name}
                                 width="100%"
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
@@ -932,7 +968,10 @@ const handleClearDate = () => {
                                   {event.name}
                                 </Text>
                                 <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
-                                  {event.location}
+                                {
+                                  organizationsMap[event.organization] ||
+                                  'Неизвестная организация'
+                                }
                                 </Text>
                               </Box>
                               <Box

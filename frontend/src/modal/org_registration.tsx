@@ -11,6 +11,7 @@ interface FormValues {
   password: string;
   mail: string;
   birthdate: string;
+  organization: string;
 }
 
 interface OrganizerRegisterModalProps {
@@ -159,6 +160,22 @@ const OrganizerRegisterModal: React.FC<OrganizerRegisterModalProps> = ({
                 })}
                 bg="white"
                 placeholder="Email"
+              />
+            </Field>
+            <Field
+              invalid={!!errors.organization}
+              errorText={errors.organization?.message}
+            >
+              <Input
+                {...register('organization', {
+                  required: 'Введите название организации',
+                  minLength: {
+                    value: 2,
+                    message: 'Название организации слишком короткое',
+                  },
+                })}
+                bg="white"
+                placeholder="Организация"
               />
             </Field>
 
