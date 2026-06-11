@@ -18,6 +18,7 @@ class ParsedEventCreate(BaseModel):
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
     pictures_main: Optional[str] = None
+    pictures_two: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -37,6 +38,12 @@ class ParseDistributeRequest(BaseModel):
 
 class ParseCategoryBackfillRequest(BaseModel):
     limit: int = Field(default=1000, ge=1, le=10000)
+
+
+class ParseImageBackfillRequest(BaseModel):
+    limit: int = Field(default=500, ge=1, le=5000)
+    offset: int = Field(default=0, ge=0)
+    force: bool = False
 
 
 class ParseRunStats(BaseModel):
@@ -71,6 +78,7 @@ class ParsedEventOut(BaseModel):
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
     pictures_main: Optional[str] = None
+    pictures_two: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -101,6 +109,19 @@ class ParseCategoryBackfillResponse(BaseModel):
     requested: int
     linked: int
     without_match: int
+    errors: int
+
+
+class ParseImageBackfillResponse(BaseModel):
+    requested: int
+    uploaded_main: int
+    uploaded_two: int
+    fallback_main: int
+    fallback_two: int
+    already_minio_main: int
+    already_minio_two: int
+    default_applied_main: int
+    default_applied_two: int
     errors: int
 
 
