@@ -19,6 +19,7 @@ parts/
 sdist/
 var/
 frontend/
+backend/
 wheels/
 share/python-wheels/
 *.egg-info/
