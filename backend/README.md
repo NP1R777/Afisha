@@ -198,7 +198,7 @@ VMUZEY_COOKIES=
 VMUZEY_USER_AGENT=
 
 # MinIO images
-MINIO_ENDPOINT=minio:9000
+MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=afisha-images
@@ -211,6 +211,8 @@ MINIO_REQUEST_TIMEOUT_SEC=30
 - `VMUZEY_PROXY` — URL прокси в формате `http://user:pass@host:port`;
 - `VMUZEY_COOKIES` — cookie-строка вида `name=value; name2=value2`;
 - `VMUZEY_USER_AGENT` — пользовательский User-Agent для запросов к vmuzey.
+- основной MinIO для проекта берётся из `docker-compose.milvus.yml` (единый MinIO для Milvus и картинок).
+- `MINIO_ENDPOINT=localhost:9000` используйте при запуске backend на хосте; если backend запущен в docker в общей сети с MinIO — используйте `minio:9000`.
 - `MINIO_PUBLIC_BASE_URL` — публичная база URL для картинок, которую получает фронт.
 - разрешены MIME: `image/jpeg`, `image/png`, `image/webp`, максимальный размер файла: `10 MB`.
 
