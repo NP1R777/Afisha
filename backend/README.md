@@ -156,6 +156,7 @@ alembic upgrade head
 - `POST /parser/run` — запуск парсинга вручную;
 - `POST /parser/distribute` — перенос записей из `parsed_event` в `events/news` по rule-based классификации;
 - `POST /parser/categories/backfill` — ручная автопривязка категорий для `events` без категорий;
+- `POST /parser/images/backfill` — ручная загрузка `events.pictures_main` в MinIO (batch-режим);
 - `GET /parser/events` — просмотр собранных событий из staging-таблицы.
 
 При переносе:
@@ -163,6 +164,7 @@ alembic upgrade head
 - успешно перенесенные записи помечаются `deleted_at`, и удаляются физически после 3 дней при следующем запуске переноса;
 - дубли в целевых таблицах удаляются из `parsed_event` сразу (без soft delete).
 - при переносе в `events` автоматически создаются связи в `event_groups_event`, если по правилам удалось определить категорию.
+- при `POST /parser/run` изображения из `pictures_main` загружаются в MinIO. Если загрузка неуспешна, сохраняется fallback на исходную внешнюю ссылку.
 
 ### Подключенные источники
 
@@ -194,11 +196,23 @@ alembic upgrade head
 VMUZEY_PROXY=
 VMUZEY_COOKIES=
 VMUZEY_USER_AGENT=
+
+# MinIO images
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=afisha-images
+MINIO_SECURE=false
+MINIO_PUBLIC_BASE_URL=http://localhost:9000
+MINIO_MAX_IMAGE_SIZE_MB=10
+MINIO_REQUEST_TIMEOUT_SEC=30
 ```
 
 - `VMUZEY_PROXY` — URL прокси в формате `http://user:pass@host:port`;
 - `VMUZEY_COOKIES` — cookie-строка вида `name=value; name2=value2`;
 - `VMUZEY_USER_AGENT` — пользовательский User-Agent для запросов к vmuzey.
+- `MINIO_PUBLIC_BASE_URL` — публичная база URL для картинок, которую получает фронт.
+- разрешены MIME: `image/jpeg`, `image/png`, `image/webp`, максимальный размер файла: `10 MB`.
 
 ### Пример запуска парсинга
 

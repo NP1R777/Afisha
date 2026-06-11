@@ -39,6 +39,12 @@ class ParseCategoryBackfillRequest(BaseModel):
     limit: int = Field(default=1000, ge=1, le=10000)
 
 
+class ParseImageBackfillRequest(BaseModel):
+    limit: int = Field(default=500, ge=1, le=5000)
+    offset: int = Field(default=0, ge=0)
+    force: bool = False
+
+
 class ParseRunStats(BaseModel):
     source_key: str
     source_name: str
@@ -101,6 +107,15 @@ class ParseCategoryBackfillResponse(BaseModel):
     requested: int
     linked: int
     without_match: int
+    errors: int
+
+
+class ParseImageBackfillResponse(BaseModel):
+    requested: int
+    uploaded: int
+    fallback_used: int
+    already_minio: int
+    skipped_without_image: int
     errors: int
 
 
