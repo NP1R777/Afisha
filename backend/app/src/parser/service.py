@@ -24,6 +24,8 @@ from src.parser.schemas import (
     ParseCategoryBackfillResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
+    ParseImageBackfillRequest,
+    ParseImageBackfillResponse,
     ParseLaunchRequest,
     ParseLaunchResponse,
     ParseRunStats,
@@ -36,6 +38,11 @@ from src.parser.sources import (
     ParserRuntimeConfig,
     parse_source,
     resolve_source_keys,
+)
+from src.storage.minio_images import (
+    ImageUploadResult,
+    is_minio_public_url,
+    upload_image_from_url,
 )
 
 
@@ -76,6 +83,7 @@ async def run_parse_and_store(
     total_inserted = 0
     total_duplicates = 0
     total_errors = 0
+    image_url_cache: dict[str, str | None] = {}
     runtime_config = ParserRuntimeConfig(
         vmuzey_proxy=settings.vmuzey_proxy,
         vmuzey_cookies=settings.vmuzey_cookies,
@@ -110,6 +118,12 @@ async def run_parse_and_store(
             if duplicate_query.scalar_one_or_none():
                 duplicates += 1
                 continue
+
+            parsed_item.pictures_main = _resolve_image_url_for_storage(
+                settings=settings,
+                image_url=parsed_item.pictures_main,
+                image_url_cache=image_url_cache,
+            )
 
             db_connect.add(
                 ParsedEvent(
@@ -157,6 +171,72 @@ async def run_parse_and_store(
         total_duplicates=total_duplicates,
         total_errors=total_errors,
         stats=stats,
+    )
+
+
+async def backfill_event_images_to_minio(
+    db_connect: AsyncSession,
+    request: ParseImageBackfillRequest,
+    settings: AppSettings,
+) -> ParseImageBackfillResponse:
+    query = (
+        select(Events)
+        .where(Events.deleted_at.is_(None))
+        .order_by(Events.id.asc())
+        .offset(request.offset)
+        .limit(request.limit)
+    )
+    rows = (await db_connect.execute(query)).scalars().all()
+
+    uploaded = 0
+    fallback_used = 0
+    already_minio = 0
+    skipped_without_image = 0
+    errors = 0
+    result_cache: dict[str, ImageUploadResult] = {}
+
+    for event in rows:
+        current_url = (event.pictures_main or "").strip()
+        if not current_url:
+            skipped_without_image += 1
+            continue
+
+        if not request.force and is_minio_public_url(current_url, settings):
+            already_minio += 1
+            continue
+
+        if current_url in result_cache:
+            result = result_cache[current_url]
+        else:
+            result = upload_image_from_url(
+                settings=settings,
+                image_url=current_url,
+                object_prefix="events",
+            )
+            result_cache[current_url] = result
+
+        if result.final_url:
+            event.pictures_main = result.final_url
+        else:
+            errors += 1
+            continue
+
+        if result.uploaded:
+            uploaded += 1
+        elif result.fallback_used:
+            fallback_used += 1
+        else:
+            errors += 1
+
+    await db_connect.flush()
+
+    return ParseImageBackfillResponse(
+        requested=len(rows),
+        uploaded=uploaded,
+        fallback_used=fallback_used,
+        already_minio=already_minio,
+        skipped_without_image=skipped_without_image,
+        errors=errors,
     )
 
 
@@ -378,6 +458,28 @@ async def _cleanup_soft_deleted_parsed(db_connect: AsyncSession) -> int:
 
 def _normalize_text(value: Optional[str]) -> str:
     return " ".join((value or "").strip().split()).lower()
+
+
+def _resolve_image_url_for_storage(
+    *,
+    settings: AppSettings,
+    image_url: str | None,
+    image_url_cache: dict[str, str | None],
+) -> str | None:
+    source_url = (image_url or "").strip()
+    if not source_url:
+        return None
+    if source_url in image_url_cache:
+        return image_url_cache[source_url]
+
+    result = upload_image_from_url(
+        settings=settings,
+        image_url=source_url,
+        object_prefix="events",
+    )
+    final_url = (result.final_url or source_url).strip() or None
+    image_url_cache[source_url] = final_url
+    return final_url
 
 
 def _normalize_category_key(name: str) -> Optional[str]:

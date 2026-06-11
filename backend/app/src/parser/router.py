@@ -8,12 +8,15 @@ from src.parser.schemas import (
     ParseCategoryBackfillResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
+    ParseImageBackfillRequest,
+    ParseImageBackfillResponse,
     ParseLaunchRequest,
     ParseLaunchResponse,
     ParseSourceInfo,
     ParsedEventListResponse,
 )
 from src.parser.service import (
+    backfill_event_images_to_minio,
     backfill_event_categories,
     distribute_parsed_events,
     list_parsed_events,
@@ -83,6 +86,23 @@ async def backfill_parser_event_categories(
     db_connect: AsyncSession = Depends(get_db),
 ) -> ParseCategoryBackfillResponse:
     return await backfill_event_categories(db_connect=db_connect, request=payload)
+
+
+@router.post(
+    "/images/backfill",
+    response_model=ParseImageBackfillResponse,
+    summary="Ручной перенос изображений events в MinIO",
+)
+async def backfill_event_images(
+    payload: ParseImageBackfillRequest,
+    db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
+) -> ParseImageBackfillResponse:
+    return await backfill_event_images_to_minio(
+        db_connect=db_connect,
+        request=payload,
+        settings=settings,
+    )
 
 
 @router.get(

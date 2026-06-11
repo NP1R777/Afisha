@@ -46,6 +46,16 @@ class AppSettings(BaseSettings):
     milvus_db_name: str = "default"
     milvus_collection_name: str = "afisha_events"
 
+    # MinIO image storage
+    minio_endpoint: Optional[str] = None
+    minio_access_key: Optional[str] = None
+    minio_secret_key: Optional[str] = None
+    minio_bucket: str = "afisha-images"
+    minio_secure: bool = False
+    minio_public_base_url: Optional[str] = None
+    minio_max_image_size_mb: int = 10
+    minio_request_timeout_sec: int = 30
+
     root_path: str = ''
 
     class Config:
