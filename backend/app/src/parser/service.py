@@ -83,7 +83,7 @@ async def run_parse_and_store(
     total_inserted = 0
     total_duplicates = 0
     total_errors = 0
-    image_url_cache: dict[str, str | None] = {}
+    image_url_cache: dict[tuple[str, str], str | None] = {}
     runtime_config = ParserRuntimeConfig(
         vmuzey_proxy=settings.vmuzey_proxy,
         vmuzey_cookies=settings.vmuzey_cookies,
@@ -122,7 +122,16 @@ async def run_parse_and_store(
             parsed_item.pictures_main = _resolve_image_url_for_storage(
                 settings=settings,
                 image_url=parsed_item.pictures_main,
+                default_image_url=settings.default_event_card_image_url,
                 image_url_cache=image_url_cache,
+                object_prefix="events/main",
+            )
+            parsed_item.pictures_two = _resolve_image_url_for_storage(
+                settings=settings,
+                image_url=parsed_item.pictures_two,
+                default_image_url=settings.default_event_detail_image_url,
+                image_url_cache=image_url_cache,
+                object_prefix="events/detail",
             )
 
             db_connect.add(
@@ -140,6 +149,7 @@ async def run_parse_and_store(
                     age_limit=parsed_item.age_limit,
                     external_url=parsed_item.external_url,
                     pictures_main=parsed_item.pictures_main,
+                    pictures_two=parsed_item.pictures_two,
                     target_type=parsed_item.target_type or "unknown",
                     process_status=parsed_item.process_status or "new",
                     processed_at=parsed_item.processed_at,
@@ -188,54 +198,60 @@ async def backfill_event_images_to_minio(
     )
     rows = (await db_connect.execute(query)).scalars().all()
 
-    uploaded = 0
-    fallback_used = 0
-    already_minio = 0
-    skipped_without_image = 0
+    uploaded_main = 0
+    uploaded_two = 0
+    fallback_main = 0
+    fallback_two = 0
+    already_minio_main = 0
+    already_minio_two = 0
+    default_applied_main = 0
+    default_applied_two = 0
     errors = 0
-    result_cache: dict[str, ImageUploadResult] = {}
+    result_cache: dict[tuple[str, str], ImageUploadResult] = {}
 
     for event in rows:
-        current_url = (event.pictures_main or "").strip()
-        if not current_url:
-            skipped_without_image += 1
-            continue
+        main_result = _backfill_single_event_image(
+            settings=settings,
+            current_url=event.pictures_main,
+            default_image_url=settings.default_event_card_image_url,
+            object_prefix="events/main",
+            result_cache=result_cache,
+            force=request.force,
+        )
+        event.pictures_main = main_result["final_url"]
+        uploaded_main += int(main_result["uploaded"])
+        fallback_main += int(main_result["fallback"])
+        already_minio_main += int(main_result["already_minio"])
+        default_applied_main += int(main_result["default_applied"])
+        errors += int(main_result["error"])
 
-        if not request.force and is_minio_public_url(current_url, settings):
-            already_minio += 1
-            continue
-
-        if current_url in result_cache:
-            result = result_cache[current_url]
-        else:
-            result = upload_image_from_url(
-                settings=settings,
-                image_url=current_url,
-                object_prefix="events",
-            )
-            result_cache[current_url] = result
-
-        if result.final_url:
-            event.pictures_main = result.final_url
-        else:
-            errors += 1
-            continue
-
-        if result.uploaded:
-            uploaded += 1
-        elif result.fallback_used:
-            fallback_used += 1
-        else:
-            errors += 1
+        detail_result = _backfill_single_event_image(
+            settings=settings,
+            current_url=event.pictures_two,
+            default_image_url=settings.default_event_detail_image_url,
+            object_prefix="events/detail",
+            result_cache=result_cache,
+            force=request.force,
+        )
+        event.pictures_two = detail_result["final_url"]
+        uploaded_two += int(detail_result["uploaded"])
+        fallback_two += int(detail_result["fallback"])
+        already_minio_two += int(detail_result["already_minio"])
+        default_applied_two += int(detail_result["default_applied"])
+        errors += int(detail_result["error"])
 
     await db_connect.flush()
 
     return ParseImageBackfillResponse(
         requested=len(rows),
-        uploaded=uploaded,
-        fallback_used=fallback_used,
-        already_minio=already_minio,
-        skipped_without_image=skipped_without_image,
+        uploaded_main=uploaded_main,
+        uploaded_two=uploaded_two,
+        fallback_main=fallback_main,
+        fallback_two=fallback_two,
+        already_minio_main=already_minio_main,
+        already_minio_two=already_minio_two,
+        default_applied_main=default_applied_main,
+        default_applied_two=default_applied_two,
         errors=errors,
     )
 
@@ -434,6 +450,7 @@ async def list_parsed_events(
                 age_limit=item.age_limit,
                 external_url=item.external_url,
                 pictures_main=item.pictures_main,
+                pictures_two=item.pictures_two,
                 target_type=item.target_type.value if item.target_type else None,
                 process_status=item.process_status.value if item.process_status else None,
                 processed_at=item.processed_at,
@@ -464,22 +481,95 @@ def _resolve_image_url_for_storage(
     *,
     settings: AppSettings,
     image_url: str | None,
-    image_url_cache: dict[str, str | None],
+    default_image_url: str | None,
+    image_url_cache: dict[tuple[str, str], str | None],
+    object_prefix: str,
 ) -> str | None:
-    source_url = (image_url or "").strip()
+    default_url = _resolve_default_image_url(default_image_url)
+    source_url = (image_url or "").strip() or default_url
     if not source_url:
         return None
-    if source_url in image_url_cache:
-        return image_url_cache[source_url]
+    cache_key = (source_url, object_prefix)
+    if cache_key in image_url_cache:
+        return image_url_cache[cache_key]
 
     result = upload_image_from_url(
         settings=settings,
         image_url=source_url,
-        object_prefix="events",
+        object_prefix=object_prefix,
     )
     final_url = (result.final_url or source_url).strip() or None
-    image_url_cache[source_url] = final_url
+    image_url_cache[cache_key] = final_url
     return final_url
+
+
+def _resolve_default_image_url(default_image_url: str | None) -> str | None:
+    normalized = (default_image_url or "").strip()
+    return normalized or None
+
+
+def _backfill_single_event_image(
+    *,
+    settings: AppSettings,
+    current_url: str | None,
+    default_image_url: str | None,
+    object_prefix: str,
+    result_cache: dict[tuple[str, str], ImageUploadResult],
+    force: bool,
+) -> dict[str, bool | str | None]:
+    normalized_current = (current_url or "").strip()
+    default_url = _resolve_default_image_url(default_image_url)
+    source_url = normalized_current or default_url
+    if not source_url:
+        return {
+            "final_url": None,
+            "uploaded": False,
+            "fallback": False,
+            "already_minio": False,
+            "default_applied": False,
+            "error": False,
+        }
+
+    if not force and is_minio_public_url(source_url, settings):
+        return {
+            "final_url": source_url,
+            "uploaded": False,
+            "fallback": False,
+            "already_minio": True,
+            "default_applied": bool(default_url and source_url == default_url and not normalized_current),
+            "error": False,
+        }
+
+    cache_key = (source_url, object_prefix)
+    if cache_key in result_cache:
+        result = result_cache[cache_key]
+    else:
+        result = upload_image_from_url(
+            settings=settings,
+            image_url=source_url,
+            object_prefix=object_prefix,
+        )
+        result_cache[cache_key] = result
+
+    if not result.final_url:
+        return {
+            "final_url": source_url,
+            "uploaded": False,
+            "fallback": False,
+            "already_minio": False,
+            "default_applied": bool(default_url and source_url == default_url and not normalized_current),
+            "error": True,
+        }
+
+    final_url = result.final_url
+    return {
+        "final_url": final_url,
+        "uploaded": result.uploaded,
+        "fallback": bool(result.fallback_used and not result.uploaded),
+        "already_minio": False,
+        "default_applied": bool(default_url and source_url == default_url and not normalized_current),
+        "error": False,
+    }
 
 
 def _normalize_category_key(name: str) -> Optional[str]:
@@ -773,6 +863,7 @@ async def _insert_event_from_parsed(
         address=item.address,
         age_limit=item.age_limit,
         pictures_main=item.pictures_main,
+        pictures_two=item.pictures_two,
         external_url=item.external_url,
     )
     db_connect.add(event)

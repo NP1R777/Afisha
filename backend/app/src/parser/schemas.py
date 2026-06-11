@@ -18,6 +18,7 @@ class ParsedEventCreate(BaseModel):
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
     pictures_main: Optional[str] = None
+    pictures_two: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -77,6 +78,7 @@ class ParsedEventOut(BaseModel):
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
     pictures_main: Optional[str] = None
+    pictures_two: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -112,10 +114,14 @@ class ParseCategoryBackfillResponse(BaseModel):
 
 class ParseImageBackfillResponse(BaseModel):
     requested: int
-    uploaded: int
-    fallback_used: int
-    already_minio: int
-    skipped_without_image: int
+    uploaded_main: int
+    uploaded_two: int
+    fallback_main: int
+    fallback_two: int
+    already_minio_main: int
+    already_minio_two: int
+    default_applied_main: int
+    default_applied_two: int
     errors: int
 
 
