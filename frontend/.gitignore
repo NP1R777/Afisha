@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Distribution / packaging
+/backend
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
