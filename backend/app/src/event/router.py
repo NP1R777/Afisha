@@ -1,14 +1,22 @@
+import re
 from datetime import date, datetime
 from core.session import get_db
 from typing import Optional, List
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
-from src.event.schemas import EventIn, EventTimeIn, EventUpdate
+from src.event.schemas import (
+    CalendarEventOut,
+    CalendarEventsResponse,
+    EventIn,
+    EventTimeIn,
+    EventUpdate,
+)
 from database.models import (
     CityEnum,
     EventGroupsEvent,
     Events,
     GroupsEvent,
+    InfoOrganization,
     TimesEvent,
     UserToEvent,
 )
@@ -16,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 router = APIRouter()
+ALLOWED_AGE_VALUES = {0, 6, 12, 16, 18}
+AGE_LIMIT_PATTERN = re.compile(r"(\d{1,2})")
 
 
 def _normalize_ids(raw_values: list[int] | None) -> list[int]:
@@ -145,6 +155,37 @@ def _parse_city(raw_city: Optional[str]) -> Optional[CityEnum]:
             status_code=422,
             detail=f"city должен быть одним из: {', '.join(item.value for item in CityEnum)}",
         )
+
+
+def _extract_age_limit_value(age_limit: str | None) -> int | None:
+    text = (age_limit or "").strip()
+    if not text:
+        return None
+    match = AGE_LIMIT_PATTERN.search(text)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _normalize_exact_age_values(raw_values: list[int] | None) -> set[int]:
+    if not raw_values:
+        return set()
+    unique_values = set(raw_values)
+    invalid_values = sorted(unique_values - ALLOWED_AGE_VALUES)
+    if invalid_values:
+        allowed_display = ", ".join(str(value) for value in sorted(ALLOWED_AGE_VALUES))
+        raise HTTPException(
+            status_code=422,
+            detail=f"Возрастной фильтр поддерживает только точные значения: {allowed_display}.",
+        )
+    return unique_values
+
+
+def _normalize_text(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
 
 @router.post(
     '/event/create_event',
@@ -353,6 +394,76 @@ async def get_all_events(db_connect: AsyncSession = Depends(get_db),
         raise HTTPException(status_code=404, detail="Мероприятия не были найдены!")
 
     return events
+
+
+@router.get(
+    "/event/calendar/events",
+    response_model=CalendarEventsResponse,
+    description="Получение показов мероприятий для календаря организатора",
+    summary="Получение показов мероприятий для календаря организатора",
+)
+async def get_calendar_events(
+    date_from: date = Query(..., description="Начальная дата диапазона (YYYY-MM-DD)"),
+    date_to: date = Query(..., description="Конечная дата диапазона (YYYY-MM-DD)"),
+    age_values: Optional[List[int]] = Query(
+        default=None,
+        description="Точные возрастные значения (0, 6, 12, 16, 18)",
+    ),
+    organizer_name: str | None = Query(
+        default=None,
+        description="Имя организатора для выделения его мероприятий",
+    ),
+    db_connect: AsyncSession = Depends(get_db),
+) -> CalendarEventsResponse:
+    if date_from > date_to:
+        raise HTTPException(status_code=422, detail="date_from не может быть больше date_to.")
+
+    exact_age_values = _normalize_exact_age_values(age_values)
+    normalized_organizer = _normalize_text(organizer_name)
+
+    rows = (
+        await db_connect.execute(
+            select(TimesEvent, Events, InfoOrganization.name_org)
+            .join(Events, TimesEvent.event_id == Events.id)
+            .outerjoin(InfoOrganization, InfoOrganization.id == Events.organization)
+            .where(
+                Events.deleted_at.is_(None),
+                func.date(TimesEvent.date_event) >= date_from,
+                func.date(TimesEvent.date_event) <= date_to,
+            )
+            .order_by(TimesEvent.date_event.asc(), TimesEvent.start_time.asc(), Events.id.asc())
+        )
+    ).all()
+
+    items: list[CalendarEventOut] = []
+    for slot, event, organization_name in rows:
+        event_age = _extract_age_limit_value(event.age_limit)
+        if exact_age_values and (event_age is None or event_age not in exact_age_values):
+            continue
+
+        organizer = (organization_name or "").strip() or None
+        is_organizer_event = bool(
+            normalized_organizer
+            and organizer
+            and _normalize_text(organizer) == normalized_organizer
+        )
+        items.append(
+            CalendarEventOut(
+                slot_id=slot.id,
+                event_id=event.id,
+                date=slot.date_event.date().isoformat(),
+                time=slot.start_time.strftime("%H:%M"),
+                title=event.name,
+                age_limit=event.age_limit,
+                organizer=organizer,
+                is_organizer_event=is_organizer_event,
+            )
+        )
+
+    return CalendarEventsResponse(
+        total=len(items),
+        items=items,
+    )
 
 
 @router.get(
