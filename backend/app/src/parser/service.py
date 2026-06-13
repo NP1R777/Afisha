@@ -310,7 +310,7 @@ async def distribute_parsed_events(
 
             if target_type == ParsedTargetType.event:
                 if await _is_event_duplicate(db_connect, item):
-                    db_connect.delete(item)
+                    await db_connect.delete(item)
                     duplicates_deleted += 1
                     continue
 
@@ -324,7 +324,7 @@ async def distribute_parsed_events(
                 continue
 
             if await _is_news_duplicate(db_connect, item):
-                db_connect.delete(item)
+                await db_connect.delete(item)
                 duplicates_deleted += 1
                 continue
 
@@ -612,7 +612,7 @@ async def delete_parsed_event_manually(
     parsed_event_id: int,
 ) -> ParseDeleteResponse:
     item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
-    db_connect.delete(item)
+    await db_connect.delete(item)
     await db_connect.flush()
     return ParseDeleteResponse(
         parsed_event_id=parsed_event_id,
