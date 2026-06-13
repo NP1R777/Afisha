@@ -43,3 +43,19 @@ class EventFilter(BaseModel):
     group_id: Optional[list[int]] = None
     date_event: Optional[list[date]] = None
     city: Optional[list[str]] = None
+
+
+class CalendarEventOut(BaseModel):
+    slot_id: int
+    event_id: int
+    date: str
+    time: str
+    title: str
+    age_limit: Optional[str] = None
+    organizer: Optional[str] = None
+    is_organizer_event: bool = False
+
+
+class CalendarEventsResponse(BaseModel):
+    total: int
+    items: list[CalendarEventOut]
