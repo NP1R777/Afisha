@@ -154,6 +154,11 @@ class ParseStatusUpdateResponse(BaseModel):
     error_text: Optional[str] = None
 
 
+class ParseDeleteResponse(BaseModel):
+    parsed_event_id: int
+    message: str
+
+
 class ParsedEventListResponse(BaseModel):
     total: int
     items: list[ParsedEventOut]
