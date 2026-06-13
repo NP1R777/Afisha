@@ -328,21 +328,13 @@ const Events = () => {
     : '0+';
   const formattedPrice = formatPrice(eventDetails.price);
 
-  const scheduleRows = (
-    eventDetails.time_slots?.length
-      ? eventDetails.time_slots
-      : (eventDetails.date_event || []).map((date) => ({
-        date_event: date,
-        start_time: eventDetails.duration || '',
-      }))
-  ).map((slot) => {
+  const scheduleRows = (eventDetails.time_slots || []).map((slot) => {
     const { day, month } = parseDateParts(slot.date_event);
-    const fallbackTime = eventDetails.duration || '';
     const slotTime = formatScheduleValue(slot.start_time);
     const timeLabel =
       slotTime !== '—' && slotTime !== '00:00'
         ? slotTime
-        : formatScheduleValue(fallbackTime);
+        : 'Время начала не указано';
 
     return {
       day,
@@ -502,7 +494,14 @@ const Events = () => {
             
           </VStack> */}
           <VStack align="start" w="100%">
-            {scheduleRows.map((d, index) => (
+            {scheduleRows.length === 0 ? (
+              <Text
+                color="white"
+                fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }}
+              >
+                Время начала не указано
+              </Text>
+            ) : scheduleRows.map((d, index) => (
               <Box key={`${d.day}-${d.month}-${index}`} w="100%">
                 <HStack w="100%" justify="space-between" >
 
