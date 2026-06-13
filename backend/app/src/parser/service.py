@@ -2,6 +2,7 @@ import re
 from datetime import datetime, time, timedelta
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -28,8 +29,12 @@ from src.parser.schemas import (
     ParseImageBackfillResponse,
     ParseLaunchRequest,
     ParseLaunchResponse,
+    ParseManualResolveRequest,
+    ParseManualResolveResponse,
     ParseRunStats,
     ParseSourceInfo,
+    ParseStatusUpdateRequest,
+    ParseStatusUpdateResponse,
     ParsedEventListResponse,
     ParsedEventOut,
 )
@@ -427,6 +432,8 @@ async def list_parsed_events(
     limit: int,
     offset: int = 0,
     source_key: str | None = None,
+    target_type: str | None = None,
+    process_status: str | None = None,
 ) -> ParsedEventListResponse:
     query = select(ParsedEvent).order_by(ParsedEvent.created_at.desc(), ParsedEvent.id.desc())
     count_query = select(func.count(ParsedEvent.id))
@@ -434,6 +441,16 @@ async def list_parsed_events(
     if source_key:
         query = query.where(ParsedEvent.source_key == source_key)
         count_query = count_query.where(ParsedEvent.source_key == source_key)
+
+    target_filter = _parse_target_type_value(target_type)
+    if target_filter:
+        query = query.where(ParsedEvent.target_type == target_filter)
+        count_query = count_query.where(ParsedEvent.target_type == target_filter)
+
+    status_filter = _parse_process_status_value(process_status)
+    if status_filter:
+        query = query.where(ParsedEvent.process_status == status_filter)
+        count_query = count_query.where(ParsedEvent.process_status == status_filter)
 
     total = (await db_connect.execute(count_query)).scalar() or 0
     rows = (await db_connect.execute(query.offset(offset).limit(limit))).scalars().all()
@@ -466,6 +483,117 @@ async def list_parsed_events(
             )
             for item in rows
         ],
+    )
+
+
+async def resolve_parsed_event_manually(
+    db_connect: AsyncSession,
+    *,
+    parsed_event_id: int,
+    request: ParseManualResolveRequest,
+) -> ParseManualResolveResponse:
+    item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
+    now_utc = datetime.utcnow()
+
+    if request.target_type == "rejected":
+        item.target_type = ParsedTargetType.unknown
+        item.process_status = ParsedProcessStatus.rejected
+        item.processed_at = now_utc
+        item.error_text = (request.error_text or "").strip() or None
+        item.deleted_at = None
+        await db_connect.flush()
+        return ParseManualResolveResponse(
+            parsed_event_id=item.id,
+            target_type=item.target_type.value,
+            process_status=item.process_status.value,
+            event_id=None,
+            news_id=None,
+            message="Запись помечена как отклоненная.",
+        )
+
+    if request.target_type == "event":
+        unique_group_ids = sorted(set(request.group_ids))
+        if not unique_group_ids:
+            raise HTTPException(status_code=400, detail="Для target_type=event нужно передать group_ids.")
+        await _validate_group_ids(db_connect=db_connect, group_ids=unique_group_ids)
+        if await _is_event_duplicate(db_connect, item):
+            raise HTTPException(status_code=409, detail="Событие уже существует в events.")
+
+        event_id = await _insert_event_from_parsed_manual(
+            db_connect=db_connect,
+            item=item,
+            group_ids=unique_group_ids,
+        )
+        item.target_type = ParsedTargetType.event
+        item.process_status = ParsedProcessStatus.processed
+        item.processed_at = now_utc
+        item.error_text = None
+        item.deleted_at = now_utc
+        await db_connect.flush()
+        return ParseManualResolveResponse(
+            parsed_event_id=item.id,
+            target_type=item.target_type.value,
+            process_status=item.process_status.value,
+            event_id=event_id,
+            news_id=None,
+            message="Событие успешно перенесено в events.",
+        )
+
+    if await _is_news_duplicate(db_connect, item):
+        raise HTTPException(status_code=409, detail="Новость уже существует в news.")
+
+    news_id = await _insert_news_from_parsed(db_connect, item)
+    item.target_type = ParsedTargetType.news
+    item.process_status = ParsedProcessStatus.processed
+    item.processed_at = now_utc
+    item.error_text = None
+    item.deleted_at = now_utc
+    await db_connect.flush()
+    return ParseManualResolveResponse(
+        parsed_event_id=item.id,
+        target_type=item.target_type.value,
+        process_status=item.process_status.value,
+        event_id=None,
+        news_id=news_id,
+        message="Запись успешно перенесена в news.",
+    )
+
+
+async def update_parsed_event_status(
+    db_connect: AsyncSession,
+    *,
+    parsed_event_id: int,
+    request: ParseStatusUpdateRequest,
+) -> ParseStatusUpdateResponse:
+    item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
+    next_status = _parse_process_status_value(request.process_status)
+    if not next_status:
+        raise HTTPException(status_code=400, detail="Некорректный статус parsed_event.")
+
+    now_utc = datetime.utcnow()
+    item.process_status = next_status
+
+    if next_status == ParsedProcessStatus.new:
+        item.target_type = ParsedTargetType.unknown
+        item.processed_at = None
+        item.error_text = None
+        item.deleted_at = None
+    elif next_status == ParsedProcessStatus.rejected:
+        item.target_type = ParsedTargetType.unknown
+        item.processed_at = now_utc
+        item.error_text = (request.error_text or "").strip() or None
+        item.deleted_at = None
+    else:
+        item.processed_at = now_utc
+        item.error_text = (request.error_text or "").strip() or "Статус обновлен вручную из админ-панели."
+        item.deleted_at = None
+
+    await db_connect.flush()
+    return ParseStatusUpdateResponse(
+        parsed_event_id=item.id,
+        target_type=item.target_type.value if item.target_type else "unknown",
+        process_status=item.process_status.value if item.process_status else "new",
+        error_text=item.error_text,
     )
 
 
@@ -876,7 +1004,7 @@ async def _insert_event_from_parsed(
     item: ParsedEvent,
     *,
     group_lookup: dict[str, list[int]],
-) -> None:
+) -> int:
     organization_id = await _get_or_create_organization_id(
         db_connect,
         name=item.organization,
@@ -929,17 +1057,122 @@ async def _insert_event_from_parsed(
         )
 
     await db_connect.flush()
+    return event.id
 
 
-async def _insert_news_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> None:
-    db_connect.add(
-        News(
-            name=item.name,
-            address=item.address,
-            organizator=item.organization,
-        )
+async def _insert_event_from_parsed_manual(
+    db_connect: AsyncSession,
+    *,
+    item: ParsedEvent,
+    group_ids: list[int],
+) -> int:
+    organization_id = await _get_or_create_organization_id(
+        db_connect,
+        name=item.organization,
+        address=item.address,
     )
+    event = Events(
+        name=item.name,
+        description=item.description,
+        organization=organization_id,
+        city=_map_city(item.city),
+        price=_parse_price_value(item.price),
+        address=item.address,
+        age_limit=item.age_limit,
+        pictures_main=item.pictures_main,
+        pictures_two=item.pictures_two,
+        external_url=item.external_url,
+    )
+    db_connect.add(event)
     await db_connect.flush()
+
+    for group_id in group_ids:
+        db_connect.add(EventGroupsEvent(event_id=event.id, groups_id=group_id))
+
+    for event_dt, start_time in _extract_schedule(item):
+        db_connect.add(
+            TimesEvent(
+                event_id=event.id,
+                date_event=event_dt,
+                start_time=start_time,
+            )
+        )
+
+    await db_connect.flush()
+    return event.id
+
+
+async def _insert_news_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> int:
+    news = News(
+        name=item.name,
+        address=item.address,
+        organizator=item.organization,
+    )
+    db_connect.add(news)
+    await db_connect.flush()
+    return news.id
+
+
+async def _get_active_parsed_event_or_404(
+    *,
+    db_connect: AsyncSession,
+    parsed_event_id: int,
+) -> ParsedEvent:
+    item = (
+        await db_connect.execute(
+            select(ParsedEvent).where(
+                ParsedEvent.id == parsed_event_id,
+                ParsedEvent.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Parsed event не найден.")
+    return item
+
+
+async def _validate_group_ids(
+    *,
+    db_connect: AsyncSession,
+    group_ids: list[int],
+) -> None:
+    rows = (
+        await db_connect.execute(
+            select(GroupsEvent.id).where(
+                GroupsEvent.id.in_(group_ids),
+                GroupsEvent.deleted_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    existing_ids = set(rows)
+    missing_ids = [group_id for group_id in group_ids if group_id not in existing_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не найдены категории groups_event: {', '.join(str(group_id) for group_id in missing_ids)}.",
+        )
+
+
+def _parse_target_type_value(value: str | None) -> ParsedTargetType | None:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return None
+    try:
+        return ParsedTargetType(normalized)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in ParsedTargetType)
+        raise HTTPException(status_code=400, detail=f"Некорректный target_type. Разрешено: {allowed}.") from exc
+
+
+def _parse_process_status_value(value: str | None) -> ParsedProcessStatus | None:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return None
+    try:
+        return ParsedProcessStatus(normalized)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in ParsedProcessStatus)
+        raise HTTPException(status_code=400, detail=f"Некорректный process_status. Разрешено: {allowed}.") from exc
 
 
 def list_sources() -> list[ParseSourceInfo]:
