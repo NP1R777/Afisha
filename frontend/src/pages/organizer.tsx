@@ -11,6 +11,7 @@ import wave from '../pictures/wave31.png';
 import { Calendar } from '../modal/org_calendar';
 
 const Organizer = () => {
+    const organizerName = 'Театр драмы им. В. Маяковского';
     const events = EVENTS.events;
     //для карточек мероприятий
     const [currentIndex, setCurrentIndex] = React.useState(0); 
@@ -72,7 +73,7 @@ const Organizer = () => {
                 zIndex={1}
                 fontFamily="Unbounded" userSelect="none">
                 <Text fontSize={{ "2xl": '70px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="400px">
-                    Театр драмы им. В. Маяковского
+                    {organizerName}
                 </Text>
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="50px">
                     Адрес
@@ -319,7 +320,7 @@ const Organizer = () => {
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="40px" ml="55px" textAlign="center">
                     План мероприятий
                 </Text>
-                <Calendar />
+                <Calendar organizerName={organizerName} />
             </Box>
         </Flex>
     );
