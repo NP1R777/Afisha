@@ -43,6 +43,38 @@ interface Event {
   horizontal_picture_url: string | null;
 }
 
+function normalizeEvent(item: any): Event {
+  const normalizedTimeSlots = Array.isArray(item?.time_slots) ? item.time_slots : [];
+  const groupIds = Array.isArray(item?.group_ids) ? item.group_ids : [];
+
+  return {
+    id: item?.id ? Number(item.id) : undefined,
+    external_url: item?.external_url || '',
+    name: item?.name || '',
+    description: item?.description || '',
+    location: item?.location || item?.address || item?.city || '',
+    group_id: Number(item?.group_id ?? groupIds[0] ?? 0),
+    time_slots: normalizedTimeSlots,
+    duration: item?.duration || '',
+    price:
+      item?.price !== null && item?.price !== undefined
+        ? String(item.price)
+        : '',
+    address: item?.address || '',
+    city: item?.city || '',
+    age_limit: item?.age_limit || '',
+    pictures_url:
+      item?.pictures_url ||
+      item?.picture_url ||
+      item?.pictures_main ||
+      '',
+    horizontal_picture_url:
+      item?.horizontal_picture_url ||
+      item?.pictures_two ||
+      null,
+  };
+}
+
 interface EventCategory {
   id: number;
   name: string;
@@ -177,7 +209,9 @@ const Frame = () => {
               res.data
             );
 
-            const events = res.data;
+            const events = Array.isArray(res.data)
+              ? res.data.map((item: any) => normalizeEvent(item))
+              : [];
 
             events.sort((a: Event, b: Event) => {
               const dateA = a.time_slots?.[0]?.date_event
@@ -747,7 +781,7 @@ const handleClearDate = () => {
                         position="relative"
                       >
                         <Image
-                          src={event.pictures_url}
+                          src={event.pictures_url || EventImage}
                           alt={event.name}
                           width="100%"
                           height={{ xl: '360px', md: '300px', sm: '290px', base: '200px' }}
@@ -894,7 +928,7 @@ const handleClearDate = () => {
                               position="relative"
                             >
                               <Image
-                                src={event.pictures_url}
+                                src={event.pictures_url || EventImage}
                                 alt={event.name}
                                 width="100%"
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
