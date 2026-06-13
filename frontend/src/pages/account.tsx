@@ -41,11 +41,10 @@ interface Category {
 
 const Account = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { username, userId, setEmail, setBirthdate, categories, setCategories,setUsername } = useUser();
+  const { username, userId, role, setRole, setEmail, setBirthdate, categories, setCategories,setUsername } = useUser();
   const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
-  const [isOrganizer, setIsOrganizer] = useState(false);
   const [isOrganizerRegisterOpen, setIsOrganizerRegisterOpen] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
@@ -106,8 +105,9 @@ const Account = () => {
       }
 
       setCategories(data.preferences || []);
-
-      setIsOrganizer(data.is_organizer || false);
+      if (data.role === 'user' || data.role === 'admin' || data.role === 'organizator') {
+        setRole(data.role);
+      }
 
     } catch (error) {
 
@@ -204,6 +204,8 @@ const Account = () => {
     }
     return name;
   };
+
+  const isOrganizer = role === 'organizator';
 
   return (
     <ContainerFluid>

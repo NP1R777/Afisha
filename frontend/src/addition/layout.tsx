@@ -2,6 +2,7 @@ import { Button, Flex, HStack, Image, Input, Separator, Stack, Text,Box } from '
 import { useEffect, useState } from 'react';
 import { LuSearch } from 'react-icons/lu';
 import { Outlet, useNavigate } from 'react-router-dom';
+import axios from '../shared/lib/axios';
 import { useUser } from '../addition/context';
 import { ContainerFluid } from '../components/ui/container';
 import { InputGroup } from '../components/ui/input-group';
@@ -12,7 +13,7 @@ import AiAssistantModal from '../modal/assistant';
 import { useLocation } from 'react-router-dom';
 
 const Layout = () => {
-  const { isAuthenticated, setUsername, setSearchQuery } = useUser();
+  const { isAuthenticated, userId, role, setRole, setUsername, setSearchQuery } = useUser();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const navigate = useNavigate();
@@ -41,6 +42,10 @@ const Layout = () => {
   };
 
   const handleProfileClick = () => {
+    if (role === 'organizator') {
+      navigate('/organizer');
+      return;
+    }
     navigate('/account');
   };
 
@@ -76,6 +81,28 @@ const Layout = () => {
       navigate('/');
     }
   };
+
+  useEffect(() => {
+    let isCancelled = false;
+    const loadRole = async () => {
+      if (!isAuthenticated || !userId || role) {
+        return;
+      }
+      try {
+        const response = await axios.get(`/user/get_user?user_id=${userId}`);
+        const value = response.data?.role;
+        if (!isCancelled && (value === 'user' || value === 'admin' || value === 'organizator')) {
+          setRole(value);
+        }
+      } catch {
+        // silent fallback for anonymous/invalid sessions
+      }
+    };
+    void loadRole();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAuthenticated, role, setRole, userId]);
 
   return (
     <>
