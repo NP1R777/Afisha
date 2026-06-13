@@ -502,7 +502,7 @@ const Account = () => {
           >
             План ваших мероприятий
           </Text>
-          <Calendar canManageEvents={isOrganizer} />
+          <Calendar />
         </Box>
       )}
         <CreateModal isOpen={isModalOpen} onRequestClose={closeModal} onCreateSuccess={handleCreateSuccess} />

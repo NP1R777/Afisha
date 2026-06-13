@@ -376,7 +376,17 @@ const handleClearDate = () => {
 
   const filteredCategories = categoriesFromBackend.filter(category => {
     const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
-    return filteredEvents.length > 0;
+    if (!userId || !userCategories || userCategories.length === 0) {
+      return true;
+    }
+    const userCategoriesStr = userCategories?.map(String) || [];
+    const isCategoryInUserCategories = userCategoriesStr.includes(category.id.toString());
+  
+    if (areFiltersApplied) {
+      return filteredEvents.length > 0;
+    } else {
+      return isCategoryInUserCategories && filteredEvents.length > 0;
+    }
   });
 
   const hasVisibleEvents = filteredCategories.some(category => {
