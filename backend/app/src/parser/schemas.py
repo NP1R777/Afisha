@@ -10,6 +10,7 @@ class ParsedEventCreate(BaseModel):
     name: str
     description: Optional[str] = None
     date_event: Optional[str] = None
+    start_time: Optional[str] = None
     duration: Optional[str] = None
     city: Optional[str] = None
     price: Optional[str] = None
@@ -70,6 +71,7 @@ class ParsedEventOut(BaseModel):
     name: str
     description: Optional[str] = None
     date_event: Optional[str] = None
+    start_time: Optional[str] = None
     duration: Optional[str] = None
     city: Optional[str] = None
     price: Optional[str] = None

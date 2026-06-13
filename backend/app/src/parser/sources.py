@@ -12,6 +12,7 @@ from src.parser.schemas import ParsedEventCreate
 from src.parser.utils import (
     absolute_url,
     clean_text,
+    extract_first_time,
     normalize_age_limit,
     normalize_duration,
     normalize_event_date,
@@ -225,6 +226,7 @@ def _event_payload(
     external_url: Optional[str] = None,
     pictures_main: Optional[str] = None,
     pictures_two: Optional[str] = None,
+    start_time: Optional[str] = None,
 ) -> Optional[ParsedEventCreate]:
     normalized_name = clean_text(name)
     if not normalized_name:
@@ -236,6 +238,9 @@ def _event_payload(
         name=normalized_name,
         description=clean_text(description),
         date_event=normalize_event_date(date_event),
+        start_time=extract_first_time(start_time)
+        or extract_first_time(date_event)
+        or extract_first_time(duration),
         duration=normalize_duration(duration),
         city=clean_text(city) or config.city,
         price=normalize_price(price),
@@ -485,7 +490,8 @@ def _parse_northdrama(config: SourceConfig, *, max_events: int) -> list[ParsedEv
                 name=title_link.get_text(" ", strip=True) if title_link else None,
                 description=detail_data.description,
                 date_event=date_raw,
-                duration=detail_data.duration or afisha_time,
+                duration=detail_data.duration,
+                start_time=afisha_time,
                 price=event_item.select_one(".performances__price").get_text(" ", strip=True) if event_item.select_one(".performances__price") else None,
                 age_limit=event_item.select_one(".mark").get_text(" ", strip=True) if event_item.select_one(".mark") else None,
                 external_url=event_url,

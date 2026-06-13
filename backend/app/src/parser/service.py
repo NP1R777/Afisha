@@ -39,6 +39,7 @@ from src.parser.sources import (
     parse_source,
     resolve_source_keys,
 )
+from src.parser.utils import extract_first_time, normalize_event_date
 from src.storage.minio_images import (
     ImageUploadResult,
     is_minio_public_url,
@@ -109,10 +110,14 @@ async def run_parse_and_store(
             errors += 1
 
         for parsed_item in parsed_items:
+            parsed_date = (parsed_item.date_event or "").strip()
+            parsed_start = (parsed_item.start_time or "").strip()
             duplicate_query = await db_connect.execute(
                 select(ParsedEvent.id).where(
+                    ParsedEvent.source_key == parsed_item.source_key,
                     ParsedEvent.name == parsed_item.name,
-                    ParsedEvent.date_event == parsed_item.date_event,
+                    func.coalesce(ParsedEvent.date_event, "") == parsed_date,
+                    func.coalesce(ParsedEvent.start_time, "") == parsed_start,
                 )
             )
             if duplicate_query.scalar_one_or_none():
@@ -141,6 +146,7 @@ async def run_parse_and_store(
                     name=parsed_item.name,
                     description=parsed_item.description,
                     date_event=parsed_item.date_event,
+                    start_time=parsed_item.start_time,
                     duration=parsed_item.duration,
                     city=parsed_item.city,
                     price=parsed_item.price,
@@ -442,6 +448,7 @@ async def list_parsed_events(
                 name=item.name,
                 description=item.description,
                 date_event=item.date_event,
+                start_time=item.start_time,
                 duration=item.duration,
                 city=item.city,
                 price=item.price,
@@ -744,6 +751,13 @@ def _map_city(value: Optional[str]) -> Optional[CityEnum]:
 
 def _extract_schedule(item: ParsedEvent) -> list[tuple[datetime, time]]:
     seen: set[tuple[datetime, time]] = set()
+    normalized_date = normalize_event_date(item.date_event)
+    normalized_start_time = extract_first_time(item.start_time)
+    if normalized_date and normalized_start_time:
+        schedule_pair = _build_schedule_pair(normalized_date, normalized_start_time)
+        if schedule_pair:
+            seen.add(schedule_pair)
+
     candidates = [item.date_event, item.duration, item.description]
 
     for source in candidates:
@@ -751,16 +765,30 @@ def _extract_schedule(item: ParsedEvent) -> list[tuple[datetime, time]]:
             continue
         for match in DATE_TIME_PATTERN.finditer(source):
             date_part = match.group(1)
-            time_part = match.group(2) or "00:00"
-            try:
-                event_date = datetime.strptime(date_part, "%d.%m.%Y")
-                start_time = datetime.strptime(time_part, "%H:%M").time()
-            except ValueError:
+            time_part = match.group(2)
+            if not time_part:
                 continue
-            event_dt = datetime.combine(event_date.date(), start_time)
-            seen.add((event_dt, start_time))
+            schedule_pair = _build_schedule_pair(date_part, time_part)
+            if schedule_pair:
+                seen.add(schedule_pair)
 
     return sorted(seen, key=lambda item_data: item_data[0])
+
+
+def _build_schedule_pair(date_value: str, time_value: str) -> tuple[datetime, time] | None:
+    normalized_date = normalize_event_date(date_value)
+    normalized_time = extract_first_time(time_value)
+    if not normalized_date or not normalized_time:
+        return None
+
+    try:
+        event_date = datetime.strptime(normalized_date, "%d.%m.%Y")
+        start_time = datetime.strptime(normalized_time, "%H:%M").time()
+    except ValueError:
+        return None
+
+    event_dt = datetime.combine(event_date.date(), start_time)
+    return event_dt, start_time
 
 
 async def _get_or_create_organization_id(
