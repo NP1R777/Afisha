@@ -1,4 +1,5 @@
 import React from "react";
+import axios from "../shared/lib/axios";
 import { Button, Flex, HStack, Image, Text, VStack, Box, Grid} from '@chakra-ui/react';
 import fon from '../pictures/fon2.png';
 import { motion } from "framer-motion";
@@ -9,9 +10,12 @@ import EventImage from '../pictures/picture1.png';
 import Organizer_picture from '../pictures/teatr.png';
 import wave from '../pictures/wave31.png';
 import { Calendar } from '../modal/org_calendar';
+import { useUser } from "../addition/context";
 
 const Organizer = () => {
+    const { userId, role, setRole } = useUser();
     const organizerName = 'Театр драмы им. В. Маяковского';
+    const isOrganizerRole = role === 'organizator';
     const events = EVENTS.events;
     //для карточек мероприятий
     const [currentIndex, setCurrentIndex] = React.useState(0); 
@@ -31,6 +35,28 @@ const Organizer = () => {
         newsIndex,
         newsIndex + itemsPerPage
     );
+
+    React.useEffect(() => {
+        let isCancelled = false;
+        const loadRole = async () => {
+            if (!userId || role) {
+                return;
+            }
+            try {
+                const response = await axios.get(`/user/get_user?user_id=${userId}`);
+                const value = response.data?.role;
+                if (!isCancelled && (value === 'user' || value === 'admin' || value === 'organizator')) {
+                    setRole(value);
+                }
+            } catch {
+                // silent fallback: page remains readable without privileged actions
+            }
+        };
+        void loadRole();
+        return () => {
+            isCancelled = true;
+        };
+    }, [role, setRole, userId]);
 
     return (
         <Flex w="100%">
@@ -320,7 +346,7 @@ const Organizer = () => {
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="40px" ml="55px" textAlign="center">
                     План мероприятий
                 </Text>
-                <Calendar organizerName={organizerName} />
+                <Calendar organizerName={organizerName} canManageEvents={isOrganizerRole} />
             </Box>
         </Flex>
     );

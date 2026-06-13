@@ -4,12 +4,14 @@ interface UserContextType {
   isAuthenticated: boolean;
   username: string | null;
   userId: string | null;
+  role: 'user' | 'admin' | 'organizator' | null;
   email: string | null;
   date_of_birth: string | null;
   categories: string[] | null;
   searchQuery: string;
   setUsername: (username: string | null) => void;
   setUserId: (userId: string | null) => void;
+  setRole: (role: 'user' | 'admin' | 'organizator' | null) => void;
   setEmail: (email: string | null) => void;
   setBirthdate: (birthdate: string | null) => void;
   setCategories: (categories: string[] | null) => void;
@@ -27,6 +29,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const [userId, setUserId] = useState<string | null>(() => {
     return localStorage.getItem('userId') || null;
+  });
+  const [role, setRole] = useState<'user' | 'admin' | 'organizator' | null>(() => {
+    const rawRole = localStorage.getItem('role');
+    if (rawRole === 'user' || rawRole === 'admin' || rawRole === 'organizator') {
+      return rawRole;
+    }
+    return null;
   });
 
   const [email, setEmail] = useState<string | null>(() => localStorage.getItem('email') || null);
@@ -66,6 +75,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [email]);
 
   useEffect(() => {
+    if (role) {
+      localStorage.setItem('role', role);
+    } else {
+      localStorage.removeItem('role');
+    }
+  }, [role]);
+
+  useEffect(() => {
     if (date_of_birth) {
       localStorage.setItem('date_of_birth', date_of_birth);
     } else {
@@ -80,12 +97,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setUsername(null);
     setUserId(null);
+    setRole(null);
     setEmail(null);
     setBirthdate(null);
     setCategories(null);
     setSearchQuery('');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
+    localStorage.removeItem('role');
     localStorage.removeItem('email');
     localStorage.removeItem('date_of_birth');
     setIsAuthenticated(false);
@@ -97,12 +116,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated,
         username,
         userId,
+        role,
         categories,
         email,
         date_of_birth,
         searchQuery,
         setUsername,
         setUserId,
+        setRole,
         setCategories,
         setEmail,
         setBirthdate,
