@@ -36,6 +36,7 @@ const CITY_LABELS: Record<string, string> = {
 const Organizer = () => {
     const { userId, role, setRole } = useUser();
     const organizerName = 'Театр драмы им. В. Маяковского';
+    const [roleResolved, setRoleResolved] = React.useState(false);
     const isOrganizerRole = role === 'organizator';
     const [events, setEvents] = React.useState<OrganizerEventCard[]>([]);
     const [newsEvents, setNewsEvents] = React.useState<OrganizerNewsCard[]>([]);
@@ -126,7 +127,10 @@ const Organizer = () => {
     React.useEffect(() => {
         let isCancelled = false;
         const loadRole = async () => {
-            if (!userId || role) {
+            if (!userId) {
+                if (!isCancelled) {
+                    setRoleResolved(true);
+                }
                 return;
             }
             try {
@@ -137,13 +141,17 @@ const Organizer = () => {
                 }
             } catch {
                 // silent fallback: page remains readable without privileged actions
+            } finally {
+                if (!isCancelled) {
+                    setRoleResolved(true);
+                }
             }
         };
         void loadRole();
         return () => {
             isCancelled = true;
         };
-    }, [role, setRole, userId]);
+    }, [setRole, userId]);
 
     React.useEffect(() => {
         void loadOrganizerContent();
@@ -449,7 +457,7 @@ const Organizer = () => {
                 </Text>
                 <Calendar
                     organizerName={organizerName}
-                    canManageEvents={isOrganizerRole}
+                    canManageEvents={roleResolved && isOrganizerRole}
                     onEventCreated={loadOrganizerContent}
                 />
             </Box>
