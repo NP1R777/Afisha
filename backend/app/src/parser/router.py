@@ -6,6 +6,7 @@ from core.settings import AppSettings
 from src.parser.schemas import (
     ParseCategoryBackfillRequest,
     ParseCategoryBackfillResponse,
+    ParseDeleteResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
     ParseImageBackfillRequest,
@@ -22,6 +23,7 @@ from src.parser.schemas import (
 from src.parser.service import (
     backfill_event_images_to_minio,
     backfill_event_categories,
+    delete_parsed_event_manually,
     distribute_parsed_events,
     list_parsed_events,
     list_sources,
@@ -175,4 +177,19 @@ async def patch_parsed_event_status(
         db_connect=db_connect,
         parsed_event_id=parsed_event_id,
         request=payload,
+    )
+
+
+@router.delete(
+    "/events/{parsed_event_id}",
+    response_model=ParseDeleteResponse,
+    summary="Удаление parsed_event из staging-таблицы",
+)
+async def delete_parsed_event(
+    parsed_event_id: int,
+    db_connect: AsyncSession = Depends(get_db),
+) -> ParseDeleteResponse:
+    return await delete_parsed_event_manually(
+        db_connect=db_connect,
+        parsed_event_id=parsed_event_id,
     )
