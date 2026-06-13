@@ -20,7 +20,7 @@ interface EventDetails {
   external_url: string;
   date_event: string[];
   duration: string;
-  price: string;
+  price: number | null;
   address: string;
   city: string;
   age_limit: string;
@@ -43,6 +43,62 @@ const Events = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
+
+  const formatScheduleValue = (rawValue: string | undefined): string => {
+    const normalized = (rawValue || '').trim();
+    if (!normalized) {
+      return '—';
+    }
+
+    const timeMatch = normalized.match(/^(\d{1,2}:\d{2})(?::\d{2})?$/);
+    if (timeMatch) {
+      return timeMatch[1];
+    }
+    return normalized;
+  };
+
+  const parseDateParts = (rawDate: string | undefined): { day: number; month: number } => {
+    const normalized = (rawDate || '').trim();
+    if (!normalized) {
+      return { day: 0, month: 0 };
+    }
+
+    const dotFormat = normalized.match(/^(\d{1,2})\.(\d{1,2})\.\d{4}$/);
+    if (dotFormat) {
+      return {
+        day: parseInt(dotFormat[1], 10),
+        month: parseInt(dotFormat[2], 10),
+      };
+    }
+
+    const isoFormat = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoFormat) {
+      return {
+        day: parseInt(isoFormat[3], 10),
+        month: parseInt(isoFormat[2], 10),
+      };
+    }
+
+    const parsed = new Date(normalized);
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        day: parsed.getDate(),
+        month: parsed.getMonth() + 1,
+      };
+    }
+
+    return { day: 0, month: 0 };
+  };
+
+  const formatPrice = (rawPrice: number | null): string => {
+    if (rawPrice === null || Number.isNaN(rawPrice)) {
+      return 'Не указана';
+    }
+    if (rawPrice === 0) {
+      return 'Бесплатно';
+    }
+    return `от ${rawPrice} ₽`;
+  };
 
   const toggleFavorite = async (index: number) => {
     if (!userId) {
@@ -180,6 +236,13 @@ const Events = () => {
 
         const normalizedEvent: EventDetails = {
           ...data,
+          description: data.description || '',
+          city: data.city || '',
+          address: data.address || '',
+          price:
+            data.price !== null && data.price !== undefined && !Number.isNaN(Number(data.price))
+              ? Number(data.price)
+              : null,
 
           picture_url:
             data.picture_url ||
@@ -208,7 +271,7 @@ const Events = () => {
             ? normalizedTimeSlots.map((slot: { date_event: string }) => slot.date_event)
             : legacyDates,
 
-          duration: data.duration || '',
+          duration: data.duration || data.start_time || '',
 
           time_slots: normalizedTimeSlots,
         };
@@ -257,7 +320,13 @@ const Events = () => {
     window.open(eventDetails.external_url, '_blank');
   };
 
-  const formattedAgeLimit = `${eventDetails.age_limit || '0'}+`;
+  const normalizedAgeLimit = (eventDetails.age_limit || '').trim();
+  const formattedAgeLimit = normalizedAgeLimit
+    ? normalizedAgeLimit.endsWith('+')
+      ? normalizedAgeLimit
+      : `${normalizedAgeLimit}+`
+    : '0+';
+  const formattedPrice = formatPrice(eventDetails.price);
 
   const scheduleRows = (
     eventDetails.time_slots?.length
@@ -267,19 +336,18 @@ const Events = () => {
         start_time: eventDetails.duration || '',
       }))
   ).map((slot) => {
-    const date = slot.date_event;
-    if (!date) {
-      return { day: 0, month: 0, startTime: '—' };
-    }
-
-    const [, month, day] = date.split('-');
+    const { day, month } = parseDateParts(slot.date_event);
+    const fallbackTime = eventDetails.duration || '';
+    const slotTime = formatScheduleValue(slot.start_time);
+    const timeLabel =
+      slotTime !== '—' && slotTime !== '00:00'
+        ? slotTime
+        : formatScheduleValue(fallbackTime);
 
     return {
-      day: parseInt(day || '0', 10),
-      month: parseInt(month || '0', 10),
-      startTime: slot.start_time
-        ? String(slot.start_time).substring(0, 5)
-        : '—',
+      day,
+      month,
+      timeLabel,
     };
   });
 
@@ -460,7 +528,7 @@ const Events = () => {
                   <HStack >
 
                     <Text color="white" fontSize={{ "2xl": '20px' }} transform="translateX(-340px)">
-                      {d.startTime}
+                      {d.timeLabel}
                     </Text>
 
                     <Box
@@ -539,15 +607,35 @@ const Events = () => {
         <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white" mt="3">
           {eventDetails.description}
         </Text>
+        <VStack align="start" gap={1} mt={3}>
+          <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
+            Возраст: {formattedAgeLimit}
+          </Text>
+          <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
+            Стоимость: {formattedPrice}
+          </Text>
+          {eventDetails.duration ? (
+            <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
+              Время / длительность: {eventDetails.duration}
+            </Text>
+          ) : null}
+          {eventDetails.city ? (
+            <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
+              Город: {eventDetails.city}
+            </Text>
+          ) : null}
+        </VStack>
         <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="5">
           Адрес
         </Text>
         <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
           {eventDetails.location}
         </Text>
-        <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-          {eventDetails.address}
-        </Text>
+        {eventDetails.address && eventDetails.address !== eventDetails.location ? (
+          <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
+            {eventDetails.address}
+          </Text>
+        ) : null}
         <Text
           fontSize="50px"
           color="white"
