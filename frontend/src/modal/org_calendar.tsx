@@ -1,6 +1,8 @@
 import React from "react";
 import axios from "../shared/lib/axios";
 import { Box, Button, Flex, Grid, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import Modal from "react-modal";
+import CreateModal from "../pages/creature";
 
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MONTHS = [
@@ -30,6 +32,8 @@ type CalendarEventsResponse = {
 
 interface CalendarProps {
   organizerName?: string;
+  canManageEvents?: boolean;
+  onEventCreated?: () => void;
 }
 
 function toDateString(year: number, monthIndex: number, day: number): string {
@@ -64,15 +68,22 @@ function normalizeText(value: string | null | undefined): string {
   return (value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ organizerName }) => {
+export const Calendar: React.FC<CalendarProps> = ({
+  organizerName,
+  canManageEvents = false,
+  onEventCreated,
+}) => {
   const currentYear = new Date().getFullYear();
   const [dateFrom, setDateFrom] = React.useState(`${currentYear}-01-01`);
   const [dateTo, setDateTo] = React.useState(`${currentYear}-12-31`);
   const [selectedAge, setSelectedAge] = React.useState("");
-  const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const [selectedDateForModal, setSelectedDateForModal] = React.useState<string | null>(null);
+  const [selectedDateForCreate, setSelectedDateForCreate] = React.useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [events, setEvents] = React.useState<CalendarEventItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = React.useState(0);
 
   const displayYear = React.useMemo(() => {
     const parsed = Number(dateFrom.split("-")[0]);
@@ -133,7 +144,7 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName }) => {
     return () => {
       isCancelled = true;
     };
-  }, [dateFrom, dateTo, selectedAge, organizerName]);
+  }, [dateFrom, dateTo, selectedAge, organizerName, refreshToken]);
 
   const eventsByDate = React.useMemo(() => {
     const grouped: Record<string, CalendarEventItem[]> = {};
@@ -161,6 +172,34 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName }) => {
     setDateFrom(`${displayYear}-01-01`);
     setDateTo(`${displayYear}-12-31`);
     setSelectedAge("");
+  };
+
+  const selectedDayEvents = selectedDateForModal ? (eventsByDate[selectedDateForModal] || []) : [];
+  const isDateModalOpen = selectedDateForModal !== null;
+
+  const handleDayClick = (day: Day, monthIndex: number) => {
+    if (!canManageEvents || !day.isCurrentMonth) {
+      return;
+    }
+    const clickedDate = toDateString(displayYear, monthIndex, day.value);
+    setSelectedDateForModal(clickedDate);
+  };
+
+  const closeDateModal = () => {
+    setSelectedDateForModal(null);
+  };
+
+  const handleOpenCreateEvent = () => {
+    setSelectedDateForCreate(selectedDateForModal);
+    closeDateModal();
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateSuccess = () => {
+    setRefreshToken((value) => value + 1);
+    if (onEventCreated) {
+      onEventCreated();
+    }
   };
 
   return (
@@ -225,6 +264,14 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName }) => {
           </Box>
         ) : null}
 
+        {!canManageEvents ? (
+          <Box bg="rgba(255, 255, 255, 0.22)" borderRadius="10px" px={3} py={2}>
+            <Text color="white" fontSize="sm">
+              Просмотр календаря доступен всем, но открывать дату и создавать мероприятия может только роль организатора.
+            </Text>
+          </Box>
+        ) : null}
+
         <HStack color="white" gap={4} fontSize="xs">
           <HStack gap={1}>
             <Box w="10px" h="10px" borderRadius="full" bg="#6B84EA" />
@@ -280,68 +327,12 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName }) => {
                         borderRadius="6px"
                         bg={hasEvents ? (hasOrganizerEvent ? "#2D4DDB" : "#6B84EA") : "transparent"}
                         color={day.isCurrentMonth ? "white" : "gray.400"}
-                        cursor={hasEvents ? "pointer" : "default"}
+                        cursor={canManageEvents && day.isCurrentMonth ? "pointer" : "default"}
                         _hover={hasEvents ? { bg: hasOrganizerEvent ? "#20379D" : "#4C6BE6" } : {}}
-                        onMouseEnter={() => hasEvents && setHoveredDate(fullDate)}
-                        onMouseLeave={() => setHoveredDate(null)}
+                        onClick={() => handleDayClick(day, monthIndex)}
                       >
                         {day.value}
                       </Box>
-
-                      {hasEvents && hoveredDate === fullDate ? (
-                        <Box
-                          position="absolute"
-                          bottom="120%"
-                          left="50%"
-                          transform="translateX(-50%)"
-                          bg="#4C6BE6"
-                          color="white"
-                          p={3}
-                          borderRadius="10px"
-                          w="260px"
-                          zIndex={10}
-                          boxShadow="lg"
-                        >
-                          <Text textAlign="center" fontWeight="bold" fontSize="sm" mb={2}>
-                            {fullDate.split("-").reverse().join(".")}
-                          </Text>
-                          <VStack align="stretch" gap={2}>
-                            {eventsForDay.map((eventItem) => {
-                              const isOrganizerEvent = eventItem.is_organizer_event || (
-                                organizerKey.length > 0 && normalizeText(eventItem.organizer) === organizerKey
-                              );
-                              return (
-                                <Box key={eventItem.slot_id} w="100%" bg="rgba(255,255,255,0.15)" p={2} borderRadius="8px">
-                                  <Flex justify="space-between" align="center" fontSize="sm" gap={2}>
-                                    <Text
-                                      fontWeight="600"
-                                      style={{
-                                        display: "-webkit-box",
-                                        overflow: "hidden",
-                                        WebkitBoxOrient: "vertical",
-                                        WebkitLineClamp: 2,
-                                      }}
-                                    >
-                                      {eventItem.title}
-                                    </Text>
-                                    <Text>{eventItem.time}</Text>
-                                  </Flex>
-                                  <Flex justify="space-between" align="center" mt={1}>
-                                    <Text fontSize="11px" opacity={0.9}>
-                                      {eventItem.organizer || "Организатор не указан"}
-                                    </Text>
-                                    {isOrganizerEvent ? (
-                                      <Box bg="#1E2B73" px={2} py={0.5} borderRadius="full">
-                                        <Text fontSize="10px">Организатор</Text>
-                                      </Box>
-                                    ) : null}
-                                  </Flex>
-                                </Box>
-                              );
-                            })}
-                          </VStack>
-                        </Box>
-                      ) : null}
                     </Box>
                   );
                 })}
@@ -350,6 +341,113 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName }) => {
           ))}
         </Grid>
       </VStack>
+
+      <Modal
+        isOpen={isDateModalOpen}
+        onRequestClose={closeDateModal}
+        contentLabel="События выбранной даты"
+        style={{
+          overlay: {
+            backgroundColor: "rgba(0, 0, 0, 0.55)",
+            zIndex: 1200,
+          },
+          content: {
+            top: "50%",
+            left: "50%",
+            right: "auto",
+            bottom: "auto",
+            marginRight: "-50%",
+            transform: "translate(-50%, -50%)",
+            border: "none",
+            borderRadius: "16px",
+            padding: "0",
+            background: "transparent",
+            maxWidth: "680px",
+            width: "92%",
+          },
+        }}
+      >
+        <Box bg="#1E2B73" p={4} borderRadius="16px" border="1px solid rgba(255,255,255,0.22)">
+          <Flex justify="space-between" align="center" mb={3}>
+            <Text color="white" fontWeight="700" fontSize="20px">
+              {selectedDateForModal ? selectedDateForModal.split("-").reverse().join(".") : "Выбранная дата"}
+            </Text>
+            <Button
+              size="sm"
+              bg="transparent"
+              color="white"
+              _hover={{ bg: "rgba(255,255,255,0.15)" }}
+              onClick={closeDateModal}
+            >
+              Закрыть
+            </Button>
+          </Flex>
+
+          {selectedDayEvents.length > 0 ? (
+            <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3} mb={4}>
+              {selectedDayEvents.map((eventItem) => {
+                const isOrganizerEvent = eventItem.is_organizer_event || (
+                  organizerKey.length > 0 && normalizeText(eventItem.organizer) === organizerKey
+                );
+                return (
+                  <Box
+                    key={eventItem.slot_id}
+                    bg="rgba(255,255,255,0.16)"
+                    border={isOrganizerEvent ? "1px solid rgba(120, 175, 255, 0.85)" : "1px solid rgba(255,255,255,0.22)"}
+                    borderRadius="12px"
+                    p={3}
+                  >
+                    <Text
+                      color="white"
+                      fontWeight="700"
+                      fontSize="14px"
+                      style={{
+                        display: "-webkit-box",
+                        overflow: "hidden",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: 2,
+                      }}
+                    >
+                      {eventItem.title}
+                    </Text>
+                    <Text color="#DCE9FF" fontSize="12px" mt={1}>
+                      Время: {eventItem.time}
+                    </Text>
+                    <Text color="#DCE9FF" fontSize="12px">
+                      Организатор: {eventItem.organizer || "не указан"}
+                    </Text>
+                    {isOrganizerEvent ? (
+                      <Box mt={2} display="inline-block" bg="#2D4DDB" borderRadius="full" px={2} py={0.5}>
+                        <Text color="white" fontSize="10px">Ваше событие</Text>
+                      </Box>
+                    ) : null}
+                  </Box>
+                );
+              })}
+            </Grid>
+          ) : null}
+
+          <Flex justify="center">
+            <Button
+              bg="#4C6BE6"
+              color="white"
+              onClick={handleOpenCreateEvent}
+            >
+              Создать мероприятие
+            </Button>
+          </Flex>
+        </Box>
+      </Modal>
+
+      <CreateModal
+        isOpen={isCreateModalOpen}
+        onRequestClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedDateForCreate(null);
+        }}
+        onCreateSuccess={handleCreateSuccess}
+        initialDate={selectedDateForCreate}
+      />
     </Box>
   );
 };
