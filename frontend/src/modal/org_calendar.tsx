@@ -77,6 +77,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [dateFrom, setDateFrom] = React.useState(`${currentYear}-01-01`);
   const [dateTo, setDateTo] = React.useState(`${currentYear}-12-31`);
   const [selectedAge, setSelectedAge] = React.useState("");
+  const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
   const [selectedDateForModal, setSelectedDateForModal] = React.useState<string | null>(null);
   const [selectedDateForCreate, setSelectedDateForCreate] = React.useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
@@ -178,7 +179,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   const isDateModalOpen = selectedDateForModal !== null;
 
   const handleDayClick = (day: Day, monthIndex: number) => {
-    if (!canManageEvents || !day.isCurrentMonth) {
+    if (!day.isCurrentMonth) {
       return;
     }
     const clickedDate = toDateString(displayYear, monthIndex, day.value);
@@ -267,7 +268,7 @@ export const Calendar: React.FC<CalendarProps> = ({
         {!canManageEvents ? (
           <Box bg="rgba(255, 255, 255, 0.22)" borderRadius="10px" px={3} py={2}>
             <Text color="white" fontSize="sm">
-              Просмотр календаря доступен всем, но открывать дату и создавать мероприятия может только роль организатора.
+              Клик по дате открывает список событий. Кнопка создания доступна только роли организатора.
             </Text>
           </Box>
         ) : null}
@@ -327,12 +328,57 @@ export const Calendar: React.FC<CalendarProps> = ({
                         borderRadius="6px"
                         bg={hasEvents ? (hasOrganizerEvent ? "#2D4DDB" : "#6B84EA") : "transparent"}
                         color={day.isCurrentMonth ? "white" : "gray.400"}
-                        cursor={canManageEvents && day.isCurrentMonth ? "pointer" : "default"}
+                        cursor={day.isCurrentMonth ? "pointer" : "default"}
                         _hover={hasEvents ? { bg: hasOrganizerEvent ? "#20379D" : "#4C6BE6" } : {}}
+                        onMouseEnter={() => hasEvents && setHoveredDate(fullDate)}
+                        onMouseLeave={() => setHoveredDate((prev) => (prev === fullDate ? null : prev))}
                         onClick={() => handleDayClick(day, monthIndex)}
                       >
                         {day.value}
                       </Box>
+
+                      {hasEvents && hoveredDate === fullDate ? (
+                        <Box
+                          position="absolute"
+                          bottom="120%"
+                          left="50%"
+                          transform="translateX(-50%)"
+                          bg="#4C6BE6"
+                          color="white"
+                          p={3}
+                          borderRadius="10px"
+                          w="260px"
+                          zIndex={15}
+                          boxShadow="lg"
+                        >
+                          <Text textAlign="center" fontWeight="bold" fontSize="sm" mb={2}>
+                            {fullDate.split("-").reverse().join(".")}
+                          </Text>
+                          <VStack align="stretch" gap={2}>
+                            {eventsForDay.map((eventItem) => (
+                              <Box key={`hover-${eventItem.slot_id}`} bg="rgba(255,255,255,0.16)" p={2} borderRadius="8px">
+                                <Flex justify="space-between" align="center" gap={2}>
+                                  <Text
+                                    fontSize="12px"
+                                    style={{
+                                      display: "-webkit-box",
+                                      overflow: "hidden",
+                                      WebkitBoxOrient: "vertical",
+                                      WebkitLineClamp: 2,
+                                    }}
+                                  >
+                                    {eventItem.title}
+                                  </Text>
+                                  <Text fontSize="11px" whiteSpace="nowrap">{eventItem.time}</Text>
+                                </Flex>
+                                <Text fontSize="10px" opacity={0.9}>
+                                  {eventItem.organizer || "Организатор не указан"}
+                                </Text>
+                              </Box>
+                            ))}
+                          </VStack>
+                        </Box>
+                      ) : null}
                     </Box>
                   );
                 })}
@@ -396,6 +442,11 @@ export const Calendar: React.FC<CalendarProps> = ({
                     border={isOrganizerEvent ? "1px solid rgba(120, 175, 255, 0.85)" : "1px solid rgba(255,255,255,0.22)"}
                     borderRadius="12px"
                     p={3}
+                    cursor="pointer"
+                    _hover={{ bg: "rgba(255,255,255,0.24)" }}
+                    onClick={() => {
+                      window.location.href = `/event/${eventItem.event_id}`;
+                    }}
                   >
                     <Text
                       color="white"
@@ -425,17 +476,23 @@ export const Calendar: React.FC<CalendarProps> = ({
                 );
               })}
             </Grid>
-          ) : null}
+          ) : (
+            <Box mb={4} bg="rgba(255,255,255,0.14)" borderRadius="12px" p={3}>
+              <Text color="white">На выбранную дату пока нет мероприятий.</Text>
+            </Box>
+          )}
 
-          <Flex justify="center">
-            <Button
-              bg="#4C6BE6"
-              color="white"
-              onClick={handleOpenCreateEvent}
-            >
-              Создать мероприятие
-            </Button>
-          </Flex>
+          {canManageEvents ? (
+            <Flex justify="center">
+              <Button
+                bg="#4C6BE6"
+                color="white"
+                onClick={handleOpenCreateEvent}
+              >
+                Создать мероприятие
+              </Button>
+            </Flex>
+          ) : null}
         </Box>
       </Modal>
 
