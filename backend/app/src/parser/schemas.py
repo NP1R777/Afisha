@@ -47,6 +47,17 @@ class ParseImageBackfillRequest(BaseModel):
     force: bool = False
 
 
+class ParseManualResolveRequest(BaseModel):
+    target_type: Literal["event", "news", "rejected"]
+    group_ids: list[int] = Field(default_factory=list)
+    error_text: Optional[str] = None
+
+
+class ParseStatusUpdateRequest(BaseModel):
+    process_status: Literal["new", "rejected", "error"]
+    error_text: Optional[str] = None
+
+
 class ParseRunStats(BaseModel):
     source_key: str
     source_name: str
@@ -125,6 +136,22 @@ class ParseImageBackfillResponse(BaseModel):
     default_applied_main: int
     default_applied_two: int
     errors: int
+
+
+class ParseManualResolveResponse(BaseModel):
+    parsed_event_id: int
+    target_type: Literal["event", "news", "unknown"]
+    process_status: Literal["new", "processed", "rejected", "error"]
+    event_id: Optional[int] = None
+    news_id: Optional[int] = None
+    message: str
+
+
+class ParseStatusUpdateResponse(BaseModel):
+    parsed_event_id: int
+    target_type: Literal["event", "news", "unknown"]
+    process_status: Literal["new", "processed", "rejected", "error"]
+    error_text: Optional[str] = None
 
 
 class ParsedEventListResponse(BaseModel):

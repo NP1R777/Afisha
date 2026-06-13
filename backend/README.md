@@ -157,7 +157,9 @@ alembic upgrade head
 - `POST /parser/distribute` — перенос записей из `parsed_event` в `events/news` по rule-based классификации;
 - `POST /parser/categories/backfill` — ручная автопривязка категорий для `events` без категорий;
 - `POST /parser/images/backfill` — ручная загрузка `events.pictures_main` и `events.pictures_two` в MinIO (batch-режим);
-- `GET /parser/events` — просмотр собранных событий из staging-таблицы.
+- `GET /parser/events` — просмотр собранных событий из staging-таблицы (доступны фильтры `source_key`, `target_type`, `process_status`);
+- `POST /parser/events/{parsed_event_id}/resolve` — ручной перенос записи: в `events`, `news` или отметка как `rejected`;
+- `PATCH /parser/events/{parsed_event_id}/status` — ручная смена `process_status` (`new`, `rejected`, `error`) без переноса.
 
 При переносе:
 - `unknown` остаются в `parsed_event` со статусом `new`;
