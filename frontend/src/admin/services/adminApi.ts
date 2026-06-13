@@ -315,8 +315,9 @@ export async function changeUserRole(
   role: UserRole,
   session: AdminSession | null = null
 ): Promise<void> {
+  const roleParam = encodeURIComponent(role);
   await axios.patch(
-    `/user/change_role?user_id=${userId}`,
+    `/user/change_role?user_id=${userId}&role=${roleParam}`,
     { role },
     {
       headers: buildAuthHeaders(session),
