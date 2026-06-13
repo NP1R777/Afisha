@@ -23,6 +23,7 @@ from database.models import (
 from src.parser.schemas import (
     ParseCategoryBackfillRequest,
     ParseCategoryBackfillResponse,
+    ParseDeleteResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
     ParseImageBackfillRequest,
@@ -516,8 +517,12 @@ async def resolve_parsed_event_manually(
         if not unique_group_ids:
             raise HTTPException(status_code=400, detail="Для target_type=event нужно передать group_ids.")
         await _validate_group_ids(db_connect=db_connect, group_ids=unique_group_ids)
-        if await _is_event_duplicate(db_connect, item):
-            raise HTTPException(status_code=409, detail="Событие уже существует в events.")
+        duplicate_event_id = await _find_event_duplicate_id(db_connect, item)
+        if duplicate_event_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Событие уже существует в events (id={duplicate_event_id}).",
+            )
 
         event_id = await _insert_event_from_parsed_manual(
             db_connect=db_connect,
@@ -539,8 +544,12 @@ async def resolve_parsed_event_manually(
             message="Событие успешно перенесено в events.",
         )
 
-    if await _is_news_duplicate(db_connect, item):
-        raise HTTPException(status_code=409, detail="Новость уже существует в news.")
+    duplicate_news_id = await _find_news_duplicate_id(db_connect, item)
+    if duplicate_news_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Новость уже существует в news (id={duplicate_news_id}).",
+        )
 
     news_id = await _insert_news_from_parsed(db_connect, item)
     item.target_type = ParsedTargetType.news
@@ -594,6 +603,20 @@ async def update_parsed_event_status(
         target_type=item.target_type.value if item.target_type else "unknown",
         process_status=item.process_status.value if item.process_status else "new",
         error_text=item.error_text,
+    )
+
+
+async def delete_parsed_event_manually(
+    db_connect: AsyncSession,
+    *,
+    parsed_event_id: int,
+) -> ParseDeleteResponse:
+    item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
+    db_connect.delete(item)
+    await db_connect.flush()
+    return ParseDeleteResponse(
+        parsed_event_id=parsed_event_id,
+        message="Запись удалена из parsed_event.",
     )
 
 
@@ -952,6 +975,11 @@ async def _get_or_create_organization_id(
 
 
 async def _is_event_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bool:
+    duplicate = await _find_event_duplicate_id(db_connect, item)
+    return duplicate is not None
+
+
+async def _find_event_duplicate_id(db_connect: AsyncSession, item: ParsedEvent) -> int | None:
     item_name = _normalize_text(item.name)
     item_address = _normalize_text(item.address)
     item_org = _normalize_text(item.organization)
@@ -977,11 +1005,15 @@ async def _is_event_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bo
         if org_ids:
             query = query.where(Events.organization.in_(org_ids))
 
-    duplicate = (await db_connect.execute(query.limit(1))).scalar_one_or_none()
-    return duplicate is not None
+    return (await db_connect.execute(query.limit(1))).scalar_one_or_none()
 
 
 async def _is_news_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bool:
+    duplicate = await _find_news_duplicate_id(db_connect, item)
+    return duplicate is not None
+
+
+async def _find_news_duplicate_id(db_connect: AsyncSession, item: ParsedEvent) -> int | None:
     item_name = _normalize_text(item.name)
     item_org = _normalize_text(item.organization)
     item_address = _normalize_text(item.address)
@@ -995,8 +1027,7 @@ async def _is_news_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> boo
     if item_address:
         query = query.where(func.coalesce(func.lower(News.address), "") == item_address)
 
-    duplicate = (await db_connect.execute(query.limit(1))).scalar_one_or_none()
-    return duplicate is not None
+    return (await db_connect.execute(query.limit(1))).scalar_one_or_none()
 
 
 async def _insert_event_from_parsed(

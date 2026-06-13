@@ -160,6 +160,7 @@ alembic upgrade head
 - `GET /parser/events` — просмотр собранных событий из staging-таблицы (доступны фильтры `source_key`, `target_type`, `process_status`);
 - `POST /parser/events/{parsed_event_id}/resolve` — ручной перенос записи: в `events`, `news` или отметка как `rejected`;
 - `PATCH /parser/events/{parsed_event_id}/status` — ручная смена `process_status` (`new`, `rejected`, `error`) без переноса.
+- `DELETE /parser/events/{parsed_event_id}` — удаление записи из `parsed_event` вручную (например, если это дубликат).
 
 При переносе:
 - `unknown` остаются в `parsed_event` со статусом `new`;
