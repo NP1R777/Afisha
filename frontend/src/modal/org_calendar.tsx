@@ -33,6 +33,7 @@ type CalendarEventsResponse = {
 interface CalendarProps {
   organizerName?: string;
   canManageEvents?: boolean;
+  onEventCreated?: () => void;
 }
 
 function toDateString(year: number, monthIndex: number, day: number): string {
@@ -67,12 +68,17 @@ function normalizeText(value: string | null | undefined): string {
   return (value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ organizerName, canManageEvents = false }) => {
+export const Calendar: React.FC<CalendarProps> = ({
+  organizerName,
+  canManageEvents = false,
+  onEventCreated,
+}) => {
   const currentYear = new Date().getFullYear();
   const [dateFrom, setDateFrom] = React.useState(`${currentYear}-01-01`);
   const [dateTo, setDateTo] = React.useState(`${currentYear}-12-31`);
   const [selectedAge, setSelectedAge] = React.useState("");
   const [selectedDateForModal, setSelectedDateForModal] = React.useState<string | null>(null);
+  const [selectedDateForCreate, setSelectedDateForCreate] = React.useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
   const [events, setEvents] = React.useState<CalendarEventItem[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -184,12 +190,16 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName, canManageEven
   };
 
   const handleOpenCreateEvent = () => {
+    setSelectedDateForCreate(selectedDateForModal);
     closeDateModal();
     setIsCreateModalOpen(true);
   };
 
   const handleCreateSuccess = () => {
     setRefreshToken((value) => value + 1);
+    if (onEventCreated) {
+      onEventCreated();
+    }
   };
 
   return (
@@ -431,8 +441,12 @@ export const Calendar: React.FC<CalendarProps> = ({ organizerName, canManageEven
 
       <CreateModal
         isOpen={isCreateModalOpen}
-        onRequestClose={() => setIsCreateModalOpen(false)}
+        onRequestClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedDateForCreate(null);
+        }}
         onCreateSuccess={handleCreateSuccess}
+        initialDate={selectedDateForCreate}
       />
     </Box>
   );
