@@ -59,15 +59,15 @@ class UserOut:
 
 
 class UserUpdate(BaseModel):
-    username: str | None
-    password: str | None
-    email: EmailStr | None
-    date_of_birth: str | None
-    preferences: List[int] | None
+    username: str | None = None
+    password: str | None = None
+    email: EmailStr | None = None
+    date_of_birth: str | None = None
+    preferences: List[int] | None = None
 
 
 class UserUpdatePreferences(BaseModel):
-    preferences: List[int] | None
+    preferences: List[int] | None = None
 
 
 class UserUpdateRole(BaseModel):
