@@ -38,7 +38,7 @@ const AdminDashboardPage: React.FC = () => {
           fetchEventCategories(session),
           fetchParsedEvents({ limit: 1, offset: 0 }, session),
         ]);
-        const parsedTotal = Number((parsed as any)?.total || 0);
+        const parsedTotal = Number(parsed?.total || 0);
         setStats({
           eventsCount: events.length,
           usersCount: users.length,
