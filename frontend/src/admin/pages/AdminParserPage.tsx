@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 import {
   backfillParserCategories,
+  deleteParsedEvent,
   distributeParser,
   fetchEventCategories,
   fetchParsedEvents,
@@ -57,6 +58,20 @@ const AdminParserPage: React.FC = () => {
 
   const [resultText, setResultText] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const getErrorMessage = (err: any, fallback: string): string => {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+    if (Array.isArray(detail) && detail.length > 0) {
+      return detail.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).join('; ');
+    }
+    if (typeof err?.message === 'string' && err.message.trim()) {
+      return err.message;
+    }
+    return fallback;
+  };
 
   const getDefaultRowState = (): ParsedRowActionState => ({
     targetType: 'event',
@@ -109,7 +124,7 @@ const AdminParserPage: React.FC = () => {
         return nextState;
       });
     } catch (err: any) {
-      setError(err?.message || 'Не удалось загрузить данные парсера');
+      setError(getErrorMessage(err, 'Не удалось загрузить данные парсера'));
     } finally {
       setSourcesLoading(false);
     }
@@ -136,7 +151,7 @@ const AdminParserPage: React.FC = () => {
       setResultText(`${prefix}${JSON.stringify(result, null, 2)}`);
       await loadMeta();
     } catch (err: any) {
-      setError(err?.message || 'Операция завершилась ошибкой');
+      setError(getErrorMessage(err, 'Операция завершилась ошибкой'));
     } finally {
       setLoading(false);
       setActiveItemId(null);
@@ -190,6 +205,35 @@ const AdminParserPage: React.FC = () => {
       {
         itemId: item.id,
         successMessage: `Статус parsed_event #${item.id} обновлен.`,
+      }
+    );
+  };
+
+  const handleSkipAsRejected = async (item: AdminParsedEvent) => {
+    const state = getRowState(item.id);
+    await runAction(
+      () =>
+        updateParsedEventStatus(
+          item.id,
+          {
+            process_status: 'rejected',
+            error_text: state.errorText.trim() || 'Пропущено администратором после проверки дубля.',
+          },
+          session
+        ),
+      {
+        itemId: item.id,
+        successMessage: `parsed_event #${item.id} пропущен и переведен в rejected.`,
+      }
+    );
+  };
+
+  const handleDeleteParsedItem = async (item: AdminParsedEvent) => {
+    await runAction(
+      () => deleteParsedEvent(item.id, session),
+      {
+        itemId: item.id,
+        successMessage: `parsed_event #${item.id} удален из staging.`,
       }
     );
   };
@@ -527,6 +571,24 @@ const AdminParserPage: React.FC = () => {
                       onClick={() => handleStatusUpdate(item)}
                     >
                       Обновить status
+                    </Button>
+                    <Button
+                      variant="outline"
+                      borderColor="rgba(242, 181, 79, 0.65)"
+                      color="#ffd898"
+                      loading={isBusy}
+                      onClick={() => handleSkipAsRejected(item)}
+                    >
+                      Пропустить в rejected
+                    </Button>
+                    <Button
+                      variant="outline"
+                      borderColor="rgba(255, 93, 93, 0.55)"
+                      color="#ffd1d1"
+                      loading={isBusy}
+                      onClick={() => handleDeleteParsedItem(item)}
+                    >
+                      Удалить запись
                     </Button>
                   </HStack>
                 </Box>

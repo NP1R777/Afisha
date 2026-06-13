@@ -428,6 +428,16 @@ export async function updateParsedEventStatus(
   return response.data;
 }
 
+export async function deleteParsedEvent(
+  parsedEventId: number,
+  session: AdminSession | null = null
+): Promise<unknown> {
+  const response = await axios.delete(`/parser/events/${parsedEventId}`, {
+    headers: buildAuthHeaders(session),
+  });
+  return response.data;
+}
+
 export async function triggerAssistantReindex(session: AdminSession | null = null): Promise<unknown> {
   const response = await axios.post(
     '/assistant/reindex',
