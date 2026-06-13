@@ -243,7 +243,13 @@ class EventGroupsEvent(Base):
 class ParsedEvent(Base):
     __tablename__ = "parsed_event"
     __table_args__ = (
-        UniqueConstraint("name", "date_event", name="parsed_event_name_date_key"),
+        UniqueConstraint(
+            "source_key",
+            "name",
+            "date_event",
+            "start_time",
+            name="parsed_event_source_name_date_start_time_key",
+        ),
     )
 
     id: int = Column(Integer, primary_key=True, autoincrement=True)
@@ -260,6 +266,7 @@ class ParsedEvent(Base):
     name: str = Column(String, nullable=False)
     description: str = Column(String, nullable=True)
     date_event: str = Column(String, nullable=True)
+    start_time: str = Column(String, nullable=True)
     duration: str = Column(String, nullable=True)
     city: str = Column(String, nullable=True)
     price: str = Column(String, nullable=True)
