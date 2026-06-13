@@ -8,7 +8,7 @@ from core.settings import AppSettings
 from core.session import get_db, get_settings
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.user.auth import create_refresh_token, create_access_token
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, Request
 from src.dependencies.autentification import get_token_payload, get_current_user
 from src.user.schemas import (UserIn, UserOut, TokenResponse, UserUpdate,
                               UserUpdatePreferences, UserUpdateLikeEvents,
@@ -531,7 +531,8 @@ async def get_all_user(db_connect: AsyncSession = Depends(get_db)):
 )
 async def change_user_role(
     user_id: int,
-    payload: UserUpdateRole,
+    payload: UserUpdateRole | None = None,
+    role: str | None = Query(default=None),
     db_connect: AsyncSession = Depends(get_db),
 ):
     user = (
@@ -553,7 +554,19 @@ async def change_user_role(
             )
         )
     ).scalar_one_or_none()
-    next_role = RoleEnum(payload.role)
+    resolved_role = (payload.role if payload else None) or role
+    normalized_role = (resolved_role or "").strip().lower()
+    if normalized_role == "organizer":
+        normalized_role = "organizator"
+    if not normalized_role:
+        raise HTTPException(status_code=422, detail="Не передана роль пользователя.")
+    try:
+        next_role = RoleEnum(normalized_role)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Роль должна быть одной из: user, admin, organizator.",
+        ) from exc
     if role_row is None:
         role_row = Roles(user_id=user_id, role=next_role)
         db_connect.add(role_row)
