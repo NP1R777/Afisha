@@ -12,7 +12,11 @@ from src.parser.schemas import (
     ParseImageBackfillResponse,
     ParseLaunchRequest,
     ParseLaunchResponse,
+    ParseManualResolveRequest,
+    ParseManualResolveResponse,
     ParseSourceInfo,
+    ParseStatusUpdateRequest,
+    ParseStatusUpdateResponse,
     ParsedEventListResponse,
 )
 from src.parser.service import (
@@ -21,7 +25,9 @@ from src.parser.service import (
     distribute_parsed_events,
     list_parsed_events,
     list_sources,
+    resolve_parsed_event_manually,
     run_parse_and_store,
+    update_parsed_event_status,
 )
 from src.assistant.service import sync_events_vector_index
 
@@ -114,6 +120,8 @@ async def get_parsed_events(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     source_key: str | None = Query(default=None),
+    target_type: str | None = Query(default=None),
+    process_status: str | None = Query(default=None),
     db_connect: AsyncSession = Depends(get_db),
 ) -> ParsedEventListResponse:
     return await list_parsed_events(
@@ -121,4 +129,50 @@ async def get_parsed_events(
         limit=limit,
         offset=offset,
         source_key=source_key,
+        target_type=target_type,
+        process_status=process_status,
+    )
+
+
+@router.post(
+    "/events/{parsed_event_id}/resolve",
+    response_model=ParseManualResolveResponse,
+    summary="Ручной перенос parsed_event в events/news или отклонение",
+)
+async def resolve_parsed_event(
+    parsed_event_id: int,
+    payload: ParseManualResolveRequest,
+    db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
+) -> ParseManualResolveResponse:
+    result = await resolve_parsed_event_manually(
+        db_connect=db_connect,
+        parsed_event_id=parsed_event_id,
+        request=payload,
+    )
+    if result.target_type == "event" and result.process_status == "processed":
+        try:
+            await sync_events_vector_index(
+                db_connect=db_connect,
+                settings=settings,
+            )
+        except Exception:
+            pass
+    return result
+
+
+@router.patch(
+    "/events/{parsed_event_id}/status",
+    response_model=ParseStatusUpdateResponse,
+    summary="Ручное обновление process_status для parsed_event",
+)
+async def patch_parsed_event_status(
+    parsed_event_id: int,
+    payload: ParseStatusUpdateRequest,
+    db_connect: AsyncSession = Depends(get_db),
+) -> ParseStatusUpdateResponse:
+    return await update_parsed_event_status(
+        db_connect=db_connect,
+        parsed_event_id=parsed_event_id,
+        request=payload,
     )
