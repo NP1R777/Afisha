@@ -42,10 +42,6 @@ const Layout = () => {
   };
 
   const handleProfileClick = () => {
-    if (role === 'organizator') {
-      navigate('/organizer');
-      return;
-    }
     navigate('/account');
   };
 
