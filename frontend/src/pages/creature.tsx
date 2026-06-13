@@ -1,153 +1,238 @@
-import { Box, Button, createListCollection, Flex, Input, Stack, Text, Textarea, useBreakpointValue, Image } from '@chakra-ui/react';
-import { FormEvent, useEffect, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { Box, Button, createListCollection, Flex, Input, Stack, Text, Textarea, useBreakpointValue } from '@chakra-ui/react';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import Modal from 'react-modal';
 import { Field } from '../components/ui/field';
 import { SelectContent, SelectItem, SelectRoot, SelectTrigger } from '../components/ui/select';
 import axios from '../shared/lib/axios';
-import { Toaster, toaster } from "../components/ui/toaster"
-import ticket from '../pictures/ticket.png';
-import EventCalendarModal from '../modal/calendar';
-import calendarIcon from '../pictures/calend.png';
+import { toaster } from "../components/ui/toaster";
 
 interface FormValues {
   name: string;
   description: string;
-  group_id: string;
-  category: string;
   external_url: string;
   date_event: string;
-  duration: string;
+  start_time: string;
   price: string;
   address: string;
-  city: string;
-  location: string;
-  age_limit: string;
-  pictures_url: string;
-  horizontal_picture_url: string;
+  pictures_main: string;
+  pictures_two: string;
+}
+
+interface GroupOption {
+  id: number;
+  name: string;
 }
 
 interface CreateModalProps {
   isOpen: boolean;
   onRequestClose: () => void;
   onCreateSuccess: () => void;
+  initialDate?: string | null;
 }
 
-const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCreateSuccess }) => {
+const CITY_OPTIONS = createListCollection({
+  items: [
+    { label: 'Норильск', value: 'norilsk' },
+    { label: 'Талнах', value: 'talnah' },
+    { label: 'Кайеркан', value: 'kayerkan' },
+    { label: 'Оганер', value: 'oganeer' },
+    { label: 'Дудинка', value: 'dudinka' },
+  ],
+});
+
+const AGE_OPTIONS = createListCollection({
+  items: [
+    { label: '0+', value: '0+' },
+    { label: '6+', value: '6+' },
+    { label: '12+', value: '12+' },
+    { label: '16+', value: '16+' },
+    { label: '18+', value: '18+' },
+  ],
+});
+
+const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCreateSuccess, initialDate }) => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>();
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
+    defaultValues: {
+      name: '',
+      description: '',
+      external_url: '',
+      date_event: '',
+      start_time: '',
+      price: '',
+      address: '',
+      pictures_main: '',
+      pictures_two: '',
+    },
+  });
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-
-  const [selectedCategoryLabel, setSelectedCategoryLabel] = useState('Категория');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [selectedGroupLabel, setSelectedGroupLabel] = useState('Категория');
+  const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
 
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedCityLabel, setSelectedCityLabel] = useState('Район мероприятия');
+  const [selectedAge, setSelectedAge] = useState('');
+  const [selectedAgeLabel, setSelectedAgeLabel] = useState('Возрастное ограничение');
 
-  const [selectedAgeLimit, setSelectedAgeLimit] = useState('');
-  const [selectedAgeLabel, setSelectedAgeLabel] = useState('Возрастное органичен.');
+  const categoryCollection = useMemo(
+    () =>
+      createListCollection({
+        items: groupOptions.map((item) => ({ label: item.name, value: String(item.id) })),
+      }),
+    [groupOptions]
+  );
 
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false); //для календаря
-
-  const districts = createListCollection({
-    items: [
-      { label: 'Норильск', value: 'Норильск' },
-      { label: 'Талнах', value: 'Талнах' },
-      { label: 'Кайеркан', value: 'Кайеркан' },
-    ],
-  });
-
-  const ageLimits = createListCollection({
-    items: [
-      { label: '0+', value: '0' },
-      { label: '6+', value: '6' },
-      { label: '12+', value: '12' },
-      { label: '16+', value: '16' },
-      { label: '18+', value: '18' },
-    ],
-  });
-
-  const handleAgeChange = (details: any) => {
-    const value = details.value[0];
-
-    setSelectedAgeLimit(value);
-
-    const selectedItem = ageLimits.items.find(
-      item => item.value === value
-    );
-
-    if (selectedItem) {
-      setSelectedAgeLabel(selectedItem.label);
+  useEffect(() => {
+    if (!isOpen) {
+      return;
     }
-  };
 
-  const onSubmit = handleSubmit(async data => {
-    try {
-      if (!selectedCategoryId) {
-        console.error('Категория не выбрана');
+    reset({
+      name: '',
+      description: '',
+      external_url: '',
+      date_event: initialDate || '',
+      start_time: '',
+      price: '',
+      address: '',
+      pictures_main: '',
+      pictures_two: '',
+    });
+    setSelectedGroupId('');
+    setSelectedGroupLabel('Категория');
+    setSelectedCity('');
+    setSelectedCityLabel('Район мероприятия');
+    setSelectedAge('');
+    setSelectedAgeLabel('Возрастное ограничение');
+  }, [initialDate, isOpen, reset]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const loadGroups = async () => {
+      if (!isOpen) {
         return;
       }
+      setGroupsLoading(true);
+      try {
+        const response = await axios.get('/event/event_list');
+        const rows = Array.isArray(response.data) ? response.data : [];
+        const mapped = rows
+          .map((item: any) => ({
+            id: Number(item?.id),
+            name: String(item?.name || '').trim(),
+          }))
+          .filter((item: GroupOption) => Number.isFinite(item.id) && item.id > 0 && item.name.length > 0);
+        if (!isCancelled) {
+          setGroupOptions(mapped);
+        }
+      } catch {
+        if (!isCancelled) {
+          setGroupOptions([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setGroupsLoading(false);
+        }
+      }
+    };
+    void loadGroups();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen]);
 
-      // await axios.post('/event/create_event', {
-      //   ...data,
-      //   group_id: selectedCategoryId,
-      // });
+  const handleCategoryChange = (details: any) => {
+    const value = details?.value?.[0] || '';
+    setSelectedGroupId(value);
+    const found = categoryCollection.items.find((item) => item.value === value);
+    setSelectedGroupLabel(found?.label || 'Категория');
+  };
+
+  const handleCityChange = (details: any) => {
+    const value = details?.value?.[0] || '';
+    setSelectedCity(value);
+    const found = CITY_OPTIONS.items.find((item) => item.value === value);
+    setSelectedCityLabel(found?.label || 'Район мероприятия');
+  };
+
+  const handleAgeChange = (details: any) => {
+    const value = details?.value?.[0] || '';
+    setSelectedAge(value);
+    const found = AGE_OPTIONS.items.find((item) => item.value === value);
+    setSelectedAgeLabel(found?.label || 'Возрастное ограничение');
+  };
+
+  const onSubmit = handleSubmit(async (data) => {
+    if (!selectedGroupId) {
       toaster.create({
-        title: 'Созданное мероприятие отправлено на модерацию.',
-        duration: 5000
+        title: 'Выбери категорию мероприятия.',
+        duration: 3500,
+      });
+      return;
+    }
+    if (!selectedCity) {
+      toaster.create({
+        title: 'Выбери район мероприятия.',
+        duration: 3500,
+      });
+      return;
+    }
+    if (!selectedAge) {
+      toaster.create({
+        title: 'Выбери возрастное ограничение.',
+        duration: 3500,
+      });
+      return;
+    }
+
+    try {
+      const priceValue = (data.price || '').trim();
+      const payload = {
+        name: data.name.trim(),
+        description: (data.description || '').trim() || null,
+        organization: null,
+        city: selectedCity,
+        price: priceValue ? Number(priceValue) : null,
+        address: (data.address || '').trim() || null,
+        age_limit: selectedAge,
+        pictures_main: (data.pictures_main || '').trim() || null,
+        pictures_two: (data.pictures_two || '').trim() || null,
+        external_url: (data.external_url || '').trim() || null,
+        group_ids: [Number(selectedGroupId)],
+        times: [
+          {
+            date_event: `${data.date_event}T00:00:00`,
+            start_time: data.start_time,
+          },
+        ],
+      };
+
+      await axios.post('/event/create_event', payload);
+      toaster.create({
+        title: 'Мероприятие создано.',
+        duration: 4500,
       });
       onCreateSuccess();
       onRequestClose();
-    } catch (err) {
-      console.error('Ошибка при создании мероприятия:', err);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      toaster.create({
+        title: typeof detail === 'string' ? detail : 'Ошибка при создании мероприятия.',
+        duration: 5000,
+      });
     }
   });
 
-  const handleDistrictChange = (details: any) => {
-    const value = details.value[0];
+  const topValue = useBreakpointValue({ base: '58%', md: '50%' });
+  const minDate = new Date().toISOString().split('T')[0];
 
-    setSelectedCity(value);
-
-    const selectedItem = districts.items.find(
-      item => item.value === value
-    );
-
-    if (selectedItem) {
-      setSelectedCityLabel(selectedItem.label);
-    }
-  };
-  const categories = createListCollection({
-  items: [
-    { label: 'Театр', value: '1' },
-    { label: 'Кино', value: '3' },
-    { label: 'Спорт', value: '5' },
-    { label: 'Культура', value: '6' },
-    { label: 'Музыка', value: '7' },
-    { label: 'Юмор', value: '8' },
-    { label: 'Образование', value: '9' },
-    { label: 'Благотворительность', value: '10' },
-    { label: 'Городские праздники', value: '11' },
-    ],
-  });
-
-const handleCategoryChange = (details: any) => {
-  const value = details.value[0];
-
-  setSelectedCategoryId(value);
-
-  const selectedItem = categories.items.find(
-    item => item.value === value
-  );
-
-  if (selectedItem) {
-    setSelectedCategoryLabel(selectedItem.label);
-  }
-};
-
-  const topValue = useBreakpointValue({ base: '60%', md: '50%' });
   return (
     <Modal
       isOpen={isOpen}
@@ -156,7 +241,7 @@ const handleCategoryChange = (details: any) => {
       style={{
         overlay: {
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 100,
+          zIndex: 1300,
         },
         content: {
           top: topValue,
@@ -168,7 +253,6 @@ const handleCategoryChange = (details: any) => {
           padding: '0',
           background: 'none',
           border: 'none',
-
         },
       }}
     >
@@ -176,14 +260,12 @@ const handleCategoryChange = (details: any) => {
         bg="#BCC7F6"
         borderRadius="20px"
         padding={{ base: '15px', md: '30px' }}
-        width={{ base: '250px', md: '600px' }}
+        width={{ base: '280px', md: '620px' }}
         textAlign="center"
-        mt="50px"
-        mb="50px"
         position="relative"
         fontFamily="Unbounded"
-        overflow={{ base: 'scroll', md:'auto'  }}
-        height={{ base: '500px' }}
+        maxH={{ base: '75vh', md: '85vh' }}
+        overflowY="auto"
       >
         <Text
           position="absolute"
@@ -194,16 +276,14 @@ const handleCategoryChange = (details: any) => {
           fontSize={{ base: '10px', md: '13px' }}
           userSelect="none"
           onClick={onRequestClose}
-          _hover={{
-            color: '#4C6BE6',
-          }}
+          _hover={{ color: '#4C6BE6' }}
         >
           Отмена
         </Text>
 
         <form onSubmit={onSubmit} style={{ marginTop: '20px' }}>
-          <Flex gap={{ base: '2', md: '4' }} justify="center"  direction={{ base: 'column', md: 'row' }}>
-            <Stack width={{ base: '100%', md: '46%' }} >
+          <Flex gap={{ base: '2', md: '4' }} justify="center" direction={{ base: 'column', md: 'row' }}>
+            <Stack width={{ base: '100%', md: '46%' }}>
               <Field invalid={!!errors.name} errorText={errors.name?.message}>
                 <Input
                   {...register('name', { required: 'Введите название мероприятия' })}
@@ -214,76 +294,55 @@ const handleCategoryChange = (details: any) => {
               </Field>
 
               <SelectRoot
-                collection={categories}
+                collection={categoryCollection}
                 size={{ base: 'xs', md: 'md' }}
-                width={{ base: '220px', md: '250px' }}
+                width={{ base: '100%', md: '250px' }}
                 bg="white"
                 overflow="hidden"
                 borderRadius="10px"
                 onValueChange={handleCategoryChange}
+                disabled={groupsLoading}
               >
                 <SelectTrigger>
-                  <Box
-                    as="span"
-                    fontSize={{ base: '13px', md: '14px' }}
-                    color={selectedCategoryId ? 'black' : 'GrayText'}
-                    cursor="pointer"
-                  >
-                    {selectedCategoryLabel}
+                  <Box as="span" fontSize={{ base: '13px', md: '14px' }} color={selectedGroupId ? 'black' : 'GrayText'}>
+                    {groupsLoading ? 'Загрузка категорий...' : selectedGroupLabel}
                   </Box>
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.items.map(category => (
-                    <SelectItem item={category} key={category.value}>
-                      {category.label}
+                  {categoryCollection.items.map((item) => (
+                    <SelectItem item={item} key={item.value}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </SelectRoot>
 
-              <Field invalid={!!errors.city} errorText={errors.city?.message}>
-                <SelectRoot
-                  collection={districts}
-                  size={{ base: 'xs', md: 'md' }}
-                  width={{ base: '220px', md: '250px' }}
-                  bg="white"
-                  overflow="hidden"
-                  borderRadius="10px"
-                  onValueChange={handleDistrictChange}
-                >
-                  <SelectTrigger>
-                    <Box
-                      as="span"
-                      fontSize={{ base: '13px', md: '14px' }}
-                      color={selectedCity ? 'black' : 'GrayText'}
-                      cursor="pointer"
-                    >
-                      {selectedCityLabel}
-                    </Box>
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {districts.items.map(district => (
-                      <SelectItem item={district} key={district.value}>
-                        {district.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </SelectRoot>
-              </Field>
-
-              <Field invalid={!!errors.location} errorText={errors.location?.message}>
-                <Input
-                  {...register('location', { required: 'Пожалуйста введите место проведения' })}
-                  bg="white"
-                  placeholder="Место проведения"
-                  borderRadius="10px"
-                />
-              </Field>
+              <SelectRoot
+                collection={CITY_OPTIONS}
+                size={{ base: 'xs', md: 'md' }}
+                width={{ base: '100%', md: '250px' }}
+                bg="white"
+                overflow="hidden"
+                borderRadius="10px"
+                onValueChange={handleCityChange}
+              >
+                <SelectTrigger>
+                  <Box as="span" fontSize={{ base: '13px', md: '14px' }} color={selectedCity ? 'black' : 'GrayText'}>
+                    {selectedCityLabel}
+                  </Box>
+                </SelectTrigger>
+                <SelectContent>
+                  {CITY_OPTIONS.items.map((item) => (
+                    <SelectItem item={item} key={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </SelectRoot>
 
               <Field invalid={!!errors.address} errorText={errors.address?.message}>
                 <Input
-                  {...register('address', { required: 'Введите пожалуйста адрес мероприятия' })}
+                  {...register('address', { required: 'Введите адрес мероприятия' })}
                   bg="white"
                   placeholder="Адрес мероприятия"
                   borderRadius="10px"
@@ -292,143 +351,104 @@ const handleCategoryChange = (details: any) => {
 
               <Field invalid={!!errors.price} errorText={errors.price?.message}>
                 <Input
-                  {...register('price', 
-                    {
-                    // required: 'Введите цену посещения мероприятия',
+                  {...register('price', {
                     pattern: {
-                      value: /^\d+$/,
-                      message: 'Пожалуйста, введите только цифры',
+                      value: /^\d*(?:[.,]\d{1,2})?$/,
+                      message: 'Цена должна быть числом',
                     },
                   })}
                   bg="white"
-                  placeholder="Цена на мероприятие от  "
+                  placeholder="Цена (опционально)"
+                  borderRadius="10px"
+                />
+              </Field>
+
+              <Field invalid={!!errors.external_url} errorText={errors.external_url?.message}>
+                <Input
+                  {...register('external_url')}
+                  bg="white"
+                  placeholder="Ссылка на организатора (опционально)"
                   borderRadius="10px"
                 />
               </Field>
             </Stack>
 
             <Stack width={{ base: '100%', md: '46%' }}>
-              <Field invalid={!!errors.pictures_url} errorText={errors.pictures_url?.message} flex="0 0 auto">
+              <Field invalid={!!errors.pictures_main} errorText={errors.pictures_main?.message}>
                 <Input
-                  // {...register('pictures_url', { required: 'Введите URL вертикальной картинки' })}
+                  {...register('pictures_main')}
                   bg="white"
-                  placeholder="Вертикальная картинка"
+                  placeholder="Ссылка на афишу (опционально)"
                   borderRadius="10px"
                 />
               </Field>
-              <Field invalid={!!errors.horizontal_picture_url} errorText={errors.horizontal_picture_url?.message}>
-                <Input {...register('horizontal_picture_url', {})} bg="white" placeholder="Горизонтальная картинка" borderRadius="10px" />
-              </Field>
 
-              <Field invalid={!!errors.external_url} errorText={errors.external_url?.message}>
+              <Field invalid={!!errors.pictures_two} errorText={errors.pictures_two?.message}>
                 <Input
-                  // {...register('external_url', { required: 'Введите ссылку на ваш сервис' })}
+                  {...register('pictures_two')}
                   bg="white"
-                  placeholder="Ссылка на организатора"
+                  placeholder="Ссылка на вторую картинку (опционально)"
                   borderRadius="10px"
                 />
               </Field>
-              <Field invalid={!!errors.age_limit} errorText={errors.age_limit?.message}>
-                <SelectRoot
-                  collection={ageLimits}
-                  size={{ base: 'xs', md: 'md' }}
-                  width={{ base: '220px', md: '250px' }}
-                  bg="white"
-                  overflow="hidden"
-                  borderRadius="10px"
-                  onValueChange={handleAgeChange}
-                >
-                  <SelectTrigger>
-                    <Box
-                      as="span"
-                      fontSize={{ base: '13px', md: '14px' }}
-                      color={selectedAgeLimit ? 'black' : 'GrayText'}
-                      cursor="pointer"
-                    >
-                      {selectedAgeLabel}
-                    </Box>
-                  </SelectTrigger>
 
-                  <SelectContent>
-                    {ageLimits.items.map(age => (
-                      <SelectItem item={age} key={age.value}>
-                        {age.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </SelectRoot>
-              </Field>
+              <SelectRoot
+                collection={AGE_OPTIONS}
+                size={{ base: 'xs', md: 'md' }}
+                width={{ base: '100%', md: '250px' }}
+                bg="white"
+                overflow="hidden"
+                borderRadius="10px"
+                onValueChange={handleAgeChange}
+              >
+                <SelectTrigger>
+                  <Box as="span" fontSize={{ base: '13px', md: '14px' }} color={selectedAge ? 'black' : 'GrayText'}>
+                    {selectedAgeLabel}
+                  </Box>
+                </SelectTrigger>
+                <SelectContent>
+                  {AGE_OPTIONS.items.map((item) => (
+                    <SelectItem item={item} key={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </SelectRoot>
 
-              <Field invalid={!!errors.duration} errorText={errors.duration?.message}>
+              <Field invalid={!!errors.start_time} errorText={errors.start_time?.message}>
                 <Input
                   type="time"
-                  {...register('duration', {
-                    required: 'Введите время начала мероприятия',
-                  })}
+                  {...register('start_time', { required: 'Введите время начала мероприятия' })}
                   bg="white"
                   borderRadius="10px"
                 />
               </Field>
-              <Field invalid={!!errors.date_event} errorText={errors.date_event?.message}>
-                <Flex gap="2" align="center">
-                  <Input
-                    width="200px"
-                    {...register('date_event', {
-                      required: 'Введите дату начала мероприятия',
-                      min: {
-                        value: new Date().toISOString().split('T')[0],
-                        message: 'Дата начала мероприятия должна быть в будущем',
-                      },
-                    })}
-                    bg="white"
-                    type="date"
-                    min={new Date().toISOString().split('T')[0]}
-                    borderRadius="10px"
-                  />
 
-                  <Button
-                    minW={{ base: '40px', md: '40px' }}
-                    h={{ base: '40px', md: '40px' }}
-                    p="0"
-                    bg="white"
-                    borderRadius="10px"
-                    _hover={{
-                      bg: '#4C6BE6',
-                    }}
-                    onClick={() => setIsCalendarModalOpen(true)}
-                  >
-                    <Image
-                      src={calendarIcon}
-                      alt="calendar"
-                      boxSize={{ base: '20px', md: '24px' }}
-                      objectFit="contain"
-                    />
-                  </Button>
-                </Flex>
+              <Field invalid={!!errors.date_event} errorText={errors.date_event?.message}>
+                <Input
+                  {...register('date_event', {
+                    required: 'Введите дату мероприятия',
+                    min: {
+                      value: minDate,
+                      message: 'Дата мероприятия должна быть не раньше сегодняшней',
+                    },
+                  })}
+                  bg="white"
+                  type="date"
+                  min={minDate}
+                  borderRadius="10px"
+                />
               </Field>
             </Stack>
           </Flex>
 
-          {/* <Flex justify="center" mt={{ base: '2', md: '4' }}>
-            <Box width={{ base: '80%', md: '50%' }}>
-              <Field invalid={!!errors.description} errorText={errors.description?.message}>
-                <Textarea
-                  {...register('description', { required: 'Введите описание мероприятия' })}
-                  bg="white"
-                  placeholder="Описание мероприятия"
-                  borderRadius="10px"
-                />
-              </Field>
-            </Box>
-          </Flex> */}
-
           <Flex justify="center" mt={{ base: '2', md: '4' }}>
-            <Box width={{ base: '80%', md: '50%' }}>
+            <Box width={{ base: '100%', md: '72%' }}>
               <Field invalid={!!errors.description} errorText={errors.description?.message}>
                 <Textarea
-                  // {...register('description', { required: 'Введите описание мероприятия' })}
+                  {...register('description')}
                   bg="white"
-                  placeholder="Описание мероприятия"
+                  placeholder="Описание мероприятия (опционально)"
                   borderRadius="10px"
                 />
               </Field>
@@ -442,24 +462,17 @@ const handleCategoryChange = (details: any) => {
               color="white"
               fontSize="17px"
               fontWeight="600"
-              w={{ base: '60%', md: '40%' }}
+              w={{ base: '70%', md: '45%' }}
               borderRadius="xl"
-              _hover={{
-                bg: '#4C6BE6',
-                color: 'white',
-              }}
+              loading={isSubmitting}
+              _hover={{ bg: '#4C6BE6', color: 'white' }}
             >
               Создать
             </Button>
           </Flex>
         </form>
       </Box>
-      <EventCalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-      />
     </Modal>
-    
   );
 };
 

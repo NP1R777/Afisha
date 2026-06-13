@@ -1,36 +1,153 @@
 import React from "react";
-import { Button, Flex, HStack, Image, Text, VStack, Box, Grid} from '@chakra-ui/react';
+import axios from "../shared/lib/axios";
+import { Button, Flex, HStack, Image, Text, VStack, Box, Grid, Spinner } from '@chakra-ui/react';
 import fon from '../pictures/fon2.png';
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { FaArrowLeft, FaArrowRight } from 'react-icons/fa';
-import EVENTS from '../shared/config/mock.json';
 import EventImage from '../pictures/picture1.png';
 import Organizer_picture from '../pictures/teatr.png';
 import wave from '../pictures/wave31.png';
 import { Calendar } from '../modal/org_calendar';
+import { useUser } from "../addition/context";
+
+interface OrganizerEventCard {
+    id: number;
+    name: string;
+    location: string;
+    price: number | null;
+    pictures_url: string;
+}
+
+interface OrganizerNewsCard {
+    id: number;
+    name: string;
+    location: string;
+}
+
+const CITY_LABELS: Record<string, string> = {
+    norilsk: 'Норильск',
+    talnah: 'Талнах',
+    kayerkan: 'Кайеркан',
+    oganeer: 'Оганер',
+    dudinka: 'Дудинка',
+};
 
 const Organizer = () => {
+    const { userId, role, setRole } = useUser();
     const organizerName = 'Театр драмы им. В. Маяковского';
-    const events = EVENTS.events;
-    //для карточек мероприятий
+    const isOrganizerRole = role === 'organizator';
+    const [events, setEvents] = React.useState<OrganizerEventCard[]>([]);
+    const [newsEvents, setNewsEvents] = React.useState<OrganizerNewsCard[]>([]);
+    const [loadingContent, setLoadingContent] = React.useState(false);
+    const [contentError, setContentError] = React.useState<string | null>(null);
+
     const [currentIndex, setCurrentIndex] = React.useState(0); 
     const itemsPerPage = 4; 
     const visibleEvents = events.slice(currentIndex, currentIndex + itemsPerPage);
-    const theaterEvents = EVENTS.events.filter(event => {
-    const category = EVENTS.categories.find(
-        category => category.id === event.group_id
-    );
-
-        return category?.name.toLowerCase() === 'театр';
-    });
 
     const [newsIndex, setNewsIndex] = React.useState(0);
 
-    const visibleNewsEvents = theaterEvents.slice(
+    const visibleNewsEvents = newsEvents.slice(
         newsIndex,
         newsIndex + itemsPerPage
     );
+
+    const loadOrganizerContent = React.useCallback(async () => {
+        setLoadingContent(true);
+        setContentError(null);
+        try {
+            const [eventsResult, newsResult] = await Promise.allSettled([
+                axios.get('/event/events'),
+                axios.get('/news/all'),
+            ]);
+
+            const eventsData =
+                eventsResult.status === 'fulfilled' && Array.isArray(eventsResult.value.data)
+                    ? eventsResult.value.data
+                    : [];
+            const normalizedEvents = eventsData.map((item: any) => {
+                const cityRaw = (item?.city || '').toString().toLowerCase();
+                return {
+                    id: Number(item?.id),
+                    name: String(item?.name || ''),
+                    location: String(item?.address || CITY_LABELS[cityRaw] || 'Адрес не указан'),
+                    price:
+                        item?.price !== null && item?.price !== undefined && !Number.isNaN(Number(item.price))
+                            ? Number(item.price)
+                            : null,
+                    pictures_url:
+                        String(
+                            item?.pictures_main ||
+                            item?.pictures_url ||
+                            ''
+                        ),
+                } as OrganizerEventCard;
+            }).filter((item: OrganizerEventCard) => Number.isFinite(item.id) && item.id > 0);
+
+            const newsData =
+                newsResult.status === 'fulfilled' && Array.isArray(newsResult.value.data)
+                    ? newsResult.value.data
+                    : [];
+            const normalizedNews = newsData.map((item: any) => ({
+                id: Number(item?.id),
+                name: String(item?.name || ''),
+                location: String(item?.address || item?.organizator || 'Новость без адреса'),
+            } as OrganizerNewsCard)).filter((item: OrganizerNewsCard) => Number.isFinite(item.id) && item.id > 0);
+
+            setEvents(normalizedEvents);
+            setNewsEvents(normalizedNews);
+            setCurrentIndex(0);
+            setNewsIndex(0);
+
+            const eventError =
+                eventsResult.status === 'rejected' && eventsResult.reason?.response?.status !== 404
+                    ? eventsResult.reason
+                    : null;
+            const newsError =
+                newsResult.status === 'rejected' && newsResult.reason?.response?.status !== 404
+                    ? newsResult.reason
+                    : null;
+            const firstError = eventError || newsError;
+            if (firstError) {
+                const detail = firstError?.response?.data?.detail;
+                setContentError(typeof detail === 'string' ? detail : (firstError?.message || 'Часть данных не загрузилась.'));
+            }
+        } catch (err: any) {
+            const detail = err?.response?.data?.detail;
+            setEvents([]);
+            setNewsEvents([]);
+            setContentError(typeof detail === 'string' ? detail : (err?.message || 'Не удалось загрузить данные страницы.'));
+        } finally {
+            setLoadingContent(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        let isCancelled = false;
+        const loadRole = async () => {
+            if (!userId || role) {
+                return;
+            }
+            try {
+                const response = await axios.get(`/user/get_user?user_id=${userId}`);
+                const value = response.data?.role;
+                if (!isCancelled && (value === 'user' || value === 'admin' || value === 'organizator')) {
+                    setRole(value);
+                }
+            } catch {
+                // silent fallback: page remains readable without privileged actions
+            }
+        };
+        void loadRole();
+        return () => {
+            isCancelled = true;
+        };
+    }, [role, setRole, userId]);
+
+    React.useEffect(() => {
+        void loadOrganizerContent();
+    }, [loadOrganizerContent]);
 
     return (
         <Flex w="100%">
@@ -94,6 +211,14 @@ const Organizer = () => {
                 <Text fontSize={{ "2xl": '48px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt={5}>
                     Ближайщие мероприятия организатора
                 </Text>
+                {loadingContent ? (
+                    <Flex justify="center" mt="20px"><Spinner color="white" /></Flex>
+                ) : null}
+                {contentError ? (
+                    <Box mt={3} bg="rgba(255, 93, 93, 0.2)" borderRadius="12px" p={3}>
+                        <Text color="#ffd8d8">{contentError}</Text>
+                    </Box>
+                ) : null}
                 <Flex justify="center" gap={8} mt="40px" zIndex={2}>
                     {visibleEvents.map((event, index) => (
                     <motion.div
@@ -162,13 +287,16 @@ const Organizer = () => {
                                     fontSize={{ xl: 'sm', base: 'xs' }}
                                     fontFamily="Unbounded">
                                     <Text>
-                                        {Number(event.price) === 0 ? "Бесплатно" : `от ${event.price} руб`}
+                                        {event.price === null ? "Цена не указана" : Number(event.price) === 0 ? "Бесплатно" : `от ${event.price} руб`}
                                     </Text>
                                 </Box>
                             </VStack>
                         </Link>
                     </motion.div>
                     ))}
+                    {!loadingContent && visibleEvents.length === 0 ? (
+                        <Text color="white" fontSize="18px">Нет доступных мероприятий.</Text>
+                    ) : null}
                 </Flex>
                 <HStack justify="flex-end" mt={7} gap="15px" w={{ xl: '92%', lg: '88%' }}>
                     <Button
@@ -216,7 +344,6 @@ const Organizer = () => {
                             exit={{ opacity: 0, x: -50 }}
                             transition={{ duration: 0.5, delay: index * 0.2 }}
                         >
-                            <Link to={`/event/${event.id}`}>
                                 <VStack
                                     align="center"
                                     textAlign="center"
@@ -226,7 +353,7 @@ const Organizer = () => {
                                     position="relative"
                                 >
                                     <Image
-                                        src={event.pictures_url || EventImage}
+                                        src={EventImage}
                                         alt={event.name}
                                         width="100%"
                                         height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
@@ -279,15 +406,15 @@ const Organizer = () => {
                                         fontFamily="Unbounded"
                                     >
                                         <Text>
-                                            {Number(event.price) === 0
-                                                ? "Бесплатно"
-                                                : `от ${event.price} руб`}
+                                            Новость
                                         </Text>
                                     </Box>
                                 </VStack>
-                            </Link>
                         </motion.div>
                     ))}
+                    {!loadingContent && visibleNewsEvents.length === 0 ? (
+                        <Text color="white" fontSize="18px">Нет доступных новостей.</Text>
+                    ) : null}
                 </Flex>
 
                 <HStack justify="flex-end" mt={7} gap="15px" w={{ xl: '92%', lg: '88%' }}>
@@ -306,7 +433,7 @@ const Organizer = () => {
 
                     <Button
                         onClick={() => setNewsIndex(newsIndex + itemsPerPage)}
-                        disabled={newsIndex + itemsPerPage >= theaterEvents.length}
+                        disabled={newsIndex + itemsPerPage >= newsEvents.length}
                         bg="transparent"
                         borderRadius="full"
                         boxShadow="0 0 0 2px white"
@@ -320,7 +447,11 @@ const Organizer = () => {
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="40px" ml="55px" textAlign="center">
                     План мероприятий
                 </Text>
-                <Calendar organizerName={organizerName} />
+                <Calendar
+                    organizerName={organizerName}
+                    canManageEvents={isOrganizerRole}
+                    onEventCreated={loadOrganizerContent}
+                />
             </Box>
         </Flex>
     );
