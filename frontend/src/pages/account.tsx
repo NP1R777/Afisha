@@ -358,7 +358,6 @@ const Account = () => {
             </Flex>
           </Box>
         </Box>
-        {!isOrganizer ? (
         <Box width="100%" mt={15}>
           <Flex direction="column" align="center">
             <Text fontSize={{ base: '24px', md: '49px' }} color="white" fontWeight="bold" userSelect="none" mb={6}>
@@ -490,21 +489,21 @@ const Account = () => {
             )}
           </Flex>
         </Box>
-        ) : (
-        <Box width="100%" mt={15}>
-          <Text
-            fontSize={{ "2xl": "50px", lg: "40px", md: "30px", base: "20px" }}
-            color="white"
-            fontWeight="bold"
-            mt="40px"
-            ml="55px"
-            textAlign="center"
-          >
-            План ваших мероприятий
-          </Text>
-          <Calendar canManageEvents={isOrganizer} />
-        </Box>
-      )}
+        {isOrganizer ? (
+          <Box width="100%" mt={15}>
+            <Text
+              fontSize={{ "2xl": "50px", lg: "40px", md: "30px", base: "20px" }}
+              color="white"
+              fontWeight="bold"
+              mt="40px"
+              ml="55px"
+              textAlign="center"
+            >
+              План ваших мероприятий
+            </Text>
+            <Calendar canManageEvents={isOrganizer} />
+          </Box>
+        ) : null}
         <CreateModal isOpen={isModalOpen} onRequestClose={closeModal} onCreateSuccess={handleCreateSuccess} />
         <CategoriesModal isOpen={isCategoriesModalOpen} onRequestClose={closeCategoriesModal} />
         <EditingModal
