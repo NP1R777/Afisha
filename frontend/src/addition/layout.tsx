@@ -103,7 +103,16 @@ const Layout = () => {
   return (
     <>
       <ContainerFluid zIndex={2} position="fixed" left={0} right={0} top={5}>
-        <Flex align="center" p={3} bg="#22212C" boxShadow="md" borderRadius="xl" margin="0 auto">
+        <Flex
+          align="center"
+          p={3}
+          bg="rgba(23, 28, 66, 0.82)"
+          boxShadow="0 12px 28px rgba(8, 12, 34, 0.35)"
+          border="1px solid rgba(255,255,255,0.18)"
+          borderRadius="2xl"
+          margin="0 auto"
+          backdropFilter="blur(7px)"
+        >
           <Image
             mr={2}
             src="/icons/logo-filled.svg"
@@ -119,13 +128,13 @@ const Layout = () => {
               <Input
                 variant="outline"
                 placeholder="Поиск"
-                bg="gray.700"
+                bg="rgba(255,255,255,0.12)"
                 h="40px"
                 color="white"
                 flex="1"
                 borderRadius={{ xl: 'xl', lg: 'xl', base: 'lg' }}
-                border="none"
-                _focus={{ border: 'none', boxShadow: 'none' }}
+                border="1px solid rgba(255,255,255,0.2)"
+                _focus={{ border: '1px solid rgba(180, 202, 255, 0.75)', boxShadow: '0 0 0 3px rgba(130, 155, 235, 0.25)' }}
                 _placeholder={{ color: 'gray.300' }}
                 fontSize="14px"
                 fontFamily="Unbounded"
@@ -135,7 +144,14 @@ const Layout = () => {
             </InputGroup>
           </HStack>
           {isAuthenticated ? (
-            <Button bg="transparent" p={{ lg: 3,md: 3, base: 0 }} onClick={handleProfileClick} _hover={{ bg: 'transparent' }}>
+            <Button
+              bg="rgba(255,255,255,0.08)"
+              border="1px solid rgba(255,255,255,0.22)"
+              p={{ lg: 3,md: 3, base: 1 }}
+              borderRadius="full"
+              onClick={handleProfileClick}
+              _hover={{ bg: 'rgba(255,255,255,0.18)' }}
+            >
               <Image
                 src="/icons/profile.svg"
                 alt="User Icon"
@@ -167,14 +183,15 @@ const Layout = () => {
         <Outlet />
       </Flex>
       <ContainerFluid mt="24px">
-        <Stack>
-          <Separator mt={5} borderColor="black" />
-          <HStack mt={3} align="center" mb={5} justify="space-between" w="100%">
+        <Stack bg="rgba(255,255,255,0.5)" border="1px solid rgba(40,60,120,0.18)" borderRadius="20px" px={{ base: 3, md: 5 }} py={3}>
+          <Separator mt={2} borderColor="rgba(22,33,80,0.35)" />
+          <HStack mt={3} align="center" mb={2} justify="space-between" w="100%">
             <Text
               fontFamily="Unbounded"
-              color="black"
+              color="#12204F"
               fontSize={{ base: '13px', lg: '15px', xl: '18px' }}
               textAlign="left"
+              lineHeight={1.5}
             >
               © {new Date().getFullYear()} "Афиша Норильска" – сайт создан студентами 4 курса Сологубовой Владой и Захаровым Ильёй
             </Text>
