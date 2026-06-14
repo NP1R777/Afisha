@@ -44,7 +44,6 @@ const Events = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const formatScheduleValue = (rawValue: string | undefined): string => {
     const normalized = (rawValue || '').trim();
@@ -100,38 +99,6 @@ const Events = () => {
       return 'Бесплатно';
     }
     return `от ${rawPrice} ₽`;
-  };
-
-  const formatDescriptionParagraphs = (rawDescription: string): string[] => {
-    const normalized = (rawDescription || '').replace(/\r/g, '').trim();
-    if (!normalized) {
-      return ['Описание пока не добавлено.'];
-    }
-
-    const byBlocks = normalized
-      .split(/\n{2,}/)
-      .map((block) => block.trim())
-      .filter(Boolean);
-
-    if (byBlocks.length > 1) {
-      return byBlocks;
-    }
-
-    const bySentences = normalized
-      .split(/(?<=[.!?])\s+/)
-      .map((sentence) => sentence.trim())
-      .filter(Boolean);
-
-    if (bySentences.length <= 2) {
-      return [normalized];
-    }
-
-    const grouped: string[] = [];
-    for (let index = 0; index < bySentences.length; index += 2) {
-      grouped.push(bySentences.slice(index, index + 2).join(' '));
-    }
-
-    return grouped;
   };
 
   const toggleFavorite = async (index: number) => {
@@ -330,10 +297,6 @@ const Events = () => {
 
   }, [eventId]);
 
-  useEffect(() => {
-    setIsDescriptionExpanded(false);
-  }, [eventId]);
-
   if (!eventDetails) {
     return <Text>Loading...</Text>;
   }
@@ -385,12 +348,6 @@ const Events = () => {
       timeLabel,
     };
   });
-  const descriptionParagraphs = formatDescriptionParagraphs(eventDetails.description || '');
-  const descriptionPreviewLimit = 3;
-  const hasLongDescription = descriptionParagraphs.length > descriptionPreviewLimit;
-  const visibleDescriptionParagraphs = isDescriptionExpanded
-    ? descriptionParagraphs
-    : descriptionParagraphs.slice(0, descriptionPreviewLimit);
 
   const openLoginModal = () => {
     setIsRegisterOpen(false);
@@ -700,40 +657,15 @@ const Events = () => {
             <Text fontSize={{ "2xl": '42px', lg: '34px', md: "28px", base: "22px" }} color="white" fontWeight="700">
               О событии
             </Text>
-            <VStack align="stretch" gap={3} mt={3}>
-              {visibleDescriptionParagraphs.map((paragraph, index) => (
-                <Text
-                  key={`desc-paragraph-${index}`}
-                  fontSize={{ "2xl": '22px', lg: '18px', md: "16px", base: "14px" }}
-                  color="white"
-                  lineHeight={1.72}
-                  whiteSpace="normal"
-                >
-                  {paragraph}
-                </Text>
-              ))}
-              {hasLongDescription ? (
-                <Button
-                  alignSelf="flex-start"
-                  mt={1}
-                  bg="rgba(255,255,255,0.12)"
-                  color="white"
-                  border="1px solid rgba(255,255,255,0.28)"
-                  borderRadius="full"
-                  px={5}
-                  py={2}
-                  fontSize={{ base: '13px', md: '15px' }}
-                  transition="all .2s ease"
-                  _hover={{
-                    bg: 'rgba(255,255,255,0.22)',
-                    transform: 'translateY(-1px)',
-                  }}
-                  onClick={() => setIsDescriptionExpanded((prev) => !prev)}
-                >
-                  {isDescriptionExpanded ? 'Свернуть описание' : 'Показать полностью'}
-                </Button>
-              ) : null}
-            </VStack>
+            <Text
+              fontSize={{ "2xl": '22px', lg: '18px', md: "16px", base: "14px" }}
+              color="white"
+              mt="3"
+              lineHeight={1.7}
+              whiteSpace="pre-line"
+            >
+              {eventDetails.description || 'Описание пока не добавлено.'}
+            </Text>
 
             <VStack align="start" gap={2} mt={4}>
               <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
