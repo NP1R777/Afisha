@@ -43,6 +43,39 @@ interface Event {
   horizontal_picture_url: string | null;
 }
 
+function sanitizeImageCandidate(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return '';
+  }
+  const lowered = normalized.toLowerCase();
+  if (lowered === 'null' || lowered === 'none' || lowered === 'undefined' || lowered === '[object object]') {
+    return '';
+  }
+  return normalized;
+}
+
+function resolveEventImage(item: any): string {
+  const candidates = [
+    item?.pictures_main,
+    item?.picture_url,
+    item?.pictures_url,
+    item?.horizontal_picture_url,
+    item?.pictures_two,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = sanitizeImageCandidate(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return EventImage;
+}
+
 function normalizeEvent(item: any): Event {
   const normalizedTimeSlots = Array.isArray(item?.time_slots) ? item.time_slots : [];
   const groupIds = Array.isArray(item?.group_ids) ? item.group_ids : [];
@@ -63,11 +96,7 @@ function normalizeEvent(item: any): Event {
     address: item?.address || '',
     city: item?.city || '',
     age_limit: item?.age_limit || '',
-    pictures_url:
-      item?.pictures_url ||
-      item?.picture_url ||
-      item?.pictures_main ||
-      '',
+    pictures_url: resolveEventImage(item),
     horizontal_picture_url:
       item?.horizontal_picture_url ||
       item?.pictures_two ||
@@ -455,7 +484,8 @@ const handleClearDate = () => {
                 fontSize={{ base: 'xs', sm:"13px", md: 'sm' }}
                 userSelect="none"
                 cursor="pointer"
-                _hover={{ bg: 'gray.50' }}
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
+                _hover={{ bg: 'gray.50', boxShadow: '0 10px 20px rgba(13, 18, 45, 0.22)' }}
                 transition="all 0.2s"
               >
                             
@@ -536,6 +566,7 @@ const handleClearDate = () => {
                 bg="white"
                 overflow="hidden"
                 borderRadius="full"
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleCategoryChange}
               >
                 <SelectTrigger>
@@ -550,7 +581,7 @@ const handleClearDate = () => {
                     Категории
                   </Box>
                 </SelectTrigger>
-                <SelectContent borderRadius="xl">
+                <SelectContent borderRadius="xl" border="1px solid rgba(76, 107, 230, 0.25)" boxShadow="0 14px 24px rgba(10, 17, 46, 0.22)">
                   {categories.items.map(category => (
                     <SelectItem item={category} key={category.value}>
                       {category.label}
@@ -568,6 +599,7 @@ const handleClearDate = () => {
                 bg="white"
                 overflow="hidden"
                 borderRadius="full"
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleDistrictChange}
               >
                 <SelectTrigger>
@@ -584,7 +616,7 @@ const handleClearDate = () => {
                     </Box>
                   </Flex>
                 </SelectTrigger>
-                <SelectContent borderRadius="xl">
+                <SelectContent borderRadius="xl" border="1px solid rgba(76, 107, 230, 0.25)" boxShadow="0 14px 24px rgba(10, 17, 46, 0.22)">
                   {districts.items.map(district => (
                     <SelectItem item={district} key={district.value}>
                       {district.label}
@@ -626,6 +658,7 @@ const handleClearDate = () => {
                 transition="all 0.2s"
                 onClick={() => setIsCalendarModalOpen(true)}
                 fontWeight="400"
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
               >
                 <Image
                   display={{ base: 'none', md: 'block' }}
@@ -834,7 +867,9 @@ const handleClearDate = () => {
                           objectFit="cover"
                           boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = EventImage;
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = EventImage;
                           }}
                         />
 
@@ -1007,7 +1042,9 @@ const handleClearDate = () => {
                                 objectFit="cover"
                                 boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = EventImage;
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.src = EventImage;
                                 }}
                               />
                               <Box
