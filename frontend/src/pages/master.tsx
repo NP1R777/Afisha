@@ -149,6 +149,12 @@ const Frame = () => {
     else return 2;
   })();
 
+  const sectionReveal = {
+    initial: { opacity: 0, y: 18 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.45, ease: 'easeOut' as const },
+  };
+
   const handleLoginSuccess = () => {
     const storedUsername = localStorage.getItem('username');
     if (storedUsername) {
@@ -421,7 +427,18 @@ const handleClearDate = () => {
     <ContainerFluid>
       <Flex direction="column" align="center" height="100%">
         <ContainerFluid position="fixed" zIndex={1}>
-          <Flex justify="space-between" fontFamily="Unbounded" w="100%">
+          <Flex
+            justify="space-between"
+            fontFamily="Unbounded"
+            w="100%"
+            bg="rgba(22, 27, 66, 0.45)"
+            border="1px solid rgba(255,255,255,0.22)"
+            borderRadius="20px"
+            px={{ base: 2, md: 3, xl: 4 }}
+            py={2}
+            boxShadow="0 10px 28px rgba(7, 11, 34, 0.33)"
+            backdropFilter="blur(6px)"
+          >
             <HStack gap={{ xl: '4', lg: '4', base: '1' }}>
               <Box
                 
@@ -623,47 +640,56 @@ const handleClearDate = () => {
           </Flex>
         </ContainerFluid>
 
-        <VStack
-          mt="40px"
-          align="center"
-          maxW={{ md: '75%', base: '90%' }}
-          p={{ lg: 10, base: 4 }}
-          color="white"
-          userSelect="none"
-        >
-          <Heading
-            as="h1"
-            fontWeight={500}
-            lineHeight={1}
-            fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
-            alignSelf="center"
-            
-            fontFamily="Unbounded"
+        <motion.div {...sectionReveal} style={{ width: '100%' }}>
+          <VStack
+            mt="40px"
+            align="center"
+            maxW={{ md: '75%', base: '90%' }}
+            p={{ lg: 10, base: 4 }}
+            color="white"
+            userSelect="none"
+            mx="auto"
+            bg="rgba(14, 20, 58, 0.34)"
+            border="1px solid rgba(255,255,255,0.2)"
+            borderRadius="28px"
+            boxShadow="0 18px 34px rgba(7, 11, 34, 0.28)"
+            backdropFilter="blur(4px)"
           >
-            Афиша
-          </Heading>
-          <Heading
-            as="h1"
-            fontWeight={500}
-            lineHeight={1}
-            
-            fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
-            alignSelf="center"
-            fontFamily="Unbounded"
-          >
-            Норильска
-          </Heading>
-          <Text
-            fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
-            fontWeight="300"
-            mt={{ xl: '20px', lg: '20px', sm:"30px", base: '5px' }}
-            textAlign="center"
-            fontFamily="Unbounded"
-          >
-            На нашем сайте вы найдете актуальные мероприятия в Норильске и других районах, чтобы каждый мог легко
-            выбрать что-то интересное для себя. Развлекайтесь и наслаждайтесь яркими моментами города!
-          </Text>
-        </VStack>
+            <Heading
+              as="h1"
+              fontWeight={500}
+              lineHeight={1}
+              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
+              alignSelf="center"
+              fontFamily="Unbounded"
+              textShadow="0 10px 28px rgba(0,0,0,0.35)"
+            >
+              Афиша
+            </Heading>
+            <Heading
+              as="h1"
+              fontWeight={500}
+              lineHeight={1}
+              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
+              alignSelf="center"
+              fontFamily="Unbounded"
+              textShadow="0 10px 28px rgba(0,0,0,0.35)"
+            >
+              Норильска
+            </Heading>
+            <Text
+              fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
+              fontWeight="300"
+              mt={{ xl: '20px', lg: '20px', sm:"30px", base: '5px' }}
+              textAlign="center"
+              fontFamily="Unbounded"
+              lineHeight={1.65}
+            >
+              На нашем сайте вы найдете актуальные мероприятия в Норильске и других районах, чтобы каждый мог легко
+              выбрать что-то интересное для себя. Развлекайтесь и наслаждайтесь яркими моментами города!
+            </Text>
+          </VStack>
+        </motion.div>
 
         <Grid
           width={{ base: "80%", md: "100%", lg: "100%", '2xl': "100%" }}
@@ -684,6 +710,9 @@ const handleClearDate = () => {
             display="flex"
             alignItems="center"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             все
           </Box>
@@ -701,6 +730,9 @@ const handleClearDate = () => {
             bgSize="cover"
             bgRepeat="no-repeat"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             события
           </Box>
@@ -714,6 +746,9 @@ const handleClearDate = () => {
             display="flex"
             alignItems="center"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             вашего 
           </Box>
@@ -727,18 +762,33 @@ const handleClearDate = () => {
             display="flex"
             alignItems="center"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             города
           </Box>
         </Grid>
         {isAuthenticated && personalizedEvents.length > 0 && (
-          <Box mt={9} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+          <Box
+            mt={9}
+            w="100%"
+            p={4}
+            color="white"
+            userSelect="none"
+            zIndex={0}
+            bg="rgba(13, 20, 58, 0.28)"
+            border="1px solid rgba(255,255,255,0.16)"
+            borderRadius="24px"
+            boxShadow="0 14px 30px rgba(7, 11, 34, 0.26)"
+          >
             <Heading
               lineHeight={1}
               fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
               fontFamily="Unbounded"
               color="white"
               textAlign="center"
+              textShadow="0 8px 22px rgba(0,0,0,0.3)"
             >
               Подборка для вас
             </Heading>
@@ -769,6 +819,11 @@ const handleClearDate = () => {
                         gap={1}
                         w={{ xl: '240px', sm: '200px', base: '140px' }}
                         position="relative"
+                        transition="all .22s ease"
+                        _hover={{
+                          transform: 'translateY(-4px)',
+                          filter: 'drop-shadow(0 14px 24px rgba(8, 14, 40, 0.42))',
+                        }}
                       >
                         <Image
                           src={event.pictures_url || EventImage}
@@ -777,6 +832,7 @@ const handleClearDate = () => {
                           height={{ xl: '360px', md: '300px', sm: '290px', base: '200px' }}
                           borderRadius="6px"
                           objectFit="cover"
+                          boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = EventImage;
                           }}
@@ -794,6 +850,7 @@ const handleClearDate = () => {
                           textAlign="left"
                           fontFamily="Unbounded"
                           color="white"
+                          border="1px solid rgba(255,255,255,0.2)"
                         >
                           <Text
                             fontWeight="hairline"
@@ -825,6 +882,8 @@ const handleClearDate = () => {
                           p={1}
                           fontSize={{ xl: 'sm', base: 'xs' }}
                           fontFamily="Unbounded"
+                          border="1px solid rgba(12, 24, 70, 0.2)"
+                          boxShadow="0 6px 16px rgba(13, 18, 45, 0.2)"
                         >
                           <Text>
                             {Number(event.price) === 0
@@ -849,6 +908,7 @@ const handleClearDate = () => {
                 width={{ xl: '50px', sm: '45px', base: '40px' }}
                 height={{ xl: '50px', sm: '45px', base: '40px' }}
                 _disabled={{ cursor: 'default', opacity: 0.5 }}
+                _hover={{ bg: 'rgba(255,255,255,0.12)' }}
               >
                 <FaArrowLeft color="white" />
               </Button>
@@ -865,6 +925,7 @@ const handleClearDate = () => {
                 width={{ xl: '50px', sm: '45px', base: '40px' }}
                 height={{ xl: '50px', sm: '45px', base: '40px' }}
                 _disabled={{ cursor: 'default', opacity: 0.5 }}
+                _hover={{ bg: 'rgba(255,255,255,0.12)' }}
               >
                 <FaArrowRight color="white" />
               </Button>
@@ -885,13 +946,28 @@ const handleClearDate = () => {
             }
             console.log(`Rendering category ${category.name} with events:`, filteredEvents);
             return (
-              <Box mt={4} id={`category-${category.id}`}  scrollMarginTop="120px" key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+              <Box
+                mt={4}
+                id={`category-${category.id}`}
+                scrollMarginTop="120px"
+                key={category.id}
+                w="100%"
+                p={4}
+                color="white"
+                userSelect="none"
+                zIndex={0}
+                bg="rgba(13, 20, 58, 0.24)"
+                border="1px solid rgba(255,255,255,0.15)"
+                borderRadius="24px"
+                boxShadow="0 14px 30px rgba(7, 11, 34, 0.24)"
+              >
                 <Heading
                   lineHeight={1}
                   fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
                   fontFamily="Unbounded"
                   color="white"
                   textAlign="center"
+                  textShadow="0 8px 22px rgba(0,0,0,0.3)"
                 >
                   {category.name}
                 </Heading>
@@ -916,6 +992,11 @@ const handleClearDate = () => {
                               height="100%"
                               w={{ xl: '240px', sm: '200px', base: '140px' }}
                               position="relative"
+                              transition="all .22s ease"
+                              _hover={{
+                                transform: 'translateY(-4px)',
+                                filter: 'drop-shadow(0 14px 24px rgba(8, 14, 40, 0.42))',
+                              }}
                             >
                               <Image
                                 src={event.pictures_url || EventImage}
@@ -924,6 +1005,7 @@ const handleClearDate = () => {
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
                                 borderRadius="6px"
                                 objectFit="cover"
+                                boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).src = EventImage;
                                 }}
@@ -940,6 +1022,7 @@ const handleClearDate = () => {
                                 textAlign="left"
                                 fontFamily="Unbounded"
                                 color="white"
+                                border="1px solid rgba(255,255,255,0.2)"
                               >
                                 <Text
                                   fontWeight="hairline"
@@ -969,6 +1052,8 @@ const handleClearDate = () => {
                                 p={1}
                                 fontSize={{ xl: 'sm', base: 'xs' }}
                                 fontFamily="Unbounded"
+                                border="1px solid rgba(12, 24, 70, 0.2)"
+                                boxShadow="0 6px 16px rgba(13, 18, 45, 0.2)"
                               >
                                 <Text>{Number(event.price) === 0 ? 'Бесплатно' : `от ${event.price} руб`}</Text>
                               </Box>
@@ -994,6 +1079,7 @@ const handleClearDate = () => {
                       width={{ xl: '50px',  sm: '45px', base: '40px' }}
                       height={{ xl: '50px', sm: '45px', base: '40px' }}
                       _disabled={{ cursor: 'default', opacity: 0.5 }}
+                      _hover={{ bg: 'rgba(255,255,255,0.12)' }}
                     >
                       <FaArrowLeft color="white"/>
                     </Button>
@@ -1006,6 +1092,7 @@ const handleClearDate = () => {
                       width={{ xl: '50px',  sm: '45px', base: '40px' }}
                       height={{ xl: '50px', sm: '45px', base: '40px' }}
                       _disabled={{ cursor: 'default', opacity: 0.5 }}
+                      _hover={{ bg: 'rgba(255,255,255,0.12)' }}
                     >
                       <FaArrowRight color="white"/>
                     </Button>
