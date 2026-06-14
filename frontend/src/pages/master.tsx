@@ -19,7 +19,7 @@ import axios from '../shared/lib/axios';
 import { ContainerFluid } from '../components/ui/container';
 import cross from '../pictures/cross.png';
 import EventImage from '../pictures/picture.png';
-import EventCalendarModal from '../modal/calendar';
+import EventCalendarModal from '../modal/user_calendar';
 
 interface Event {
   id?: number;
