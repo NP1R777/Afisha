@@ -1,6 +1,7 @@
-import { Button, Flex, Heading, HStack, Image, Separator, Stack, Text, VStack, Box, AspectRatio } from '@chakra-ui/react';
+import { Button, Flex, Heading, HStack, Image, Separator, Stack, Text, VStack, Box } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useUser } from '../addition/context';
 import LoginModal from '../pages/authorization';
 import RegisterModal from '../pages/registration';
@@ -327,6 +328,11 @@ const Events = () => {
       : `${normalizedAgeLimit}+`
     : '0+';
   const formattedPrice = formatPrice(eventDetails.price);
+  const sectionAnimation = {
+    initial: { opacity: 0, y: 16 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.45, ease: 'easeOut' as const },
+  };
 
   const scheduleRows = (eventDetails.time_slots || []).map((slot) => {
     const { day, month } = parseDateParts(slot.date_event);
@@ -402,252 +408,334 @@ const Events = () => {
         px={{ base: 5, sm: 6, md: 10, lg: 16, xl: 24, "2xl": 100 }}
         mx="auto"
         zIndex={1}
-        fontFamily="Unbounded" userSelect="none"
+        fontFamily="Unbounded"
+        userSelect="none"
       >
-        <Flex wrap="wrap" mt={{ "2xl": 25 }} align="flex-end"
-        >
-          <VStack w={{ "2xl": '380px', xl: '280px', lg: '200px', md: "190px", sm: "125px", base: "100px" }}>
-            <Image src={eventDetails.picture_url} alt={eventDetails.name} objectFit="cover" width="100%"
-              height={{ "2xl": '550px', xl: '410px', md: '300px', sm: '200px', base: '150px' }} borderRadius="6px"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = EventImage;
-              }} />
-          </VStack>
-          <VStack align="start" gap="4" ml={{ xl: 8, base: 3 }} justifyContent="flex-end" height="full">
-            <Heading
-              as="h1"
-              color="white"
-              fontSize={{ "2xl": '60px', lg: '40px', md: "30px", sm: "17px", base: "18px" }}
-              fontWeight="700"
-              fontFamily="Unbounded"
-              lineHeight="1"
-              whiteSpace="normal"
-              textAlign="start"
-              maxWidth={{ "2xl": '800px', lg: '500px', md: "400px", sm: "300px", base: "200px" }}
-              overflow="hidden"
-              textOverflow="ellipsis"
-              lineClamp={4}
+        <motion.div {...sectionAnimation}>
+          <Flex
+            wrap="nowrap"
+            mt={{ "2xl": 25, xl: 16, base: 8 }}
+            align="flex-end"
+            gap={{ base: 3, md: 6, xl: 8 }}
+          >
+            <VStack
+              w={{ "2xl": '380px', xl: '300px', lg: '230px', md: "210px", sm: "155px", base: "115px" }}
+              align="stretch"
+              flexShrink={0}
             >
-              {eventDetails.name}
-            </Heading>
-            {/* <Button
-              bg="white"
-              color="black"
-              fontSize={{ "2xl": '50px',  lg: '30px',md:"25px",  sm:"16px", base: "13px" }}
-              fontWeight="900"
-              padding={{ "2xl": '40px',  lg: '25px', base: "10px" }}
-              bottom="0px"
-              width={{ "2xl": '800px', lg: '500px', md: "430px",  sm:"270px", base: "210px" }}
-              borderRadius="xl"
-              boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
-              _hover={{
-                bg: '#8499EE',
-                color: 'white',
-                boxShadow: '0px 4px 32px rgba(114, 150, 204, 0.5)',
-                border: '2px solid white',
-              }}
-              onClick={handleBookTicket}
+              <Image
+                src={eventDetails.picture_url}
+                alt={eventDetails.name}
+                objectFit="cover"
+                width="100%"
+                height={{ "2xl": '550px', xl: '430px', md: '330px', sm: '235px', base: '170px' }}
+                borderRadius="14px"
+                boxShadow="0 22px 54px rgba(8, 12, 38, 0.45)"
+                transition="transform 0.28s ease, box-shadow 0.28s ease"
+                _hover={{
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 26px 60px rgba(8, 12, 38, 0.55)',
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = EventImage;
+                }}
+              />
+            </VStack>
+
+            <VStack
+              align="start"
+              gap={{ base: 2, md: 4 }}
+              justifyContent="flex-end"
+              height="full"
+              bg="rgba(18, 22, 52, 0.48)"
+              border="1px solid rgba(255,255,255,0.2)"
+              borderRadius="20px"
+              px={{ base: 3, md: 6 }}
+              py={{ base: 3, md: 5 }}
+              backdropFilter="blur(6px)"
             >
-              Добавить в избранное
-            </Button> */}
-          </VStack>
-        </Flex>
-        <Stack >
-          <Text mt={{ "2xl": '20', base: "8" }} fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold">
-            Расписание
-          </Text>
-          <Separator mt={{ "2xl": '5', base: "1" }} borderColor="white" />
-        </Stack>
-
-        <Flex direction={{ base: "column", "sm": "row" }} align="start" justify="space-between" mt={{ "2xl": '6', base: "2" }}>
-          {/* <VStack align="start" gap={2} w="100%">
-            {parsedDates.map((d, index) => (
-              <HStack key={index} w="100%" position="relative">
-  
-                <HStack>
-                  <Text fontSize="60px" fontWeight="bold" color="white">
-                    {d.day}
-                  </Text>
-
-                  <Text fontSize="25px" fontWeight="bold" color="#0E3EA0">
-                    {monthNames[d.month - 1]}
-                  </Text>
-                </HStack>
-
-                <Text
-                  color="white"
-                  position="absolute"
-                  left="50%"
-                  transform="translateX(-50%)"
-                  fontSize="20px"
-                >
-                  {eventDetails.duration.substring(0, 5)}
-                </Text>
-
-                <Text color="white" fontSize="18px" position="absolute" left="70%">
-                  {Number(eventDetails.price) === 0 ? 'Бесплатно' : `от ${eventDetails.price} рублей`}
-                </Text>
-              
-              </HStack>
-              
-            ))}
-            
-          </VStack> */}
-          <VStack align="start" w="100%">
-            {scheduleRows.length === 0 ? (
-              <Text
+              <Heading
+                as="h1"
                 color="white"
-                fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }}
+                fontSize={{ "2xl": '62px', lg: '46px', md: "34px", sm: "24px", base: "20px" }}
+                fontWeight="700"
+                fontFamily="Unbounded"
+                lineHeight={{ base: 1.15, md: 1.08 }}
+                textAlign="start"
+                maxWidth={{ "2xl": '860px', lg: '560px', md: "450px", sm: "340px", base: "230px" }}
+                style={{
+                  textShadow: '0 10px 28px rgba(0, 0, 0, 0.35)',
+                  display: '-webkit-box',
+                  overflow: 'hidden',
+                  WebkitLineClamp: 4,
+                  WebkitBoxOrient: 'vertical',
+                }}
               >
-                Время начала не указано
+                {eventDetails.name}
+              </Heading>
+
+              <HStack gap={2} flexWrap="wrap">
+                <Box
+                  bg="rgba(255,255,255,0.14)"
+                  border="1px solid rgba(255,255,255,0.28)"
+                  borderRadius="full"
+                  px={3}
+                  py={1}
+                >
+                  <Text color="white" fontSize={{ base: '10px', md: '13px', lg: '15px' }}>
+                    {formattedAgeLimit}
+                  </Text>
+                </Box>
+                <Box
+                  bg="rgba(138, 174, 255, 0.25)"
+                  border="1px solid rgba(199,220,255,0.4)"
+                  borderRadius="full"
+                  px={3}
+                  py={1}
+                >
+                  <Text color="white" fontSize={{ base: '10px', md: '13px', lg: '15px' }}>
+                    {formattedPrice}
+                  </Text>
+                </Box>
+                {eventDetails.duration ? (
+                  <Box
+                    bg="rgba(255,255,255,0.10)"
+                    border="1px solid rgba(255,255,255,0.2)"
+                    borderRadius="full"
+                    px={3}
+                    py={1}
+                  >
+                    <Text color="white" fontSize={{ base: '10px', md: '13px', lg: '15px' }}>
+                      {eventDetails.duration}
+                    </Text>
+                  </Box>
+                ) : null}
+              </HStack>
+            </VStack>
+          </Flex>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut', delay: 0.08 }}
+        >
+          <Box
+            mt={{ base: 6, md: 10 }}
+            bg="rgba(16, 22, 56, 0.52)"
+            border="1px solid rgba(255,255,255,0.2)"
+            borderRadius="22px"
+            p={{ base: 3, md: 6 }}
+            backdropFilter="blur(6px)"
+          >
+            <Stack>
+              <Text
+                fontSize={{ "2xl": '46px', lg: '36px', md: "30px", base: "24px" }}
+                color="white"
+                fontWeight="700"
+              >
+                Расписание
               </Text>
-            ) : scheduleRows.map((d, index) => (
-              <Box key={`${d.day}-${d.month}-${index}`} w="100%">
-                <HStack w="100%" justify="space-between" >
+              <Separator mt={1} borderColor="rgba(255,255,255,0.35)" />
+            </Stack>
 
-                  {/* ЛЕВАЯ ЧАСТЬ — дата */}
-                  <HStack gap="15px">
+            <VStack align="stretch" mt={4} gap={3} w="100%">
+              {scheduleRows.length === 0 ? (
+                <Text color="white" fontSize={{ lg: '18px', md: "16px", base: "14px" }}>
+                  Время начала не указано
+                </Text>
+              ) : scheduleRows.map((d, index) => (
+                <Box
+                  key={`${d.day}-${d.month}-${index}`}
+                  w="100%"
+                  bg="rgba(255,255,255,0.08)"
+                  border="1px solid rgba(255,255,255,0.16)"
+                  borderRadius="14px"
+                  p={{ base: 2.5, md: 3.5 }}
+                  transition="all .22s ease"
+                  _hover={{
+                    bg: 'rgba(255,255,255,0.12)',
+                    borderColor: 'rgba(170, 198, 255, 0.45)',
+                    boxShadow: '0 10px 24px rgba(4, 8, 28, 0.35)',
+                  }}
+                >
+                  <Flex
+                    w="100%"
+                    justify="space-between"
+                    align={{ base: 'start', md: 'center' }}
+                    direction={{ base: 'column', md: 'row' }}
+                    gap={{ base: 3, md: 4 }}
+                  >
+                    <HStack gap="14px">
+                      <Text
+                        fontSize={{ "2xl": '56px', lg: '44px', md: "36px", base: "30px" }}
+                        fontWeight="700"
+                        color="white"
+                        lineHeight={1}
+                      >
+                        {d.day}
+                      </Text>
+                      <Text
+                        fontSize={{ "2xl": '24px', lg: '20px', md: "16px", base: "13px" }}
+                        fontWeight="700"
+                        color="#BFD4FF"
+                        lineHeight={1.1}
+                      >
+                        {monthNames[d.month - 1] || '—'}
+                      </Text>
+                    </HStack>
+
                     <Text
-                      fontSize={{ "2xl": '60px', lg: '47px', md: "35px", base: "30px" }}
-                      fontWeight="bold"
                       color="white"
+                      fontSize={{ "2xl": '24px', lg: '20px', md: '16px', base: '14px' }}
+                      fontWeight="500"
+                      textShadow="0 0 14px rgba(196, 219, 255, 0.45)"
                     >
-                      {d.day}
-                    </Text>
-
-                    <Text
-                      fontSize={{ "2xl": '25px', lg: '20px', md: "15px", base: "11px" }}
-                      fontWeight="bold"
-                      color="#0E3EA0"
-                    >
-                      {monthNames[d.month - 1]}
-                    </Text>
-                  </HStack>
-
-                  <HStack >
-
-                    <Text color="white" fontSize={{ "2xl": '20px' }} transform="translateX(-340px)">
                       {d.timeLabel}
                     </Text>
 
-                    <Box
-                      as="button"
-                      onClick={() => toggleFavorite(index)}
-                      transition="0.2s"
-                      _hover={{
-                        transform: "scale(1.08)",
-                      }}
-
-                    >
-                      <Image
-                        src={favorites[index] ? star_full : star_empty}
-                        alt="favorite"
-                        boxSize={{
-                          "2xl": "50px",
-                          xl: "50px",
-                          lg: "45px",
-                          md: "40px",
-                          sm: "32px",
+                    <HStack gap={{ base: 2, md: 3 }} align="center" ml={{ md: 'auto' }}>
+                      <Box
+                        as="button"
+                        onClick={() => toggleFavorite(index)}
+                        transition="all 0.2s ease"
+                        _hover={{
+                          transform: 'scale(1.08)',
+                          filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.45))',
                         }}
-                        objectFit="contain"
+                      >
+                        <Image
+                          src={favorites[index] ? star_full : star_empty}
+                          alt="favorite"
+                          boxSize={{ "2xl": "48px", xl: "46px", lg: "42px", md: "38px", sm: "32px", base: '30px' }}
+                          objectFit="contain"
+                        />
+                      </Box>
 
-                      />
-                    </Box>
+                      <Button
+                        bg="white"
+                        color="black"
+                        fontSize={{ "2xl": '22px', xl: '20px', md: "18px", lg: '18px', sm: "14px", base: '13px' }}
+                        fontWeight="700"
+                        px={{ "2xl": '34px', xl: '24px', md: "20px", base: '16px' }}
+                        py={{ base: 4, md: 6 }}
+                        borderRadius="xl"
+                        boxShadow="0px 10px 26px rgba(114, 150, 204, 0.38)"
+                        transition="all .22s ease"
+                        _hover={{
+                          bg: '#0F173E',
+                          color: 'white',
+                          border: '1px solid rgba(255,255,255,0.35)',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0px 14px 30px rgba(8, 12, 30, 0.48)',
+                        }}
+                        onClick={handleBookTicket}
+                      >
+                        Купить билет
+                      </Button>
+                    </HStack>
+                  </Flex>
+                </Box>
+              ))}
+            </VStack>
+          </Box>
+        </motion.div>
 
-                    <Button
-                      bg="white"
-                      color="black"
-                      fontSize={{ "2xl": '25px', xl: '30px', md: "25px", lg: '25px', sm: "14px" }}
-                      fontWeight="800"
-                      ml="20px"
-                      padding={{ "2xl": '33px', xl: '20px', md: "20px", lg: "10px" }}
-                      borderRadius="xl"
-                      boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
-                      _hover={{ bg: 'black', color: 'white' }}
-                      onClick={handleBookTicket}
-                    >
-                      Купить билет
-                    </Button>
-
-                  </HStack>
-                </HStack>
-                {index !== scheduleRows.length - 1 && (
-                  <Box w="100%" >
-                    <Separator borderColor="white" my={3} />
-                  </Box>
-                )}
-              </Box>
-            ))}
-          </VStack>
-
-          {/* <Box display={{ base: "none", "sm": "block" }} mt={{ "2xl": '7px', lg: "4",md: "1",}}>
-            <Button
-              bg="white"
-              color="black"
-              fontSize={{ "2xl": '30px', xl: '30px', md: "25px", lg: '25px', sm: "14px"}}
-              fontWeight="900"
-              padding={{ "2xl": '35px', xl: '20px', md: "20px", lg:"10px"}}
-              borderRadius="xl"
-              boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
-              _hover={{ bg: 'black', color: 'white' }}
-              ml="auto"
-            onClick={handleBookTicket}
-            >
-              Добавить в избранное
-            </Button>
-          </Box> */}
-        </Flex>
-        <Stack w="100%" >
-          <Separator mt={5} borderColor="white" />
-        </Stack>
-        <Text fontSize={{ "2xl": '50px', xl: '1px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="8">
-          О событии
-        </Text>
-        <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white" mt="3">
-          {eventDetails.description}
-        </Text>
-        <VStack align="start" gap={1} mt={3}>
-          <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-            Возраст: {formattedAgeLimit}
-          </Text>
-          <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-            Стоимость: {formattedPrice}
-          </Text>
-          {eventDetails.duration ? (
-            <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-              Время / длительность: {eventDetails.duration}
-            </Text>
-          ) : null}
-          {eventDetails.city ? (
-            <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-              Город: {eventDetails.city}
-            </Text>
-          ) : null}
-        </VStack>
-        <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="5">
-          Адрес
-        </Text>
-        <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-          {eventDetails.location}
-        </Text>
-        {eventDetails.address && eventDetails.address !== eventDetails.location ? (
-          <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white">
-            {eventDetails.address}
-          </Text>
-        ) : null}
-        <Text
-          fontSize="50px"
-          color="white"
-          mt="10px"
-          fontWeight="bold"
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.46, ease: 'easeOut', delay: 0.14 }}
         >
-          <a
-            href="/organizer"
-            style={{ color: 'white', textDecoration: 'underline' }}
+          <Box
+            mt={5}
+            bg="rgba(17, 23, 58, 0.5)"
+            border="1px solid rgba(255,255,255,0.2)"
+            borderRadius="22px"
+            p={{ base: 3, md: 6 }}
+            backdropFilter="blur(6px)"
           >
-            Страница организатора
-          </a>
-        </Text>
+            <Text fontSize={{ "2xl": '42px', lg: '34px', md: "28px", base: "22px" }} color="white" fontWeight="700">
+              О событии
+            </Text>
+            <Text
+              fontSize={{ "2xl": '22px', lg: '18px', md: "16px", base: "14px" }}
+              color="white"
+              mt="3"
+              lineHeight={1.7}
+              whiteSpace="pre-line"
+            >
+              {eventDetails.description || 'Описание пока не добавлено.'}
+            </Text>
+
+            <VStack align="start" gap={2} mt={4}>
+              <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
+                Возраст: {formattedAgeLimit}
+              </Text>
+              <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
+                Стоимость: {formattedPrice}
+              </Text>
+              {eventDetails.duration ? (
+                <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
+                  Время / длительность: {eventDetails.duration}
+                </Text>
+              ) : null}
+              {eventDetails.city ? (
+                <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
+                  Город: {eventDetails.city}
+                </Text>
+              ) : null}
+            </VStack>
+          </Box>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.46, ease: 'easeOut', delay: 0.2 }}
+        >
+          <Box
+            mt={5}
+            mb={10}
+            bg="rgba(17, 23, 58, 0.52)"
+            border="1px solid rgba(255,255,255,0.2)"
+            borderRadius="22px"
+            p={{ base: 3, md: 6 }}
+            backdropFilter="blur(6px)"
+          >
+            <Text fontSize={{ "2xl": '40px', lg: '32px', md: "26px", base: "22px" }} color="white" fontWeight="700">
+              Адрес
+            </Text>
+            <Text fontSize={{ "2xl": '21px', lg: '17px', md: "15px", base: "14px" }} color="white" mt={3}>
+              {eventDetails.location || 'Адрес не указан'}
+            </Text>
+            {eventDetails.address && eventDetails.address !== eventDetails.location ? (
+              <Text fontSize={{ "2xl": '21px', lg: '17px', md: "15px", base: "14px" }} color="white" mt={1}>
+                {eventDetails.address}
+              </Text>
+            ) : null}
+
+            <Button
+              mt={4}
+              bg="rgba(255,255,255,0.12)"
+              color="white"
+              border="1px solid rgba(255,255,255,0.3)"
+              borderRadius="full"
+              px={{ base: 4, md: 6 }}
+              py={{ base: 4, md: 6 }}
+              fontSize={{ base: '14px', md: '16px', lg: '18px' }}
+              textDecoration="none"
+              transition="all .2s ease"
+              _hover={{
+                bg: 'rgba(255,255,255,0.22)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
+              }}
+              onClick={() => navigate('/organizer')}
+            >
+              Страница организатора
+            </Button>
+          </Box>
+        </motion.div>
       </Box>
     </Flex>
   );
