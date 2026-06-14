@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Button, Flex, Grid, HStack, Image, Input, Spinner, Text } from '@chakra-ui/react';
 import Modal from 'react-modal';
+import { useNavigate } from 'react-router-dom';
 import axios from '../shared/lib/axios';
 import cloud from '../pictures/cloud.png';
 import cloud2 from '../pictures/cloud2.png';
@@ -79,6 +80,7 @@ function getCalendarDays(date: Date): CalendarDay[] {
 }
 
 const UserCalendarModal = ({ isOpen, onClose }: Props) => {
+  const navigate = useNavigate();
   const initialMonth = React.useMemo(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1), []);
   const initialBounds = React.useMemo(() => getMonthBounds(initialMonth), [initialMonth]);
 
@@ -87,6 +89,7 @@ const UserCalendarModal = ({ isOpen, onClose }: Props) => {
   const [dateTo, setDateTo] = React.useState(initialBounds.to);
   const [selectedAge, setSelectedAge] = React.useState('');
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const [selectedDateForModal, setSelectedDateForModal] = React.useState<string | null>(null);
   const [events, setEvents] = React.useState<CalendarEventItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -171,6 +174,8 @@ const UserCalendarModal = ({ isOpen, onClose }: Props) => {
     return grouped;
   }, [events]);
 
+  const selectedDayEvents = selectedDateForModal ? eventsByDate[selectedDateForModal] || [] : [];
+  const isDayModalOpen = selectedDateForModal !== null;
   const days = React.useMemo(() => getCalendarDays(currentDate), [currentDate]);
 
   const handlePrevMonth = () => {
@@ -196,6 +201,13 @@ const UserCalendarModal = ({ isOpen, onClose }: Props) => {
     }
   };
 
+  const handleDayClick = (dateString: string, hasEvents: boolean) => {
+    if (!hasEvents) {
+      return;
+    }
+    setSelectedDateForModal(dateString);
+  };
+
   const groupedByOrganizer = (items: CalendarEventItem[]) => {
     return items.reduce((accumulator, item) => {
       const organizer = item.organizer || 'Организатор не указан';
@@ -213,36 +225,37 @@ const UserCalendarModal = ({ isOpen, onClose }: Props) => {
     .replace(/^./, (letter) => letter.toUpperCase());
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onRequestClose={onClose}
-      style={{
-        overlay: {
-          backgroundColor: 'rgba(0,0,0,0.6)',
-          zIndex: 1000,
-        },
-        content: {
-          inset: '50% auto auto 50%',
-          transform: 'translate(-50%, -50%)',
-          padding: 0,
-          border: 'none',
-          borderRadius: '20px',
-          maxWidth: '760px',
-          width: '92%',
-          background: '#22212C',
-        },
-      }}
-    >
-      <Box p={5} color="white" fontFamily="Unbounded">
-        <Flex justify="center" align="center" mb={2} gap={12}>
-          <Image src={cloud2} alt="decor-left" boxSize="80px" objectFit="contain" />
-          <Text fontSize="30px" fontWeight="bold" textAlign="center">
-            Календарь событий
-          </Text>
-          <Image src={cloud} alt="decor-right" boxSize="80px" objectFit="contain" />
-        </Flex>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onRequestClose={onClose}
+        style={{
+          overlay: {
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            zIndex: 1000,
+          },
+          content: {
+            inset: '50% auto auto 50%',
+            transform: 'translate(-50%, -50%)',
+            padding: 0,
+            border: 'none',
+            borderRadius: '20px',
+            maxWidth: '760px',
+            width: '92%',
+            background: '#22212C',
+          },
+        }}
+      >
+        <Box p={5} color="white" fontFamily="Unbounded">
+          <Flex justify="center" align="center" mb={2} gap={12}>
+            <Image src={cloud2} alt="decor-left" boxSize="80px" objectFit="contain" />
+            <Text fontSize="30px" fontWeight="bold" textAlign="center">
+              Календарь событий
+            </Text>
+            <Image src={cloud} alt="decor-right" boxSize="80px" objectFit="contain" />
+          </Flex>
 
-        <HStack mb={3} gap={2} flexWrap="wrap" justify="center">
+          <HStack mb={3} gap={2} flexWrap="wrap" justify="center">
           <Input
             type="date"
             bg="white"
@@ -291,31 +304,31 @@ const UserCalendarModal = ({ isOpen, onClose }: Props) => {
             Сбросить
           </Button>
           {loading ? <Spinner size="sm" color="white" /> : null}
-        </HStack>
+          </HStack>
 
-        {error ? (
-          <Box mb={3} bg="rgba(255, 93, 93, 0.2)" borderRadius="10px" px={3} py={2}>
-            <Text color="#ffe1e1" fontSize="sm">
-              {error}
-            </Text>
-          </Box>
-        ) : null}
-
-        <Box bg="white" borderRadius="xl" p={4} color="black" fontWeight="medium">
-          <Text textAlign="center" mb={3} fontSize="20px">
-            {monthTitle}
-          </Text>
-
-          <Grid templateColumns="repeat(7, 1fr)" gap={2} mb={2}>
-            {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((day) => (
-              <Text key={day} textAlign="center" fontSize="sm">
-                {day}
+          {error ? (
+            <Box mb={3} bg="rgba(255, 93, 93, 0.2)" borderRadius="10px" px={3} py={2}>
+              <Text color="#ffe1e1" fontSize="sm">
+                {error}
               </Text>
-            ))}
-          </Grid>
+            </Box>
+          ) : null}
 
-          <Grid templateColumns="repeat(7, 1fr)" gap={2} overflow="visible">
-            {days.map((item, index) => {
+          <Box bg="white" borderRadius="xl" p={4} color="black" fontWeight="medium">
+            <Text textAlign="center" mb={3} fontSize="20px">
+              {monthTitle}
+            </Text>
+
+            <Grid templateColumns="repeat(7, 1fr)" gap={2} mb={2}>
+              {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((day) => (
+                <Text key={day} textAlign="center" fontSize="sm">
+                  {day}
+                </Text>
+              ))}
+            </Grid>
+
+            <Grid templateColumns="repeat(7, 1fr)" gap={2} overflow="visible">
+              {days.map((item, index) => {
               const dateStr =
                 item.type === 'current'
                   ? toDateString(currentDate.getFullYear(), currentDate.getMonth(), item.day)
@@ -330,127 +343,216 @@ const UserCalendarModal = ({ isOpen, onClose }: Props) => {
                     ? { right: '0', transform: 'translateY(-120%)' }
                     : { left: '50%', transform: 'translate(-50%, -120%)' };
 
-              return (
-                <Box
-                  key={`${item.type}-${item.day}-${index}`}
-                  height="60px"
-                  borderRadius="md"
-                  bg={
-                    item.type !== 'current'
-                      ? '#EAEAEA'
-                      : hasEvents
-                        ? eventsForDay.length > 3
-                          ? '#000E47'
-                          : eventsForDay.length > 1
-                            ? '#0021A6'
-                            : '#6F8CFF'
-                        : '#C9D4FF'
-                  }
-                  color={item.type === 'current' ? 'white' : 'gray.500'}
-                  position="relative"
-                  display="flex"
-                  alignItems="flex-start"
-                  justifyContent="flex-start"
-                  pt={1}
-                  pl={2}
-                  fontSize="sm"
-                  onMouseEnter={() => dateStr && setHoveredDate(dateStr)}
-                  onMouseLeave={() => setHoveredDate(null)}
-                  overflow="visible"
-                >
-                  {item.day}
-                  {hasEvents ? (
-                    <Box position="absolute" bottom="-2px" right="4px">
-                      <Image src={tickets} alt="events-count" boxSize="35px" objectFit="contain" />
-                    </Box>
-                  ) : null}
-
-                  {hoveredDate === dateStr && hasEvents ? (
-                    <Box
-                      position="absolute"
-                      top="50%"
-                      {...tooltipOffset}
-                      bg="#34333C"
-                      color="white"
-                      p={3}
-                      borderRadius="xl"
-                      zIndex={20}
-                      w="270px"
-                      boxShadow="xl"
-                      textAlign="center"
-                    >
-                      <Text fontSize="13px" mb={2} fontWeight="medium">
-                        {formatDisplayDate(dateStr)}
-                      </Text>
-
-                      <Box bg="white" color="black" borderRadius="lg" p={2} textAlign="left">
-                        {Object.entries(groupedEvents).map(([organizer, organizerEvents]) => (
-                          <Box key={organizer} mb={2}>
-                            <Text fontWeight="bold" fontSize="12px" mb={1}>
-                              {organizer}
-                            </Text>
-                            {organizerEvents.map((eventItem) => (
-                              <Flex
-                                key={eventItem.slot_id}
-                                justify="space-between"
-                                align="center"
-                                fontSize="10px"
-                                mb={1}
-                                gap={2}
-                              >
-                                <Text
-                                  style={{
-                                    display: '-webkit-box',
-                                    overflow: 'hidden',
-                                    WebkitBoxOrient: 'vertical',
-                                    WebkitLineClamp: 2,
-                                  }}
-                                >
-                                  {eventItem.title}
-                                </Text>
-                                <Text whiteSpace="nowrap">{eventItem.time}</Text>
-                              </Flex>
-                            ))}
-                          </Box>
-                        ))}
+                return (
+                  <Box
+                    key={`${item.type}-${item.day}-${index}`}
+                    height="60px"
+                    borderRadius="md"
+                    bg={
+                      item.type !== 'current'
+                        ? '#EAEAEA'
+                        : hasEvents
+                          ? eventsForDay.length > 3
+                            ? '#000E47'
+                            : eventsForDay.length > 1
+                              ? '#0021A6'
+                              : '#6F8CFF'
+                          : '#C9D4FF'
+                    }
+                    color={item.type === 'current' ? 'white' : 'gray.500'}
+                    position="relative"
+                    display="flex"
+                    alignItems="flex-start"
+                    justifyContent="flex-start"
+                    pt={1}
+                    pl={2}
+                    fontSize="sm"
+                    cursor={hasEvents ? 'pointer' : 'default'}
+                    onMouseEnter={() => dateStr && setHoveredDate(dateStr)}
+                    onMouseLeave={() => setHoveredDate(null)}
+                    onClick={() => dateStr && handleDayClick(dateStr, hasEvents)}
+                    overflow="visible"
+                  >
+                    {item.day}
+                    {hasEvents ? (
+                      <Box position="absolute" bottom="-2px" right="4px">
+                        <Image src={tickets} alt="events-count" boxSize="35px" objectFit="contain" />
                       </Box>
-                    </Box>
-                  ) : null}
-                </Box>
-              );
-            })}
-          </Grid>
-        </Box>
+                    ) : null}
 
-        <Flex justify="space-between" align="center" mt={4}>
-          <Text color="white" fontSize="sm">
-            Показаны все события сайта
-          </Text>
-          <Flex gap={2}>
+                    {hoveredDate === dateStr && hasEvents ? (
+                      <Box
+                        position="absolute"
+                        top="50%"
+                        {...tooltipOffset}
+                        bg="#34333C"
+                        color="white"
+                        p={3}
+                        borderRadius="xl"
+                        zIndex={20}
+                        w="270px"
+                        boxShadow="xl"
+                        textAlign="center"
+                      >
+                        <Text fontSize="13px" mb={2} fontWeight="medium">
+                          {formatDisplayDate(dateStr)}
+                        </Text>
+
+                        <Box bg="white" color="black" borderRadius="lg" p={2} textAlign="left">
+                          {Object.entries(groupedEvents).map(([organizer, organizerEvents]) => (
+                            <Box key={organizer} mb={2}>
+                              <Text fontWeight="bold" fontSize="12px" mb={1}>
+                                {organizer}
+                              </Text>
+                              {organizerEvents.map((eventItem) => (
+                                <Flex
+                                  key={eventItem.slot_id}
+                                  justify="space-between"
+                                  align="center"
+                                  fontSize="10px"
+                                  mb={1}
+                                  gap={2}
+                                >
+                                  <Text
+                                    style={{
+                                      display: '-webkit-box',
+                                      overflow: 'hidden',
+                                      WebkitBoxOrient: 'vertical',
+                                      WebkitLineClamp: 2,
+                                    }}
+                                  >
+                                    {eventItem.title}
+                                  </Text>
+                                  <Text whiteSpace="nowrap">{eventItem.time}</Text>
+                                </Flex>
+                              ))}
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    ) : null}
+                  </Box>
+                );
+              })}
+            </Grid>
+          </Box>
+
+          <Flex justify="space-between" align="center" mt={4}>
+            <Text color="white" fontSize="sm">
+              Показаны все события сайта
+            </Text>
+            <Flex gap={2}>
+              <Button
+                onClick={handlePrevMonth}
+                p={1}
+                borderRadius="full"
+                variant="ghost"
+                _hover={{ bg: 'transparent' }}
+                _active={{ bg: 'transparent' }}
+              >
+                <Image src={left} boxSize="40px" />
+              </Button>
+              <Button
+                onClick={handleNextMonth}
+                p={1}
+                borderRadius="full"
+                variant="ghost"
+                _hover={{ bg: 'transparent' }}
+                _active={{ bg: 'transparent' }}
+              >
+                <Image src={right} boxSize="40px" />
+              </Button>
+            </Flex>
+          </Flex>
+        </Box>
+      </Modal>
+
+      <Modal
+        isOpen={isDayModalOpen}
+        onRequestClose={() => setSelectedDateForModal(null)}
+        style={{
+          overlay: {
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            zIndex: 1300,
+          },
+          content: {
+            inset: '50% auto auto 50%',
+            transform: 'translate(-50%, -50%)',
+            padding: 0,
+            border: 'none',
+            borderRadius: '16px',
+            maxWidth: '700px',
+            width: '90%',
+            background: '#1E2B73',
+          },
+        }}
+      >
+        <Box p={4} color="white" fontFamily="Unbounded">
+          <Flex justify="space-between" align="center" mb={3}>
+            <Text fontSize="20px" fontWeight="700">
+              {selectedDateForModal ? formatDisplayDate(selectedDateForModal) : 'Выбранная дата'}
+            </Text>
             <Button
-              onClick={handlePrevMonth}
-              p={1}
-              borderRadius="full"
-              variant="ghost"
-              _hover={{ bg: 'transparent' }}
-              _active={{ bg: 'transparent' }}
+              size="sm"
+              bg="transparent"
+              color="white"
+              _hover={{ bg: 'rgba(255,255,255,0.15)' }}
+              onClick={() => setSelectedDateForModal(null)}
             >
-              <Image src={left} boxSize="40px" />
-            </Button>
-            <Button
-              onClick={handleNextMonth}
-              p={1}
-              borderRadius="full"
-              variant="ghost"
-              _hover={{ bg: 'transparent' }}
-              _active={{ bg: 'transparent' }}
-            >
-              <Image src={right} boxSize="40px" />
+              Закрыть
             </Button>
           </Flex>
-        </Flex>
-      </Box>
-    </Modal>
+
+          {selectedDayEvents.length > 0 ? (
+            <Grid templateColumns={{ base: '1fr', md: '1fr 1fr' }} gap={3}>
+              {selectedDayEvents.map((eventItem) => (
+                <Box
+                  key={eventItem.slot_id}
+                  bg="rgba(255,255,255,0.16)"
+                  border="1px solid rgba(255,255,255,0.25)"
+                  borderRadius="12px"
+                  p={3}
+                  cursor="pointer"
+                  _hover={{ bg: 'rgba(255,255,255,0.24)' }}
+                  onClick={() => {
+                    setSelectedDateForModal(null);
+                    onClose();
+                    navigate(`/event/${eventItem.event_id}`);
+                  }}
+                >
+                  <Text
+                    color="white"
+                    fontWeight="700"
+                    fontSize="14px"
+                    style={{
+                      display: '-webkit-box',
+                      overflow: 'hidden',
+                      WebkitBoxOrient: 'vertical',
+                      WebkitLineClamp: 2,
+                    }}
+                  >
+                    {eventItem.title}
+                  </Text>
+                  <Text color="#DCE9FF" fontSize="12px" mt={1}>
+                    Время: {eventItem.time}
+                  </Text>
+                  <Text color="#DCE9FF" fontSize="12px">
+                    Возраст: {eventItem.age_limit || 'не указан'}
+                  </Text>
+                  <Text color="#DCE9FF" fontSize="12px">
+                    Организатор: {eventItem.organizer || 'не указан'}
+                  </Text>
+                </Box>
+              ))}
+            </Grid>
+          ) : (
+            <Box bg="rgba(255,255,255,0.14)" borderRadius="12px" p={3}>
+              <Text color="white">На выбранную дату пока нет мероприятий.</Text>
+            </Box>
+          )}
+        </Box>
+      </Modal>
+    </>
   );
 };
 
