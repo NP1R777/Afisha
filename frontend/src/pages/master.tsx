@@ -58,6 +58,78 @@ function sanitizeImageCandidate(value: unknown): string {
   return normalized;
 }
 
+function extractImageFromStructuredString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const directHttp = trimmed.match(/https?:\/\/[^\s"'<>]+/i);
+  if (directHttp?.[0]) {
+    return directHttp[0];
+  }
+
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    const normalizedArrayString = trimmed.replace(/'/g, '"');
+    try {
+      const parsed = JSON.parse(normalizedArrayString);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          const nested = extractImageFromStructuredString(String(entry));
+          if (nested) {
+            return nested;
+          }
+        }
+      }
+    } catch {
+      // ignore malformed arrays
+    }
+  }
+
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    const normalizedObjectString = trimmed.replace(/'/g, '"');
+    try {
+      const parsed = JSON.parse(normalizedObjectString) as Record<string, unknown>;
+      const objectCandidates = [parsed.url, parsed.src, parsed.picture_url, parsed.pictures_main];
+      for (const candidate of objectCandidates) {
+        const nested = extractImageFromStructuredString(String(candidate ?? ''));
+        if (nested) {
+          return nested;
+        }
+      }
+    } catch {
+      // ignore malformed objects
+    }
+  }
+
+  const splitCandidates = trimmed
+    .split(/[,\n;]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  for (const candidate of splitCandidates) {
+    if (candidate.startsWith('https://') || candidate.startsWith('http://')) {
+      return candidate;
+    }
+    if (candidate.startsWith('//')) {
+      return `https:${candidate}`;
+    }
+    if (candidate.startsWith('/')) {
+      return candidate;
+    }
+  }
+
+  return '';
+}
+
 function resolveEventImage(item: any): string {
   const candidates = [
     item?.pictures_main,
@@ -69,8 +141,12 @@ function resolveEventImage(item: any): string {
 
   for (const candidate of candidates) {
     const normalized = sanitizeImageCandidate(candidate);
-    if (normalized) {
-      return normalized;
+    if (!normalized) {
+      continue;
+    }
+    const extracted = extractImageFromStructuredString(normalized);
+    if (extracted) {
+      return extracted;
     }
   }
   return EventImage;
