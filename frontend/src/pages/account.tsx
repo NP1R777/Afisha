@@ -1,4 +1,4 @@
-import { Box, Flex, Image, Button, Text, useBreakpointValue } from '@chakra-ui/react';
+import { Box, Flex, Image, Button, Text, useBreakpointValue, SimpleGrid, Badge, HStack, VStack, Icon } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../addition/context';
@@ -14,6 +14,8 @@ import { Toaster, toaster } from "../components/ui/toaster"
 import { Calendar } from '../modal/org_calendar';
 import OrganizerRegisterModal from '../modal/org_registration';
 import EventImage from '../pictures/picture1.png';
+import { motion } from 'framer-motion';
+import { FiCalendar, FiHeart, FiMapPin, FiSettings, FiStar } from 'react-icons/fi';
 
 interface Event {
   id: number;
@@ -285,338 +287,403 @@ const Account = () => {
   };
 
   const isOrganizer = role === 'organizator';
+  const roleLabel = role === 'admin' ? 'Администратор' : isOrganizer ? 'Организатор' : 'Пользователь';
+  const visibleUsername = useBreakpointValue({
+    base: getTruncatedUsername(username || 'Логин'),
+    lg: username || 'Логин',
+  });
 
   return (
     <ContainerFluid>
       <Toaster />
       <Flex
         direction="column"
-        align={{ base: 'start', lg: 'center' }}
-        justify={{ base: 'start', lg: 'center' }}
+        align="center"
+        justify="flex-start"
         fontFamily="Unbounded"
+        gap={{ base: 8, lg: 10 }}
+        py={{ base: 4, lg: 6 }}
       >
-        <Box overflowX="auto" width="100%" display="grid" gridTemplateColumns="min-content auto min-content" gap={4}>
-          <Box
-            bg="#6B84EA"
-            borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
-            width={{ base: '170px', lg: '250px' }}
-            userSelect="none"
-            fontWeight="semibold"
-            position="relative"
-            p={{ base: '1', lg: '9' }}
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Image
-              src={imageSrc}
-              alt="cloud"
-              width={{ base: '41%', lg: '90%' }}
-              height={{ base: '30%', lg: '90%' }}
-              objectFit="cover"
-              pointerEvents="none"
-              mb={{ base: '3', lg: '1' }}
-            />
-            <Text fontSize={{ base: '17px', lg: '20px' }} color="white" mb={2}>
-              {useBreakpointValue({
-                base: getTruncatedUsername(username || 'Логин'),
-                lg: username || 'Логин',
-              })}
-            </Text>
-            <Button
-              bg="white"
-              color="#6B84EA"
-              size="md"
-              borderRadius="xl"
-              _hover={{ bg: '#4C6BE6', color: 'white' }}
-              onClick={openEditingModal}
-            >
-              Настройки
-            </Button>
-          </Box>
-          <Box
-            bg="#6B84EA"
-            borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
-            minWidth="400px"
-            position="relative"
-            p={4}
-            userSelect="none"
-            fontWeight="semibold"
-          >
-            <Box
-              bg="white"
-              borderRadius="xl"
-              color="#A3B3F2"
-              height={{ base: '40px', lg: '50px' }}
-              width={{ base: '220px', lg: '250px' }}
-              fontSize={{ base: '16px', lg: '18px' }}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <p>Мои предпочтения</p>
-            </Box>
-            <Flex wrap="wrap" gap={4} mt={4}>
-              {categories && categories.length > 0 ? (
-                categories.map((preference, index) => (
-                  <Box
-                    key={index}
-                    bg="#A3B3F2"
-                    borderRadius="xl"
-                    color="white"
-                    height={{ base: '35px', lg: '40px' }}
-                    width="auto"
-                    fontSize={{ base: '13px', lg: '20px' }}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    px={4}
-                  >
-                    <p>{getPreferenceText(Number(preference))}</p>
-                  </Box>
-                ))
-              ) : (
-                <Text color="white" fontSize={{ base: '13px', sm:"13px", lg: '17px', xl: '22px' }} textAlign="center" width="100%">
-                  У вас пока нет выбранных предпочтений. Нажмите кнопку "Изменить", чтобы выбрать понравившиеся
-                  категории.
-                </Text>
-              )}
-            </Flex>
-            <Button
-              bg="white"
-              color="#6B84EA"
-              size="md"
-              borderRadius="xl"
-              position="absolute"
-              onClick={openCategoriesModal}
-              bottom="26px"
-              right="26px"
-              _hover={{
-                bg: '#4C6BE6',
-                color: 'white',
-              }}
-            >
-              Изменить
-            </Button>
-          </Box>
-          <Box
-            bg="#6B84EA"
-            borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
-            width={{ base: '210px', lg: '250px' }}
-          >
-            <Flex direction="column" align="center" justify="center" height="100%" gap={4} userSelect="none">
-              <Image
-                src={comp}
-                alt="Component"
-                height={{ base: '100px', lg: '130px' }}
-                width={{ base: '160px', lg: '220px' }}
-                objectFit="cover"
-                pointerEvents="none"
-              />
-              <Button
-                borderRadius="xl"
-                bg="white"
-                color="#6B84EA"
-                height={{ base: '45px', lg: '60px' }}
-                width={{ base: '160px', lg: '190px' }}
-                whiteSpace="normal"
-                fontWeight="semibold"
-                fontSize={{ base: '15px', lg: '17px' }}
-                _hover={{
-                  bg: '#4C6BE6',
-                  color: 'white',
-                }}
-                onClick={isOrganizer ? openModal : openOrganizerRegisterModal}
+        <Box width="100%" maxW="1250px">
+          <SimpleGrid columns={{ base: 1, lg: 3 }} gap={5}>
+            <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+              <Box
+                borderRadius="3xl"
+                minH={{ base: '220px', lg: '270px' }}
+                p={{ base: 5, lg: 7 }}
+                position="relative"
+                overflow="hidden"
+                bg="linear-gradient(135deg, rgba(72, 105, 234, 0.92) 0%, rgba(50, 76, 178, 0.92) 100%)"
+                border="1px solid rgba(206, 223, 255, 0.35)"
+                boxShadow="0 20px 48px rgba(20, 34, 91, 0.45)"
               >
-                {isOrganizer ? 'Создать мероприятие' : 'Стать организатором'}
-              </Button>
-            </Flex>
-          </Box>
-        </Box>
-        <Box width="100%" mt={15}>
-          <Flex direction="column" align="center">
-            <Text fontSize={{ base: '24px', md: '49px' }} color="white" fontWeight="bold" userSelect="none" mb={6}>
-              Мои избранные мероприятия
-            </Text>
-            {events.length > 0 ? (
-              <Flex
-                direction={{ base: 'row', md: 'column' }}
-                gap={7}
-                userSelect="none"
-                mb={9}
-                overflowX="auto"
-                overflowY="hidden"
-                width="100%"
-                align="center"
-              >
-                {events.map((event) => (
-                  <Flex key={event.id} userSelect="none" direction={{ base: 'column', md: 'row' }} w="100%" maxW={{ md: '980px', xl: '1100px' }}>
-                    <Box
-                      bg="rgba(24, 37, 104, 0.78)"
-                      border="1px solid rgba(200, 220, 255, 0.24)"
-                      borderRadius="2xl"
-                      height={{ base: 'auto', md: '250px' }}
-                      width={{ base: '100%', md: 'calc(100% - 145px)' }}
-                      p={{ base: 4, md: 6 }}
+                <Box
+                  position="absolute"
+                  top="-70px"
+                  right="-70px"
+                  w="190px"
+                  h="190px"
+                  borderRadius="full"
+                  bg="rgba(255,255,255,0.20)"
+                  filter="blur(8px)"
+                />
+                <VStack align="start" gap={4} zIndex={1} position="relative">
+                  <HStack gap={3}>
+                    <Text color="white" fontWeight="bold" fontSize={{ base: '20px', lg: '24px' }}>
+                      Личный кабинет
+                    </Text>
+                    <Badge
+                      borderRadius="full"
+                      px={3}
+                      py={1}
                       color="white"
+                      bg="rgba(255,255,255,0.18)"
+                      border="1px solid rgba(255,255,255,0.34)"
                       fontWeight="semibold"
-                      position="relative"
-                      boxShadow="0 12px 30px rgba(8, 12, 30, 0.32)"
-                      transition="all .2s ease"
-                      _hover={{
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 16px 34px rgba(8, 12, 30, 0.42)',
-                      }}
                     >
-                      <Flex direction={{ base: 'column', md: 'row' }} align="center" height="100%" gap={4}>
+                      {roleLabel}
+                    </Badge>
+                  </HStack>
+                  <Text color="white" fontSize={{ base: '26px', lg: '32px' }} fontWeight="bold" lineHeight="1.15">
+                    {visibleUsername}
+                  </Text>
+                  <HStack gap={2} color="#D7E6FF">
+                    <Icon as={FiHeart} />
+                    <Text fontSize={{ base: '13px', lg: '15px' }}>
+                      Избранных мероприятий: {events.length}
+                    </Text>
+                  </HStack>
+                  <Button
+                    bg="white"
+                    color="#3F5DD2"
+                    borderRadius="xl"
+                    px={6}
+                    _hover={{ bg: '#dfe8ff', transform: 'translateY(-1px)' }}
+                    transition="all .2s ease"
+                    onClick={openEditingModal}
+                  >
+                    <HStack gap={2}>
+                      <Icon as={FiSettings} />
+                      <Text>Настройки</Text>
+                    </HStack>
+                  </Button>
+                </VStack>
+                <Image
+                  src={imageSrc}
+                  alt="cloud"
+                  width={{ base: '112px', lg: '160px' }}
+                  height={{ base: '112px', lg: '160px' }}
+                  objectFit="cover"
+                  pointerEvents="none"
+                  position="absolute"
+                  bottom={{ base: '-6px', lg: '8px' }}
+                  right={{ base: '-6px', lg: '6px' }}
+                  opacity={0.88}
+                />
+              </Box>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08 }}>
+              <Box
+                borderRadius="3xl"
+                minH={{ base: '220px', lg: '270px' }}
+                p={{ base: 5, lg: 7 }}
+                position="relative"
+                bg="rgba(35, 56, 143, 0.80)"
+                border="1px solid rgba(198, 219, 255, 0.28)"
+                backdropFilter="blur(10px)"
+                boxShadow="0 20px 48px rgba(15, 22, 58, 0.40)"
+              >
+                <VStack align="start" gap={5}>
+                  <HStack gap={2} color="white">
+                    <Icon as={FiStar} boxSize={5} color="#CFE1FF" />
+                    <Text fontSize={{ base: '18px', lg: '22px' }} fontWeight="bold">Мои предпочтения</Text>
+                  </HStack>
+                  <Flex wrap="wrap" gap={3}>
+                    {categories && categories.length > 0 ? (
+                      categories.map((preference, index) => (
+                        <Box
+                          key={index}
+                          px={4}
+                          py={2}
+                          borderRadius="full"
+                          color="white"
+                          fontSize={{ base: '12px', lg: '14px' }}
+                          fontWeight="semibold"
+                          bg="rgba(163, 188, 255, 0.24)"
+                          border="1px solid rgba(214, 228, 255, 0.45)"
+                          boxShadow="0 0 0 1px rgba(255,255,255,0.05) inset"
+                          _hover={{ bg: 'rgba(185, 206, 255, 0.34)' }}
+                          transition="all .2s ease"
+                        >
+                          {getPreferenceText(Number(preference))}
+                        </Box>
+                      ))
+                    ) : (
+                      <Text color="#E4EDFF" fontSize={{ base: '13px', lg: '15px' }} lineHeight={1.6}>
+                        Пока нет выбранных предпочтений. Нажмите «Изменить», чтобы собрать персональную ленту.
+                      </Text>
+                    )}
+                  </Flex>
+                  <Button
+                    mt="auto"
+                    bg="white"
+                    color="#3F5DD2"
+                    borderRadius="xl"
+                    _hover={{ bg: '#dfe8ff', transform: 'translateY(-1px)' }}
+                    transition="all .2s ease"
+                    onClick={openCategoriesModal}
+                  >
+                    Изменить
+                  </Button>
+                </VStack>
+              </Box>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.16 }}>
+              <Box
+                borderRadius="3xl"
+                minH={{ base: '220px', lg: '270px' }}
+                p={{ base: 5, lg: 7 }}
+                bg="linear-gradient(145deg, rgba(79, 106, 224, 0.90) 0%, rgba(58, 84, 192, 0.86) 100%)"
+                border="1px solid rgba(205, 222, 255, 0.30)"
+                position="relative"
+                overflow="hidden"
+                boxShadow="0 20px 44px rgba(21, 31, 84, 0.36)"
+              >
+                <VStack gap={5} justify="center" align="center" h="100%" userSelect="none">
+                  <Image
+                    src={comp}
+                    alt="Component"
+                    height={{ base: '104px', lg: '132px' }}
+                    width={{ base: '164px', lg: '212px' }}
+                    objectFit="cover"
+                    pointerEvents="none"
+                  />
+                  <Button
+                    borderRadius="xl"
+                    bg="white"
+                    color="#3F5DD2"
+                    px={6}
+                    py={6}
+                    whiteSpace="normal"
+                    fontWeight="bold"
+                    fontSize={{ base: '14px', lg: '16px' }}
+                    _hover={{ bg: '#dfe8ff', transform: 'translateY(-2px)' }}
+                    transition="all .2s ease"
+                    onClick={isOrganizer ? openModal : openOrganizerRegisterModal}
+                  >
+                    {isOrganizer ? 'Создать мероприятие' : 'Стать организатором'}
+                  </Button>
+                </VStack>
+              </Box>
+            </motion.div>
+          </SimpleGrid>
+        </Box>
+        <Box width="100%" maxW="1250px">
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.2 }}>
+            <Flex
+              justify="space-between"
+              align={{ base: 'flex-start', md: 'center' }}
+              direction={{ base: 'column', md: 'row' }}
+              mb={6}
+              gap={4}
+            >
+              <VStack gap={1} align="start">
+                <Text
+                  fontSize={{ base: '29px', md: '44px' }}
+                  fontWeight="bold"
+                  bgGradient="linear(to-r, #ffffff, #cbdbff)"
+                  bgClip="text"
+                  userSelect="none"
+                  lineHeight="1.05"
+                >
+                  Мои избранные мероприятия
+                </Text>
+                <Text color="#D5E2FF" fontSize={{ base: '13px', md: '15px' }}>
+                  Все события, которые вы отметили как интересные
+                </Text>
+              </VStack>
+              <Badge
+                borderRadius="full"
+                bg="rgba(95, 130, 255, 0.30)"
+                border="1px solid rgba(205, 224, 255, 0.36)"
+                color="#EEF4FF"
+                px={4}
+                py={2}
+                fontSize={{ base: '12px', md: '13px' }}
+              >
+                {events.length} в избранном
+              </Badge>
+            </Flex>
+          </motion.div>
+          {events.length > 0 ? (
+            <VStack gap={5} align="stretch" userSelect="none" mb={3}>
+              {events.map((event, index) => (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: 0.03 * index }}
+                  whileHover={{ y: -3 }}
+                >
+                  <Box
+                    bg="linear-gradient(135deg, rgba(21, 35, 95, 0.88) 0%, rgba(34, 53, 132, 0.86) 100%)"
+                    border="1px solid rgba(193, 214, 255, 0.30)"
+                    borderRadius="3xl"
+                    p={{ base: 4, md: 6 }}
+                    boxShadow="0 20px 45px rgba(8, 14, 40, 0.40)"
+                    transition="all .2s ease"
+                  >
+                    <Flex gap={5} direction={{ base: 'column', md: 'row' }}>
+                      <Box position="relative" flexShrink={0} alignSelf={{ base: 'center', md: 'stretch' }}>
                         <Image
                           src={event.picture_url || EventImage}
                           alt={event.name}
-                          height={{ base: '260px', md: '195px' }}
-                          width={{ base: '180px', md: '130px' }}
+                          height={{ base: '240px', md: '210px' }}
+                          width={{ base: '190px', md: '145px' }}
                           pointerEvents="none"
-                          borderRadius={{ base: 'lg', md: 'xl' }}
+                          borderRadius="2xl"
                           objectFit="cover"
+                          border="1px solid rgba(255,255,255,0.28)"
+                          boxShadow="0 16px 30px rgba(10, 18, 54, 0.45)"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = EventImage;
                           }}
                         />
-                        <Flex direction="column" justify="space-between" flex="1" height="100%">
-                          <Flex
-                            justify="space-between"
-                            align="stretch"
-                            direction={{ base: 'column', md: 'row' }}
-                            width="100%"
+                        <Badge
+                          position="absolute"
+                          top={3}
+                          left={3}
+                          borderRadius="full"
+                          px={3}
+                          py={1}
+                          bg="rgba(15, 27, 76, 0.74)"
+                          border="1px solid rgba(196, 219, 255, 0.38)"
+                          color="#ddecff"
+                          fontWeight="semibold"
+                        >
+                          {formatAgeLimit(event.age_limit)}
+                        </Badge>
+                      </Box>
+                      <VStack align="stretch" gap={4} flex="1">
+                        <Flex
+                          align={{ base: 'flex-start', lg: 'center' }}
+                          justify="space-between"
+                          direction={{ base: 'column', lg: 'row' }}
+                          gap={3}
+                        >
+                          <Text
+                            fontSize={{ base: '22px', md: '28px' }}
+                            color="white"
+                            fontWeight="bold"
+                            lineHeight="1.18"
+                            style={{
+                              display: '-webkit-box',
+                              overflow: 'hidden',
+                              WebkitBoxOrient: 'vertical',
+                              WebkitLineClamp: 2,
+                            }}
                           >
+                            {event.name}
+                          </Text>
+                          <Badge
+                            alignSelf={{ base: 'flex-start', lg: 'center' }}
+                            borderRadius="full"
+                            px={3}
+                            py={2}
+                            bg="rgba(173, 198, 255, 0.20)"
+                            color="#EAF2FF"
+                            border="1px solid rgba(205, 223, 255, 0.36)"
+                            fontWeight="semibold"
+                          >
+                            {formatPrice(event.price)}
+                          </Badge>
+                        </Flex>
+                        <HStack gap={3} flexWrap="wrap" color="#DDEAFF" fontSize={{ base: '13px', md: '14px' }}>
+                          <Badge borderRadius="full" px={3} py={1.5} bg="rgba(255,255,255,0.12)" color="#E7F0FF">
+                            {event.dateLabel} {event.monthLabel}
+                          </Badge>
+                          <Badge borderRadius="full" px={3} py={1.5} bg="rgba(255,255,255,0.12)" color="#E7F0FF">
+                            {event.timeLabel}
+                          </Badge>
+                          <HStack gap={1} bg="rgba(255,255,255,0.12)" borderRadius="full" px={3} py={1.5}>
+                            <Icon as={FiMapPin} />
                             <Text
-                              fontSize={{ base: '20px', md: '20px', lg: '27px' }}
-                              textAlign={{ base: 'center', md: 'left' }}
-                              alignSelf={{ base: 'center', md: 'flex-start' }}
                               style={{
                                 display: '-webkit-box',
                                 overflow: 'hidden',
                                 WebkitBoxOrient: 'vertical',
-                                WebkitLineClamp: 3,
+                                WebkitLineClamp: 1,
                               }}
-                            >
-                              {event.name}
-                            </Text>
-                            <Text
-                              fontSize={{ base: '13px', md: '12px', lg: '15px' }}
-                              textAlign={{ base: 'center', md: 'left' }}
-                              alignSelf={{ base: 'center', md: 'flex-start' }}
-                              maxW={{ base: '80%', md: '250px' }}
-                              style={{
-                                display: '-webkit-box',
-                                overflow: 'hidden',
-                                WebkitBoxOrient: 'vertical',
-                                WebkitLineClamp: 3,
-                              }}
-                              display="flex"
-                              alignItems="flex-start"
-                              mt={{ base: 2, md: 1, lg: 2 }}
                             >
                               {event.location}
                             </Text>
-                          </Flex>
-                          <Flex
-                            justify="space-between"
-                            align={{ base: 'center', md: 'flex-end' }}
-                            direction={{ base: 'column', md: 'row' }}
-                            mt={{ base: 4, md: 0 }}
+                          </HStack>
+                        </HStack>
+                        <Flex justify="space-between" align={{ base: 'stretch', md: 'center' }} direction={{ base: 'column', md: 'row' }} gap={3}>
+                          <Text color="#D0E0FF" fontSize={{ base: '13px', md: '14px' }}>
+                            Нажмите, чтобы открыть подробную страницу мероприятия
+                          </Text>
+                          <Button
+                            borderRadius="xl"
+                            bg="rgba(255,255,255,0.16)"
+                            color="white"
+                            border="1px solid rgba(255,255,255,0.35)"
+                            _hover={{ bg: 'rgba(255,255,255,0.28)' }}
+                            onClick={() => navigate(`/event/${event.id}`)}
                           >
-                            <Flex align="center">
-                              <Text fontSize="50px" mr={1}>
-                                {event.dateLabel}
-                              </Text>
-                              <Text fontSize="15px" color="#A5C0FF">
-                                {event.monthLabel}
-                              </Text>
-                            </Flex>
-                            <Flex mt={5}>
-                              <Text fontSize="20px" textAlign="center" mb={2}>
-                                {event.timeLabel}
-                              </Text>
-                              <Text
-                                fontSize="14px"
-                                textAlign="right"
-                                ml={{ base: 10, md: 20, lg: 40 }}
-                                mb={5}
-                                mt={{ base: 1, md: 1 }}
-                              >
-                                {formatAgeLimit(event.age_limit)} · {formatPrice(event.price)}
-                              </Text>
-                            </Flex>
-                          </Flex>
+                            Открыть мероприятие
+                          </Button>
                         </Flex>
-                      </Flex>
-                      <Button
-                        position="absolute"
-                        bottom={{ base: 3, md: 4 }}
-                        right={{ base: 3, md: 4 }}
-                        size="sm"
-                        borderRadius="full"
-                        bg="rgba(255,255,255,0.16)"
-                        color="white"
-                        border="1px solid rgba(255,255,255,0.32)"
-                        _hover={{ bg: 'rgba(255,255,255,0.26)' }}
-                        onClick={() => navigate(`/event/${event.id}`)}
-                      >
-                        Открыть
-                      </Button>
-                    </Box>
-                    <Box
-                      bg="rgba(64, 92, 200, 0.78)"
-                      border="1px solid rgba(200, 220, 255, 0.24)"
-                      borderRadius="2xl"
-                      height={{ base: '160px', md: '250px' }}
-                      width={{ base: '100%', md: '145px' }}
-                      p={7}
-                      color="white"
-                      fontWeight="semibold"
-                    >
-                      <Flex
-                        align="center"
-                        justify="center"
-                        height="100%"
-                      >
-                        <Text fontSize={{ base: '18px', md: '15px' }} textAlign="center" lineHeight={1.4}>
-                          {formatPrice(event.price)}
-                        </Text>
-                      </Flex>
-                    </Box>
-                  </Flex>
-                ))}
-              </Flex>
-            ) : (
-              <Text
-                color="white"
-                fontSize={{ base: '15px', md: '30px' }}
-                textAlign="center"
-                width={{ base: '80%', md: '100%' }}
-                mb={6}
-              >
-                У вас пока нет избранных мероприятий.
-              </Text>
-            )}
-          </Flex>
-        </Box>
-        {isOrganizer ? (
-          <Box width="100%" mt={15}>
-            <Text
-              fontSize={{ "2xl": "50px", lg: "40px", md: "30px", base: "20px" }}
-              color="white"
-              fontWeight="bold"
-              mt="40px"
-              ml="55px"
+                      </VStack>
+                    </Flex>
+                  </Box>
+                </motion.div>
+              ))}
+            </VStack>
+          ) : (
+            <Box
+              borderRadius="3xl"
+              bg="rgba(31, 47, 120, 0.70)"
+              border="1px solid rgba(199, 218, 255, 0.30)"
+              p={{ base: 6, md: 10 }}
               textAlign="center"
             >
-              План ваших мероприятий
-            </Text>
+              <VStack gap={3}>
+                <Icon as={FiCalendar} boxSize={8} color="#d9e7ff" />
+                <Text color="white" fontSize={{ base: '18px', md: '27px' }} fontWeight="bold">
+                  Пока нет избранных мероприятий
+                </Text>
+                <Text color="#D5E3FF" fontSize={{ base: '13px', md: '15px' }}>
+                  Добавьте интересные события из ленты — они появятся здесь.
+                </Text>
+              </VStack>
+            </Box>
+          )}
+        </Box>
+        {isOrganizer ? (
+          <Box width="100%" maxW="1250px" mt={2}>
+            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.25 }}>
+              <Box
+                borderRadius="3xl"
+                bg="rgba(26, 40, 107, 0.68)"
+                border="1px solid rgba(194, 214, 255, 0.28)"
+                p={{ base: 4, md: 6 }}
+                mb={4}
+              >
+                <Text
+                  fontSize={{ "2xl": "50px", lg: "40px", md: "30px", base: "24px" }}
+                  color="white"
+                  fontWeight="bold"
+                  textAlign={{ base: 'left', md: 'center' }}
+                  mb={2}
+                >
+                  План ваших мероприятий
+                </Text>
+                <Text color="#D6E5FF" fontSize={{ base: '13px', md: '15px' }} textAlign={{ base: 'left', md: 'center' }}>
+                  Календарь поможет управлять расписанием и быстро создавать новые события.
+                </Text>
+              </Box>
+            </motion.div>
             <Calendar canManageEvents={isOrganizer} />
           </Box>
         ) : null}
