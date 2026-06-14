@@ -6,8 +6,6 @@ import comp from '../pictures/comp.png';
 import EditingModal from '../modal/editing';
 import CreateModal from '../pages/creature';
 import CategoriesModal from '../pages/categories';
-import com from '../pictures/comp2.png';
-import com2 from '../pictures/settings.png';
 import axios from '../shared/lib/axios';
 import { ContainerFluid } from '../components/ui/container';
 import { Toaster, toaster } from "../components/ui/toaster"
@@ -15,7 +13,7 @@ import { Calendar } from '../modal/org_calendar';
 import OrganizerRegisterModal from '../modal/org_registration';
 import EventImage from '../pictures/picture1.png';
 import { motion } from 'framer-motion';
-import { FiCalendar, FiHeart, FiMapPin, FiSettings, FiStar } from 'react-icons/fi';
+import { FiCalendar, FiHeart, FiMapPin, FiSettings, FiStar, FiUser } from 'react-icons/fi';
 
 interface Event {
   id: number;
@@ -165,8 +163,6 @@ const Account = () => {
     fetchCategories();
   }, []);
 
-  const imageSrc = useBreakpointValue({ base: com2, lg: com });
-
   const getPreferenceText = (id: number) => {
 
     return allCategories.find(
@@ -292,6 +288,7 @@ const Account = () => {
     base: getTruncatedUsername(username || 'Логин'),
     lg: username || 'Логин',
   });
+  const userInitial = (username?.trim()?.[0] || 'U').toUpperCase();
 
   return (
     <ContainerFluid>
@@ -305,83 +302,132 @@ const Account = () => {
         py={{ base: 4, lg: 6 }}
       >
         <Box width="100%" maxW="1250px">
-          <SimpleGrid columns={{ base: 1, lg: 3 }} gap={5}>
-            <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-              <Box
-                borderRadius="3xl"
-                minH={{ base: '220px', lg: '270px' }}
-                p={{ base: 5, lg: 7 }}
-                position="relative"
-                overflow="hidden"
-                bg="linear-gradient(135deg, rgba(72, 105, 234, 0.92) 0%, rgba(50, 76, 178, 0.92) 100%)"
-                border="1px solid rgba(206, 223, 255, 0.35)"
-                boxShadow="0 20px 48px rgba(20, 34, 91, 0.45)"
-              >
+          <SimpleGrid columns={{ base: 1, lg: 4 }} gap={5}>
+            <Box gridColumn={{ base: 'auto', lg: 'span 2' }}>
+              <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
                 <Box
-                  position="absolute"
-                  top="-70px"
-                  right="-70px"
-                  w="190px"
-                  h="190px"
-                  borderRadius="full"
-                  bg="rgba(255,255,255,0.20)"
-                  filter="blur(8px)"
-                />
-                <VStack align="start" gap={4} zIndex={1} position="relative">
-                  <HStack gap={3}>
-                    <Text color="white" fontWeight="bold" fontSize={{ base: '20px', lg: '24px' }}>
-                      Личный кабинет
-                    </Text>
-                    <Badge
-                      borderRadius="full"
-                      px={3}
-                      py={1}
-                      color="white"
-                      bg="rgba(255,255,255,0.18)"
-                      border="1px solid rgba(255,255,255,0.34)"
-                      fontWeight="semibold"
-                    >
-                      {roleLabel}
-                    </Badge>
-                  </HStack>
-                  <Text color="white" fontSize={{ base: '26px', lg: '32px' }} fontWeight="bold" lineHeight="1.15">
-                    {visibleUsername}
-                  </Text>
-                  <HStack gap={2} color="#D7E6FF">
-                    <Icon as={FiHeart} />
-                    <Text fontSize={{ base: '13px', lg: '15px' }}>
-                      Избранных мероприятий: {events.length}
-                    </Text>
-                  </HStack>
-                  <Button
-                    bg="white"
-                    color="#3F5DD2"
-                    borderRadius="xl"
-                    px={6}
-                    _hover={{ bg: '#dfe8ff', transform: 'translateY(-1px)' }}
-                    transition="all .2s ease"
-                    onClick={openEditingModal}
+                  borderRadius="3xl"
+                  minH={{ base: '240px', lg: '280px' }}
+                  p={{ base: 5, lg: 7 }}
+                  position="relative"
+                  overflow="hidden"
+                  bg="linear-gradient(135deg, rgba(72, 105, 234, 0.92) 0%, rgba(50, 76, 178, 0.92) 100%)"
+                  border="1px solid rgba(206, 223, 255, 0.35)"
+                  boxShadow="0 20px 48px rgba(20, 34, 91, 0.45)"
+                >
+                  <Box
+                    position="absolute"
+                    top="-90px"
+                    right="-80px"
+                    w="220px"
+                    h="220px"
+                    borderRadius="full"
+                    bg="rgba(255,255,255,0.16)"
+                    filter="blur(10px)"
+                  />
+                  <Flex
+                    direction={{ base: 'column', lg: 'row' }}
+                    gap={{ base: 5, lg: 6 }}
+                    position="relative"
+                    zIndex={1}
                   >
-                    <HStack gap={2}>
-                      <Icon as={FiSettings} />
-                      <Text>Настройки</Text>
-                    </HStack>
-                  </Button>
-                </VStack>
-                <Image
-                  src={imageSrc}
-                  alt="cloud"
-                  width={{ base: '112px', lg: '160px' }}
-                  height={{ base: '112px', lg: '160px' }}
-                  objectFit="cover"
-                  pointerEvents="none"
-                  position="absolute"
-                  bottom={{ base: '-6px', lg: '8px' }}
-                  right={{ base: '-6px', lg: '6px' }}
-                  opacity={0.88}
-                />
-              </Box>
-            </motion.div>
+                    <Box
+                      flex={{ base: '1', lg: '0 0 45%' }}
+                      borderRadius="2xl"
+                      bg="rgba(255,255,255,0.10)"
+                      border="1px solid rgba(255,255,255,0.26)"
+                      p={{ base: 4, lg: 5 }}
+                    >
+                      <Text color="white" fontWeight="bold" fontSize={{ base: '20px', lg: '24px' }} mb={4}>
+                        Личный кабинет
+                      </Text>
+                      <HStack align="center" gap={4}>
+                        <Flex
+                          w={{ base: '58px', lg: '70px' }}
+                          h={{ base: '58px', lg: '70px' }}
+                          borderRadius="full"
+                          bg="rgba(255,255,255,0.22)"
+                          border="1px solid rgba(255,255,255,0.34)"
+                          color="white"
+                          align="center"
+                          justify="center"
+                          fontWeight="bold"
+                          fontSize={{ base: '22px', lg: '26px' }}
+                          boxShadow="0 8px 24px rgba(10, 20, 61, 0.35)"
+                        >
+                          {userInitial}
+                        </Flex>
+                        <VStack align="start" gap={0}>
+                          <Text color="white" fontSize={{ base: '24px', lg: '30px' }} fontWeight="bold" lineHeight="1.1">
+                            {visibleUsername}
+                          </Text>
+                          <HStack gap={1.5} color="#D7E6FF">
+                            <Icon as={FiUser} boxSize={3.5} />
+                            <Text fontSize={{ base: '12px', lg: '13px' }}>
+                              Профиль пользователя
+                            </Text>
+                          </HStack>
+                        </VStack>
+                      </HStack>
+                    </Box>
+                    <Box
+                      flex="1"
+                      borderRadius="2xl"
+                      bg="rgba(255,255,255,0.08)"
+                      border="1px solid rgba(255,255,255,0.24)"
+                      p={{ base: 4, lg: 5 }}
+                    >
+                      <Flex direction="column" h="100%">
+                        <HStack
+                          justify="space-between"
+                          align={{ base: 'flex-start', md: 'center' }}
+                          flexWrap="wrap"
+                          gap={3}
+                          mb={4}
+                        >
+                          <Badge
+                            borderRadius="full"
+                            px={3}
+                            py={1}
+                            color="white"
+                            bg="rgba(255,255,255,0.18)"
+                            border="1px solid rgba(255,255,255,0.34)"
+                            fontWeight="semibold"
+                          >
+                            {roleLabel}
+                          </Badge>
+                          <HStack gap={2} color="#E6F0FF">
+                            <Icon as={FiHeart} />
+                            <Text fontSize={{ base: '14px', lg: '16px' }} fontWeight="semibold">
+                              Избранных мероприятий: {events.length}
+                            </Text>
+                          </HStack>
+                        </HStack>
+                        <Text color="#D6E4FF" fontSize={{ base: '13px', lg: '14px' }} mb={4}>
+                          Управляйте личными данными, настройками и вашим списком избранного в одном месте.
+                        </Text>
+                        <Button
+                          mt="auto"
+                          alignSelf="flex-start"
+                          bg="white"
+                          color="#3F5DD2"
+                          borderRadius="xl"
+                          px={6}
+                          _hover={{ bg: '#dfe8ff', transform: 'translateY(-1px)' }}
+                          transition="all .2s ease"
+                          onClick={openEditingModal}
+                        >
+                          <HStack gap={2}>
+                            <Icon as={FiSettings} />
+                            <Text>Настройки</Text>
+                          </HStack>
+                        </Button>
+                      </Flex>
+                    </Box>
+                  </Flex>
+                </Box>
+              </motion.div>
+            </Box>
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08 }}>
               <Box
                 borderRadius="3xl"
