@@ -1,8 +1,8 @@
 import { Box, Flex, Image, Button, Text, useBreakpointValue } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../addition/context';
 import comp from '../pictures/comp.png';
-import barcode from '../pictures/barcode.png';
 import EditingModal from '../modal/editing';
 import CreateModal from '../pages/creature';
 import CategoriesModal from '../pages/categories';
@@ -13,25 +13,18 @@ import { ContainerFluid } from '../components/ui/container';
 import { Toaster, toaster } from "../components/ui/toaster"
 import { Calendar } from '../modal/org_calendar';
 import OrganizerRegisterModal from '../modal/org_registration';
+import EventImage from '../pictures/picture1.png';
 
 interface Event {
-  name: string;
-  created_at: string;
-  update_at: string;
-  group_id: number;
-  date_event: string;
-  duration: string;
-  price: number;
-  address: string;
-  picture_url: string;
-  deleted_at: string | null;
   id: number;
-  description: string;
-  external_url: string;
+  name: string;
+  dateLabel: string;
+  monthLabel: string;
+  timeLabel: string;
+  price: number | null;
   location: string;
-  city: string;
-  age_limit: string;
-  horizontal_picture_url: string | null;
+  picture_url: string;
+  age_limit: string | null;
 }
 
 interface Category {
@@ -47,6 +40,7 @@ const Account = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [isOrganizerRegisterOpen, setIsOrganizerRegisterOpen] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const navigate = useNavigate();
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => {
@@ -129,14 +123,11 @@ const Account = () => {
       );
 
       const data = response.data;
-
-      console.log('LIKED EVENTS:', data);
-
-      const flattenedEvents = Array.isArray(data[0])
-        ? data.flat()
-        : data;
-
-      setEvents(flattenedEvents);
+      const extracted = extractEventsFromResponse(data);
+      const normalized = extracted
+        .map(normalizeFavoriteEvent)
+        .filter((event): event is Event => event !== null);
+      setEvents(normalized);
 
     } catch (error) {
 
@@ -144,6 +135,7 @@ const Account = () => {
         'Ошибка при получении мероприятий:',
         error
       );
+      setEvents([]);
     }
   };
 
@@ -186,6 +178,16 @@ const Account = () => {
     return time.substring(0, 5);
   };
 
+  const formatPrice = (rawPrice: number | null): string => {
+    if (rawPrice === null || Number.isNaN(rawPrice)) {
+      return 'Цена не указана';
+    }
+    if (rawPrice === 0) {
+      return 'Бесплатно';
+    }
+    return `от ${rawPrice} ₽`;
+  };
+
   const formatAgeLimit = (ageLimit?: string | null) => {
     if (!ageLimit) {
       return '0+';
@@ -203,6 +205,83 @@ const Account = () => {
       return name.substring(0, 10) + '...';
     }
     return name;
+  };
+
+  const monthNames = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
+
+  const parseDateParts = (rawDate: string | undefined): { day: number; month: number } => {
+    const normalized = (rawDate || '').trim();
+    if (!normalized) {
+      return { day: 0, month: 0 };
+    }
+
+    const dotFormat = normalized.match(/^(\d{1,2})\.(\d{1,2})\.\d{4}$/);
+    if (dotFormat) {
+      return {
+        day: parseInt(dotFormat[1], 10),
+        month: parseInt(dotFormat[2], 10),
+      };
+    }
+
+    const isoFormat = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoFormat) {
+      return {
+        day: parseInt(isoFormat[3], 10),
+        month: parseInt(isoFormat[2], 10),
+      };
+    }
+
+    const parsed = new Date(normalized);
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        day: parsed.getDate(),
+        month: parsed.getMonth() + 1,
+      };
+    }
+
+    return { day: 0, month: 0 };
+  };
+
+  const extractEventsFromResponse = (payload: any): any[] => {
+    if (Array.isArray(payload)) {
+      return payload.flatMap((item) => (Array.isArray(item) ? item : [item]));
+    }
+    if (payload && typeof payload === 'object') {
+      if (Array.isArray(payload.items)) return payload.items;
+      if (Array.isArray(payload.data)) return payload.data;
+      if (Array.isArray(payload.results)) return payload.results;
+    }
+    return [];
+  };
+
+  const normalizeFavoriteEvent = (item: any): Event | null => {
+    const id = Number(item?.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return null;
+    }
+
+    const slots = Array.isArray(item?.time_slots) ? item.time_slots : [];
+    const firstSlot = slots[0] || null;
+    const rawDate = firstSlot?.date_event
+      || (Array.isArray(item?.date_event) ? item.date_event[0] : item?.date_event)
+      || '';
+    const rawTime = firstSlot?.start_time || item?.start_time || '';
+    const { day, month } = parseDateParts(rawDate);
+
+    return {
+      id,
+      name: String(item?.name || 'Без названия'),
+      dateLabel: day > 0 ? String(day) : '—',
+      monthLabel: month > 0 ? monthNames[month - 1] : 'ДАТА НЕ УКАЗАНА',
+      timeLabel: formatTime(rawTime),
+      price:
+        item?.price !== null && item?.price !== undefined && !Number.isNaN(Number(item.price))
+          ? Number(item.price)
+          : null,
+      location: String(item?.location || item?.address || item?.city || 'Адрес не указан'),
+      picture_url: String(item?.picture_url || item?.pictures_main || item?.pictures_url || ''),
+      age_limit: item?.age_limit ? String(item.age_limit) : null,
+    };
   };
 
   const isOrganizer = role === 'organizator';
@@ -374,26 +453,37 @@ const Account = () => {
                 width="100%"
                 align="center"
               >
-                {events.map((event, index) => (
-                  <Flex key={index} userSelect="none" direction={{ base: 'column', md: 'row' }}>
+                {events.map((event) => (
+                  <Flex key={event.id} userSelect="none" direction={{ base: 'column', md: 'row' }} w="100%" maxW={{ md: '980px', xl: '1100px' }}>
                     <Box
-                      bg="#4C6BE6"
-                      borderRadius="xl"
-                      height={{ base: '650px', md: '250px' }}
-                      width={{ base: '250px', md: '600px', lg: '800px', xl: '1000px' }}
-                      p={7}
+                      bg="rgba(24, 37, 104, 0.78)"
+                      border="1px solid rgba(200, 220, 255, 0.24)"
+                      borderRadius="2xl"
+                      height={{ base: 'auto', md: '250px' }}
+                      width={{ base: '100%', md: 'calc(100% - 145px)' }}
+                      p={{ base: 4, md: 6 }}
                       color="white"
                       fontWeight="semibold"
                       position="relative"
+                      boxShadow="0 12px 30px rgba(8, 12, 30, 0.32)"
+                      transition="all .2s ease"
+                      _hover={{
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 16px 34px rgba(8, 12, 30, 0.42)',
+                      }}
                     >
                       <Flex direction={{ base: 'column', md: 'row' }} align="center" height="100%" gap={4}>
                         <Image
-                          src={event.picture_url}
+                          src={event.picture_url || EventImage}
                           alt={event.name}
                           height={{ base: '260px', md: '195px' }}
                           width={{ base: '180px', md: '130px' }}
                           pointerEvents="none"
-                          borderRadius={{ base: 'md', md: 'xl' }}
+                          borderRadius={{ base: 'lg', md: 'xl' }}
+                          objectFit="cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = EventImage;
+                          }}
                         />
                         <Flex direction="column" justify="space-between" flex="1" height="100%">
                           <Flex
@@ -403,19 +493,29 @@ const Account = () => {
                             width="100%"
                           >
                             <Text
-                              fontSize={{ base: '20px', md: '19px', lg: '25px' }}
+                              fontSize={{ base: '20px', md: '20px', lg: '27px' }}
                               textAlign={{ base: 'center', md: 'left' }}
                               alignSelf={{ base: 'center', md: 'flex-start' }}
-                              lineClamp={4}
+                              style={{
+                                display: '-webkit-box',
+                                overflow: 'hidden',
+                                WebkitBoxOrient: 'vertical',
+                                WebkitLineClamp: 3,
+                              }}
                             >
                               {event.name}
                             </Text>
                             <Text
-                              fontSize={{ base: '13px', md: '10px', lg: '15px' }}
+                              fontSize={{ base: '13px', md: '12px', lg: '15px' }}
                               textAlign={{ base: 'center', md: 'left' }}
                               alignSelf={{ base: 'center', md: 'flex-start' }}
                               maxW={{ base: '80%', md: '250px' }}
-                              lineClamp={4}
+                              style={{
+                                display: '-webkit-box',
+                                overflow: 'hidden',
+                                WebkitBoxOrient: 'vertical',
+                                WebkitLineClamp: 3,
+                              }}
                               display="flex"
                               alignItems="flex-start"
                               mt={{ base: 2, md: 1, lg: 2 }}
@@ -431,35 +531,50 @@ const Account = () => {
                           >
                             <Flex align="center">
                               <Text fontSize="50px" mr={1}>
-                                {new Date(event.date_event).getDate()}
+                                {event.dateLabel}
                               </Text>
-                              <Text fontSize="15px" color="#0E3EA0">
-                                {new Date(event.date_event).toLocaleString('default', { month: 'long' }).toUpperCase()}
+                              <Text fontSize="15px" color="#A5C0FF">
+                                {event.monthLabel}
                               </Text>
                             </Flex>
                             <Flex mt={5}>
                               <Text fontSize="20px" textAlign="center" mb={2}>
-                                {formatTime(event.duration)}
+                                {event.timeLabel}
                               </Text>
                               <Text
-                                fontSize="15px"
+                                fontSize="14px"
                                 textAlign="right"
                                 ml={{ base: 10, md: 20, lg: 40 }}
                                 mb={5}
                                 mt={{ base: 1, md: 1 }}
                               >
-                                {formatAgeLimit(event.age_limit)}
+                                {formatAgeLimit(event.age_limit)} · {formatPrice(event.price)}
                               </Text>
                             </Flex>
                           </Flex>
                         </Flex>
                       </Flex>
+                      <Button
+                        position="absolute"
+                        bottom={{ base: 3, md: 4 }}
+                        right={{ base: 3, md: 4 }}
+                        size="sm"
+                        borderRadius="full"
+                        bg="rgba(255,255,255,0.16)"
+                        color="white"
+                        border="1px solid rgba(255,255,255,0.32)"
+                        _hover={{ bg: 'rgba(255,255,255,0.26)' }}
+                        onClick={() => navigate(`/event/${event.id}`)}
+                      >
+                        Открыть
+                      </Button>
                     </Box>
                     <Box
-                      bg="#6B84EA"
-                      borderRadius="xl"
+                      bg="rgba(64, 92, 200, 0.78)"
+                      border="1px solid rgba(200, 220, 255, 0.24)"
+                      borderRadius="2xl"
                       height={{ base: '160px', md: '250px' }}
-                      width={{ base: '250px', md: '160px' }}
+                      width={{ base: '100%', md: '145px' }}
                       p={7}
                       color="white"
                       fontWeight="semibold"
@@ -468,9 +583,10 @@ const Account = () => {
                         align="center"
                         justify="center"
                         height="100%"
-                        transform={{ base: 'rotate(90deg)', md: 'rotate(0deg)' }}
                       >
-                        <Image src={barcode} alt="Barcode" height="150px" width="93px" pointerEvents="none" />
+                        <Text fontSize={{ base: '18px', md: '15px' }} textAlign="center" lineHeight={1.4}>
+                          {formatPrice(event.price)}
+                        </Text>
                       </Flex>
                     </Box>
                   </Flex>
