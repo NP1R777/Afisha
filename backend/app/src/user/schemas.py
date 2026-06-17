@@ -1,8 +1,16 @@
 import uuid
+from enum import Enum
 from typing import Optional
 from datetime import datetime
 from typing_extensions import List
 from pydantic import BaseModel, Field, EmailStr
+from typing import Literal
+
+
+class UserRole(str, Enum):
+    user = "user"
+    admin = "admin"
+    organizator = "organizator"
 
 
 class UserIn:
@@ -12,6 +20,13 @@ class UserIn:
         email: EmailStr
         date_of_birth: str
         preferences: List[int]
+
+        # Поле для Swagger (будет выпадающий список)
+        role: UserRole = Field(
+            default=UserRole.user,
+            description="Роль пользователя: user/admin/organizator",
+        )
+
 
     class Login(BaseModel):
         username: str
@@ -53,6 +68,22 @@ class UserUpdate(BaseModel):
 
 class UserUpdatePreferences(BaseModel):
     preferences: List[int] | None
+
+
+class UserUpdateRole(BaseModel):
+    role: Literal["user", "admin", "organizator"]
+
+
+class UserAdminOut(BaseModel):
+    id: int
+    username: str
+    email: EmailStr | None = None
+    date_of_birth: str | None = None
+    role: Literal["user", "admin", "organizator"] | None = None
+    preferences: list[int] = Field(default_factory=list)
+    created_at: datetime | None = None
+    update_at: datetime | None = None
+    deleted_at: datetime | None = None
 
 
 class UserOutLikeEvents(BaseModel):

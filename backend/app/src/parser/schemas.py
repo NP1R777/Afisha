@@ -17,6 +17,7 @@ class ParsedEventCreate(BaseModel):
     organization: Optional[str] = None
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
+    pictures_main: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -69,6 +70,7 @@ class ParsedEventOut(BaseModel):
     organization: Optional[str] = None
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
+    pictures_main: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None

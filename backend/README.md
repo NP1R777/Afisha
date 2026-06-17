@@ -100,7 +100,29 @@ python scripts/restore_db_dump.py --dump-file ./db_dumps/afisha_prod.sql
 
 По умолчанию восстановление выполняется через служебную БД `postgres` (`--maintenance-db postgres`).
 
-### 3) Запуск backend после восстановления
+### 3) Очистка выбранных таблиц
+
+Если нужно быстро очистить только часть таблиц в БД, используйте скрипт:
+
+```bash
+python scripts/clear_db_tables.py --tables parsed_event events news
+```
+
+По умолчанию применяется режим `truncate` (`RESTART IDENTITY CASCADE`).
+
+Для безопасной проверки SQL без выполнения:
+
+```bash
+python scripts/clear_db_tables.py --tables parsed_event events --dry-run
+```
+
+Для режима `DELETE FROM`:
+
+```bash
+python scripts/clear_db_tables.py --tables parsed_event --mode delete --yes
+```
+
+### 4) Запуск backend после восстановления
 
 ```bash
 alembic upgrade head
@@ -189,6 +211,61 @@ curl -X POST "http://localhost:8000/parser/run" \
     "max_events_per_source": 100
   }'
 ```
+
+## AI-ассистент (Mistral + Milvus)
+
+В backend добавлен модуль ассистента:
+
+- `POST /assistant/chat` — диалог с ассистентом (строгий JSON-ответ);
+- `POST /assistant/reindex` — ручная переиндексация `events` в Milvus.
+
+Основная логика:
+
+1. Ассистент через Mistral определяет intent (`afisha_search` или `general_chat`).
+2. Для запросов по афише выполняется семантический поиск по Milvus.
+3. Затем применяются фильтры (категория, дата, время суток, город, цена, организация, возраст).
+4. Возвращается строгий JSON с полями `intent`, `filters`, `matches`, `fallback_level`, `warnings`.
+
+### Автообновление индекса
+
+После каждого вызова `POST /parser/distribute` backend автоматически запускает синхронизацию `events` в Milvus.
+
+### Переменные окружения
+
+```bash
+# Mistral
+MISTRAL_API_KEY=
+MISTRAL_API_BASE_URL=https://api.mistral.ai/v1
+MISTRAL_CHAT_MODEL=mistral-large-latest
+MISTRAL_EMBEDDING_MODEL=mistral-embed
+
+# Assistant
+ASSISTANT_EMBEDDING_DIM=1024
+ASSISTANT_EMBEDDING_BATCH_SIZE=32
+ASSISTANT_SEMANTIC_LIMIT=80
+
+# Milvus
+MILVUS_URI=
+MILVUS_HOST=localhost
+MILVUS_PORT=19530
+MILVUS_USER=
+MILVUS_PASSWORD=
+MILVUS_DB_NAME=default
+MILVUS_COLLECTION_NAME=afisha_events
+```
+
+### Запуск Milvus и Attu (отдельный compose)
+
+Для векторной БД используйте новый compose (основной `docker-compose.yml` не изменяется):
+
+```bash
+docker compose -f docker-compose.milvus.yml up -d
+```
+
+После старта:
+
+- Milvus gRPC: `localhost:19530`
+- Attu UI: `http://localhost:8001`
 
 ## Разработка
 

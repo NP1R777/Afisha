@@ -36,11 +36,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openReg
     try {
       const response = await axios.post('/user/login', data);
       if (response.status === 200) {
-        const { user_id: userId, username } = response.data;
-        localStorage.setItem('userId', userId);
-        localStorage.setItem('username', username);
-        setUsername(username);
-        setUserId(userId);
+          const { user_id: userId, username } = response.data;
+
+          const isOrganizer = username === 'organizer';
+
+          localStorage.setItem('userId', userId);
+          localStorage.setItem('username', username);
+          localStorage.setItem('isOrganizer', JSON.stringify(isOrganizer));
+
+          setUsername(username);
+          setUserId(userId);
 
         console.log('User ID:', userId);
         console.log('Username:', username);

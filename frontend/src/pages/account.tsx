@@ -59,6 +59,14 @@ const Account = () => {
   7: 'Норильский колледж искусств',
 };
 
+useEffect(() => {
+  const organizerFlag = localStorage.getItem('isOrganizer');
+
+  if (organizerFlag) {
+    setIsOrganizer(JSON.parse(organizerFlag));
+  }
+}, []);
+
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => {
     setIsModalOpen(false);
@@ -117,7 +125,7 @@ const Account = () => {
 
       setCategories(data.preferences || []);
 
-      setIsOrganizer(data.is_organizer || false);
+      // setIsOrganizer(data.is_organizer || false);
 
     } catch (error) {
 
@@ -214,6 +222,12 @@ const Account = () => {
     }
     return name;
   };
+
+  const handleOrganizerRegisterSuccess = async () => {
+  await fetchUserData(); // обновляем данные пользователя
+  setIsOrganizer(true); // сразу переключаем интерфейс
+  setIsOrganizerRegisterOpen(false);
+};
 
   return (
     <ContainerFluid>
