@@ -1,0 +1,103 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from core.session import get_db
+from database.models import Events, News, InfoOrganization
+from src.event.router import _serialize_event
+
+router = APIRouter()
+
+
+def _serialize_news(item: News) -> dict:
+    return {
+        "id": item.id,
+        "name": item.name,
+        "address": item.address,
+        "organizator": item.organizator,
+        "organization": item.organization,
+        "created_at": item.created_at,
+        "update_at": item.update_at,
+        "deleted_at": item.deleted_at,
+    }
+
+
+def _event_sort_key(event: dict):
+    time_slots = event.get("time_slots") or []
+    if time_slots:
+        return (0, time_slots[0]["date_event"])
+    # Events without scheduled shows go last, newest first.
+    return (1, -event["id"])
+
+
+@router.get(
+    "/organization/{org_id:int}",
+    description=(
+        "Получение информации об организаторе вместе с его мероприятиями "
+        "и новостями для страницы организатора."
+    ),
+    summary="Информация об организаторе для страницы организатора",
+    responses={
+        200: {"description": "Данные организатора получены"},
+        404: {"description": "Организатор не найден"},
+    },
+)
+async def get_organization_page(
+    org_id: int,
+    events_limit: int = Query(default=50, ge=1, le=200),
+    news_limit: int = Query(default=50, ge=1, le=200),
+    db_connect: AsyncSession = Depends(get_db),
+):
+    organization = (
+        await db_connect.execute(
+            select(InfoOrganization).where(
+                InfoOrganization.id == org_id,
+                InfoOrganization.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if organization is None:
+        raise HTTPException(status_code=404, detail="Организатор не найден")
+
+    events = (
+        await db_connect.execute(
+            select(Events)
+            .where(
+                Events.organization == org_id,
+                Events.deleted_at.is_(None),
+            )
+            .options(
+                selectinload(Events.group_links),
+                selectinload(Events.time_slots),
+            )
+        )
+    ).scalars().all()
+
+    news_rows = (
+        await db_connect.execute(
+            select(News)
+            .where(
+                News.organization == org_id,
+                News.deleted_at.is_(None),
+            )
+            .order_by(News.id.desc())
+            .limit(news_limit)
+        )
+    ).scalars().all()
+
+    serialized_events = [_serialize_event(event) for event in events]
+    serialized_events.sort(key=_event_sort_key)
+    serialized_events = serialized_events[:events_limit]
+
+    return {
+        "id": organization.id,
+        "name_org": organization.name_org,
+        "address": organization.address,
+        "organizator": organization.organizator,
+        "created_at": organization.created_at,
+        "update_at": organization.update_at,
+        "deleted_at": organization.deleted_at,
+        "events": serialized_events,
+        "news": [_serialize_news(item) for item in news_rows],
+    }
