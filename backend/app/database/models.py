@@ -143,6 +143,7 @@ class InfoOrganization(Base):
     organizator: str = Column(String, nullable=True)
 
     events = relationship("Events", back_populates="organization_rel")
+    news = relationship("News", back_populates="organization_rel")
 
 
 class Events(Base):
@@ -200,6 +201,9 @@ class News(Base):
     name: str = Column(String, nullable=False)
     address: str = Column(String, nullable=True)
     organizator: str = Column(String, nullable=True)
+    organization: int = Column(Integer, ForeignKey("info_organization.id"), nullable=True)
+
+    organization_rel = relationship("InfoOrganization", back_populates="news")
 
 
 class UserToEvent(Base):
