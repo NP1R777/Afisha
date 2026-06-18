@@ -61,3 +61,46 @@ export interface ParserDistributePayload {
 export interface ParserBackfillPayload {
   limit?: number;
 }
+
+export type ParsedTargetType = 'event' | 'news' | 'unknown';
+export type ParsedProcessStatus = 'new' | 'processed' | 'rejected' | 'error';
+
+export interface AdminParsedEvent {
+  id: number;
+  source_key: string;
+  source_name: string;
+  name: string;
+  description?: string | null;
+  date_event?: string | null;
+  start_time?: string | null;
+  duration?: string | null;
+  city?: string | null;
+  price?: string | null;
+  address?: string | null;
+  organization?: string | null;
+  age_limit?: string | null;
+  external_url?: string | null;
+  pictures_main?: string | null;
+  pictures_two?: string | null;
+  target_type?: ParsedTargetType | null;
+  process_status?: ParsedProcessStatus | null;
+  processed_at?: string | null;
+  error_text?: string | null;
+  created_at?: string | null;
+}
+
+export interface AdminParsedEventListResponse {
+  total: number;
+  items: AdminParsedEvent[];
+}
+
+export interface ParserResolvePayload {
+  target_type: 'event' | 'news' | 'rejected';
+  group_ids?: number[];
+  error_text?: string;
+}
+
+export interface ParserStatusUpdatePayload {
+  process_status: 'new' | 'rejected' | 'error';
+  error_text?: string;
+}

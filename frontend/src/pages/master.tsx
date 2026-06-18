@@ -43,6 +43,143 @@ interface Event {
   pictures_two: string | null;
 }
 
+function sanitizeImageCandidate(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return '';
+  }
+  const lowered = normalized.toLowerCase();
+  if (lowered === 'null' || lowered === 'none' || lowered === 'undefined' || lowered === '[object object]') {
+    return '';
+  }
+  return normalized;
+}
+
+function extractImageFromStructuredString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const directHttp = trimmed.match(/https?:\/\/[^\s"'<>]+/i);
+  if (directHttp?.[0]) {
+    return directHttp[0];
+  }
+
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    const normalizedArrayString = trimmed.replace(/'/g, '"');
+    try {
+      const parsed = JSON.parse(normalizedArrayString);
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          const nested = extractImageFromStructuredString(String(entry));
+          if (nested) {
+            return nested;
+          }
+        }
+      }
+    } catch {
+      // ignore malformed arrays
+    }
+  }
+
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    const normalizedObjectString = trimmed.replace(/'/g, '"');
+    try {
+      const parsed = JSON.parse(normalizedObjectString) as Record<string, unknown>;
+      const objectCandidates = [parsed.url, parsed.src, parsed.picture_url, parsed.pictures_main];
+      for (const candidate of objectCandidates) {
+        const nested = extractImageFromStructuredString(String(candidate ?? ''));
+        if (nested) {
+          return nested;
+        }
+      }
+    } catch {
+      // ignore malformed objects
+    }
+  }
+
+  const splitCandidates = trimmed
+    .split(/[,\n;]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  for (const candidate of splitCandidates) {
+    if (candidate.startsWith('https://') || candidate.startsWith('http://')) {
+      return candidate;
+    }
+    if (candidate.startsWith('//')) {
+      return `https:${candidate}`;
+    }
+    if (candidate.startsWith('/')) {
+      return candidate;
+    }
+  }
+
+  return '';
+}
+
+function resolveEventImage(item: any): string {
+  const candidates = [
+    item?.pictures_main,
+    item?.picture_url,
+    item?.pictures_url,
+    item?.horizontal_picture_url,
+    item?.pictures_two,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = sanitizeImageCandidate(candidate);
+    if (!normalized) {
+      continue;
+    }
+    const extracted = extractImageFromStructuredString(normalized);
+    if (extracted) {
+      return extracted;
+    }
+  }
+  return EventImage;
+}
+
+function normalizeEvent(item: any): Event {
+  const normalizedTimeSlots = Array.isArray(item?.time_slots) ? item.time_slots : [];
+  const groupId = item?.group_links?.[0]?.groups_id ?? 0;
+
+  return {
+    id: item?.id ? Number(item.id) : undefined,
+    external_url: item?.external_url || '',
+    name: item?.name || '',
+    description: item?.description || '',
+    organization: item?.organization || '',
+    group_id: Number(groupId),
+    time_slots: normalizedTimeSlots,
+    duration: item?.duration || '',
+    price:
+      item?.price !== null && item?.price !== undefined
+        ? String(item.price)
+        : '',
+    address: item?.address || '',
+    city: item?.city || '',
+    age_limit: item?.age_limit || '',
+    pictures_main: resolveEventImage(item),
+    pictures_two:
+      item?.horizontal_picture_url ||
+      item?.pictures_two ||
+      null,
+  };
+}
+
 interface EventCategory {
   id: number;
   name: string;
@@ -54,13 +191,14 @@ interface EventCategory {
 }
 
 const Frame = () => {
-    const {
-      userId,
-      categories: userCategories,
-      setUsername,
-      searchQuery,
-      isAuthenticated
-    } = useUser();
+  const {
+    userId,
+    categories: userCategories,
+    setUsername,
+    searchQuery,
+    isAuthenticated,
+    role
+  } = useUser();
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [categoriesFromBackend, setCategoriesFromBackend] = useState<EventCategory[]>([]);
@@ -89,9 +227,20 @@ const Frame = () => {
     if (!searchQuery) return;
 
     const timer = setTimeout(() => {
-      categoriesRef.current?.scrollIntoView({
+      const element = categoriesRef.current;
+
+      if (!element) return;
+
+      const offset = 130; // высота твоего fixed header
+
+      const top =
+        element.getBoundingClientRect().top +
+        window.scrollY -
+        offset;
+
+      window.scrollTo({
+        top,
         behavior: 'smooth',
-        block: 'start',
       });
     }, 150);
 
@@ -116,6 +265,12 @@ const Frame = () => {
     if (isMd) return 3;
     else return 2;
   })();
+
+  const sectionReveal = {
+    initial: { opacity: 0, y: 18 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.45, ease: 'easeOut' as const },
+  };
 
   const handleLoginSuccess = () => {
     const storedUsername = localStorage.getItem('username');
@@ -177,7 +332,9 @@ const Frame = () => {
               res.data
             );
 
-            const events = res.data;
+            const events = Array.isArray(res.data)
+              ? res.data.map((item: any) => normalizeEvent(item))
+              : [];
 
             events.sort((a: Event, b: Event) => {
               const dateA = a.time_slots?.[0]?.date_event
@@ -244,7 +401,8 @@ const Frame = () => {
     5: 'Талнахская детская школа искусств',
     6: 'Норильская детская школа искусств',
     7: 'Норильский колледж искусств',
-    8: 'Культурно-досуговый центр имени В. Высоцкого',
+    8: 'Афиша Северного города',
+    9: 'Культурно-досуговый центр имени В. Высоцкого',
   };
 
   const districts = createListCollection({
@@ -277,8 +435,32 @@ const Frame = () => {
   };
 
   const handleDistrictChange = (event: FormEvent<HTMLDivElement>) => {
-    const selectedValues = Array.from((event.target as HTMLSelectElement).selectedOptions, option => option.value);
+    const selectedValues = Array.from(
+      (event.target as HTMLSelectElement).selectedOptions,
+      option => option.value
+    );
+
     setSelectedDistricts(selectedValues);
+
+    if (selectedValues.length > 0) {
+      setTimeout(() => {
+        const element = categoriesRef.current;
+
+        if (!element) return;
+
+        const offset = 130;
+
+        const top =
+          element.getBoundingClientRect().top +
+          window.scrollY -
+          offset;
+
+        window.scrollTo({
+          top,
+          behavior: 'smooth',
+        });
+      }, 100);
+    }
   };
 
 const handleDateChange = (dates: [Date | null, Date | null]) => {
@@ -329,22 +511,80 @@ const handleClearDate = () => {
     setIsLoginOpen(false);
     setIsRegisterOpen(true);
   };
-  
+ 
+const isEventInSelectedDateRange = (event: Event) => {
+  if (!startDate) return true;
+
+  const eventDates = event.time_slots.map(slot => {
+    const d = new Date(slot.date_event);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  });
+
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+
+  // выбрана одна дата
+  if (!endDate) {
+    return eventDates.some(
+      eventDate => eventDate === start.getTime()
+    );
+  }
+
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  // выбран период
+  return eventDates.some(
+    eventDate =>
+      eventDate >= start.getTime() &&
+      eventDate <= end.getTime()
+  );
+};
+
   const filterEventsBySearchQuery = (events: Event[]) => {
-    return events.filter(event => {
-      const matchesSearchQuery =
-        !searchQuery ||
-        event.name
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase());
+  return events.filter(event => {
+    const matchesSearchQuery =
+      !searchQuery ||
+      event.name
+        ?.toLowerCase()
+        .includes(searchQuery.toLowerCase());
 
-      const matchesDistrict =
-        selectedDistricts.length === 0 ||
-        selectedDistricts.includes(event.city?.toLowerCase());
+    const matchesDistrict =
+      selectedDistricts.length === 0 ||
+      selectedDistricts.includes(
+        event.city?.toLowerCase()
+      );
 
-      return matchesSearchQuery && matchesDistrict;
-    });
-  };
+    const matchesDate =
+      isEventInSelectedDateRange(event);
+
+    return (
+      matchesSearchQuery &&
+      matchesDistrict &&
+      matchesDate
+    );
+  });
+};
+
+useEffect(() => {
+  if (!startDate) return;
+
+  const element = categoriesRef.current;
+  if (!element) return;
+
+  const offset = 130;
+
+  const top =
+    element.getBoundingClientRect().top +
+    window.scrollY -
+    offset;
+
+  window.scrollTo({
+    top,
+    behavior: 'smooth',
+  });
+}, [startDate, endDate]);
 
   const userCategoriesStr = userCategories?.map(String) || [];
   const areFiltersApplied = 
@@ -354,18 +594,19 @@ const handleClearDate = () => {
   endDate !== null;
 
   const filteredCategories = categoriesFromBackend.filter(category => {
-    const filteredEvents =
-      filterEventsBySearchQuery(
-        eventsByCategory[category.id] || []
-      );
+    // const filteredEvents =
+    //   filterEventsBySearchQuery(
+    //     eventsByCategory[category.id] || [] // моё изменение проверить 
+    //   );
 
-    if (
-      selectedCategories.length > 0 &&
-      !selectedCategories.includes(category.id.toString())
-    ) {
-      return false;
-    }
+    // if (
+    //   selectedCategories.length > 0 &&
+    //   !selectedCategories.includes(category.id.toString())
+    // ) {
+    //   return false;
+    // }
 
+    const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
     return filteredEvents.length > 0;
   });
 
@@ -383,6 +624,14 @@ const handleClearDate = () => {
 
     return filteredEvents.length > 0;
   });
+
+  const uniqueEvents = Array.from(
+  new Map(
+    Object.values(eventsByCategory)
+      .flat()
+      .map(event => [event.id, event])
+  ).values()
+);
 
 const personalizedEvents = Object.values(eventsByCategory)
   .flat()
@@ -425,12 +674,28 @@ const personalizedEvents = Object.values(eventsByCategory)
     return dateA - dateB;
   })
   .slice(0, 12);
+  
+console.log(
+  'PERSONALIZED EVENT IDS:',
+  personalizedEvents.map(e => e.id)
+);
 
   return (
     <ContainerFluid>
       <Flex direction="column" align="center" height="100%">
         <ContainerFluid position="fixed" zIndex={1}>
-          <Flex justify="space-between" fontFamily="Unbounded" w="100%">
+          <Flex
+            justify="space-between"
+            fontFamily="Unbounded"
+            w="100%"
+            bg="rgba(22, 27, 66, 0.45)"
+            border="1px solid rgba(255,255,255,0.22)"
+            borderRadius="20px"
+            px={{ base: 2, md: 3, xl: 4 }}
+            py={2}
+            boxShadow="0 10px 28px rgba(7, 11, 34, 0.33)"
+            backdropFilter="blur(6px)"
+          >
             <HStack gap={{ xl: '4', lg: '4', base: '1' }}>
               <Box
                 
@@ -447,7 +712,8 @@ const personalizedEvents = Object.values(eventsByCategory)
                 fontSize={{ base: 'xs', sm:"13px", md: 'sm' }}
                 userSelect="none"
                 cursor="pointer"
-                _hover={{ bg: 'gray.50' }}
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
+                _hover={{ bg: 'gray.50', boxShadow: '0 10px 20px rgba(13, 18, 45, 0.22)' }}
                 transition="all 0.2s"
               >
                             
@@ -528,6 +794,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                 bg="white"
                 overflow="hidden"
                 borderRadius="full"
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleCategoryChange}
               >
                 <SelectTrigger width="185px">
@@ -542,7 +809,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                     Категории
                   </Box>
                 </SelectTrigger>
-                <SelectContent borderRadius="xl">
+                <SelectContent borderRadius="xl" border="1px solid rgba(76, 107, 230, 0.25)" boxShadow="0 14px 24px rgba(10, 17, 46, 0.22)">
                   {categories.items.map(category => (
                     <SelectItem item={category} key={category.value}>
                       {category.label}
@@ -560,6 +827,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                 bg="white"
                 overflow="hidden"
                 borderRadius="full"
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleDistrictChange}
               >
                 <SelectTrigger>
@@ -576,7 +844,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                     </Box>
                   </Flex>
                 </SelectTrigger>
-                <SelectContent borderRadius="xl">
+                <SelectContent borderRadius="xl" border="1px solid rgba(76, 107, 230, 0.25)" boxShadow="0 14px 24px rgba(10, 17, 46, 0.22)">
                   {districts.items.map(district => (
                     <SelectItem item={district} key={district.value}>
                       {district.label}
@@ -585,27 +853,6 @@ const personalizedEvents = Object.values(eventsByCategory)
                 </SelectContent>
               </SelectRoot>
 
-              {/* <Button //нужен или нет вообщев
-                maxHeight={{ base: '36px', md: '40px' }}
-                bg="white"
-                borderRadius="full"
-                onClick={handleMyTicketsClick}
-                color="black"
-                fontSize={{ base: '8px', md: 'sm' }}
-                height="40px"
-                px={{ base: '10px', md: '16px' }}
-                _hover={{ bg: 'gray.50' }}
-                transition="all 0.2s"
-              >
-                <Image
-                  display={{ base: 'none', md: 'block' }}
-                  src={ticket}
-                  alt="Билет"
-                  boxSize={{ base: '16px', md: '20px' }}
-                  objectFit="contain"
-                />
-                <Text>Мои билеты</Text>
-              </Button> */}
               <Button
                 maxHeight={{ base: '36px', md: '40px' }}
                 bg="white"
@@ -618,6 +865,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                 transition="all 0.2s"
                 onClick={() => setIsCalendarModalOpen(true)}
                 fontWeight="400"
+                boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
               >
                 <Image
                   display={{ base: 'none', md: 'block' }}
@@ -632,47 +880,56 @@ const personalizedEvents = Object.values(eventsByCategory)
           </Flex>
         </ContainerFluid>
 
-        <VStack
-          mt="40px"
-          align="center"
-          maxW={{ md: '75%', base: '90%' }}
-          p={{ lg: 10, base: 4 }}
-          color="white"
-          userSelect="none"
-        >
-          <Heading
-            as="h1"
-            fontWeight={500}
-            lineHeight={1}
-            fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
-            alignSelf="center"
-            
-            fontFamily="Unbounded"
+        <motion.div {...sectionReveal} style={{ width: '100%' }}>
+          <VStack
+            mt="40px"
+            align="center"
+            maxW={{ md: '75%', base: '90%' }}
+            p={{ lg: 10, base: 4 }}
+            color="white"
+            userSelect="none"
+            mx="auto"
+            bg="rgba(14, 20, 58, 0.34)"
+            border="1px solid rgba(255,255,255,0.2)"
+            borderRadius="28px"
+            boxShadow="0 18px 34px rgba(7, 11, 34, 0.28)"
+            backdropFilter="blur(4px)"
           >
-            Афиша
-          </Heading>
-          <Heading
-            as="h1"
-            fontWeight={500}
-            lineHeight={1}
-            
-            fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
-            alignSelf="center"
-            fontFamily="Unbounded"
-          >
-            Норильска
-          </Heading>
-          <Text
-            fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
-            fontWeight="300"
-            mt={{ xl: '20px', lg: '20px', sm:"30px", base: '5px' }}
-            textAlign="center"
-            fontFamily="Unbounded"
-          >
-            На нашем сайте вы найдете актуальные мероприятия в Норильске и других районах, чтобы каждый мог легко
-            выбрать что-то интересное для себя. Развлекайтесь и наслаждайтесь яркими моментами города!
-          </Text>
-        </VStack>
+            <Heading
+              as="h1"
+              fontWeight={500}
+              lineHeight={1}
+              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
+              alignSelf="center"
+              fontFamily="Unbounded"
+              textShadow="0 10px 28px rgba(0,0,0,0.35)"
+            >
+              Афиша
+            </Heading>
+            <Heading
+              as="h1"
+              fontWeight={500}
+              lineHeight={1}
+              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
+              alignSelf="center"
+              fontFamily="Unbounded"
+              textShadow="0 10px 28px rgba(0,0,0,0.35)"
+            >
+              Норильска
+            </Heading>
+            <Text
+              fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
+              fontWeight="300"
+              mt={{ xl: '20px', lg: '20px', sm:"30px", base: '5px' }}
+              textAlign="center"
+              fontFamily="Unbounded"
+              lineHeight={1.65}
+            >
+              На нашем сайте вы найдете актуальные мероприятия в Норильске и других районах, чтобы каждый мог легко
+              выбрать что-то интересное для себя. Развлекайтесь и наслаждайтесь яркими моментами города!
+            </Text>
+          </VStack>
+        </motion.div>
 
         <Grid
           width={{ base: "80%", md: "100%", lg: "100%", '2xl': "100%" }}
@@ -693,6 +950,9 @@ const personalizedEvents = Object.values(eventsByCategory)
             display="flex"
             alignItems="center"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             все
           </Box>
@@ -710,6 +970,9 @@ const personalizedEvents = Object.values(eventsByCategory)
             bgSize="cover"
             bgRepeat="no-repeat"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             события
           </Box>
@@ -723,6 +986,9 @@ const personalizedEvents = Object.values(eventsByCategory)
             display="flex"
             alignItems="center"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             вашего 
           </Box>
@@ -736,18 +1002,35 @@ const personalizedEvents = Object.values(eventsByCategory)
             display="flex"
             alignItems="center"
             justifyContent="center"
+            transition="all .2s ease"
+            boxShadow="0 10px 24px rgba(13, 18, 45, 0.2)"
+            _hover={{ transform: 'translateY(-2px)', boxShadow: '0 14px 28px rgba(13, 18, 45, 0.3)' }}
           >
             города
           </Box>
         </Grid>
-        {isAuthenticated && personalizedEvents.length > 0 && (
-          <Box mt={9} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
+        {/* {isAuthenticated &&
+          role === 'user' &&
+          personalizedEvents.length > 0 && (
+          <Box
+            mt={9}
+            w={{base: "700px", xl: "1100px"}}
+                p={4}
+                color="white"
+                userSelect="none"
+                zIndex={0}
+                bg="rgba(13, 20, 58, 0.24)"
+                border="1px solid rgba(255,255,255,0.15)"
+                borderRadius="24px"
+                boxShadow="0 14px 30px rgba(7, 11, 34, 0.24)"
+          >
             <Heading
               lineHeight={1}
               fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
               fontFamily="Unbounded"
               color="white"
               textAlign="center"
+              textShadow="0 8px 22px rgba(0,0,0,0.3)"
             >
               Подборка для вас
             </Heading>
@@ -773,154 +1056,6 @@ const personalizedEvents = Object.values(eventsByCategory)
                   >
                     <Link to={`/event/${event.id}`}>
                       <VStack
-                        align="center"
-                        textAlign="center"
-                        gap={1}
-                        w={{ xl: '240px', sm: '200px', base: '140px' }}
-                        position="relative"
-                      >
-                        <Image
-                          src={event.pictures_main}
-                          alt={event.name}
-                          width="100%"
-                          height={{ xl: '360px', md: '300px', sm: '290px', base: '200px' }}
-                          borderRadius="6px"
-                          objectFit="cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = EventImage;
-                          }}
-                        />
-
-                        <Box
-                          position="absolute"
-                          bottom="0"
-                          bgImage={`url(${wave})`}
-                          bgSize="cover"
-                          width={{ xl: '240px', sm: '200px', base: '140px' }}
-                          height="150px"
-                          p={2}
-                          borderRadius="md"
-                          textAlign="left"
-                          fontFamily="Unbounded"
-                          color="white"
-                        >
-                          <Text
-                            fontWeight="hairline"
-                            mt={7}
-                            ml={2}
-                            fontSize={{ lg: '14px', base: '12px' }}
-                            style={{
-                              display: '-webkit-box',
-                              overflow: 'hidden',
-                              WebkitBoxOrient: 'vertical',
-                              WebkitLineClamp: 2,
-                            }}
-                          >
-                            {event.name}
-                          </Text>
-
-                          <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
-                            {
-                                organizationsMap[event.organization] ||
-                                'Неизвестная организация'
-                              }
-                          </Text>
-                        </Box>
-
-                        <Box
-                          position="absolute"
-                          bottom="10px"
-                          right="10px"
-                          bgColor="white"
-                          color="black"
-                          borderRadius="xl"
-                          p={1}
-                          fontSize={{ xl: 'sm', base: 'xs' }}
-                          fontFamily="Unbounded"
-                        >
-                          <Text>
-                            {Number(event.price) === 0
-                              ? 'Бесплатно'
-                              : `от ${event.price} руб`}
-                          </Text>
-                        </Box>
-                      </VStack>
-                    </Link>
-                  </motion.div>
-                ))}
-            </Flex>
-            {personalizedEvents.length > itemsPerPage && (
-            <HStack justify="flex-end" w={{ xl: '92%', lg: '88%' }} mt={4}>
-              <Button
-                onClick={handlePersonalizedPrev}
-                disabled={personalizedIndex === 0}
-                bg="transparent"
-                mr={2}
-                borderRadius="full"
-                boxShadow="0 0 0 2px white"
-                width={{ xl: '50px', sm: '45px', base: '40px' }}
-                height={{ xl: '50px', sm: '45px', base: '40px' }}
-                _disabled={{ cursor: 'default', opacity: 0.5 }}
-              >
-                <FaArrowLeft color="white" />
-              </Button>
-
-              <Button
-                onClick={handlePersonalizedNext}
-                disabled={
-                  personalizedIndex + itemsPerPage >=
-                  personalizedEvents.length
-                }
-                bg="transparent"
-                borderRadius="full"
-                boxShadow="0 0 0 2px white"
-                width={{ xl: '50px', sm: '45px', base: '40px' }}
-                height={{ xl: '50px', sm: '45px', base: '40px' }}
-                _disabled={{ cursor: 'default', opacity: 0.5 }}
-              >
-                <FaArrowRight color="white" />
-              </Button>
-            </HStack>
-          )}
-          </Box>
-        )}
-        <Box ref={categoriesRef}>
-        {hasVisibleEvents ? (
-          filteredCategories.map(category => {
-            const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
-            
-            if (selectedCategories.length > 0 && !selectedCategories.includes(category.id.toString())) {
-              return null;
-            }
-            if (filteredEvents.length === 0) {
-              return null;
-            }
-            console.log(`Rendering category ${category.name} with events:`, filteredEvents);
-            return (
-              <Box mt={4} id={`category-${category.id}`}  scrollMarginTop="120px" key={category.id} w="100%" p={4} color="white" userSelect="none" zIndex={0}>
-                <Heading
-                  lineHeight={1}
-                  fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
-                  fontFamily="Unbounded"
-                  color="white"
-                  textAlign="center"
-                >
-                  {category.name}
-                </Heading>
-                <Flex justify="center" gap={8} mt={{ base: '35px', lg: '20px', xl: '60px' }} zIndex={2}>
-                  {filteredEvents.length ? (
-                    filteredEvents
-                      .slice(categoryIndexes[category.id] || 0, (categoryIndexes[category.id] || 0) + itemsPerPage)
-                      .map((event, index) => (
-                        <motion.div
-                          key={`${event.id}-${index}`}
-                          initial={{ opacity: 0, x: 50 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -50 }}
-                          transition={{ duration: 0.5, delay: index * 0.2 }}
-                        >
-                          <Link to={`/event/${event.id}`}>
-                            <VStack
                               align="center"
                               textAlign="center"
                               mb={{ xl: 0, md: 0.1 }}
@@ -928,16 +1063,24 @@ const personalizedEvents = Object.values(eventsByCategory)
                               height="100%"
                               w={{ xl: '240px', sm: '200px', base: '140px' }}
                               position="relative"
+                              transition="all .22s ease"
+                              _hover={{
+                                transform: 'translateY(-4px)',
+                                filter: 'drop-shadow(0 14px 24px rgba(8, 14, 40, 0.42))',
+                              }}
                             >
                               <Image
-                                src={event.pictures_main}
+                                src={event.pictures_main || EventImage}
                                 alt={event.name}
                                 width="100%"
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
                                 borderRadius="6px"
                                 objectFit="cover"
+                                boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = EventImage;
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.src = EventImage;
                                 }}
                               />
                               <Box
@@ -952,6 +1095,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                                 textAlign="left"
                                 fontFamily="Unbounded"
                                 color="white"
+                                
                               >
                                 <Text
                                   fontWeight="hairline"
@@ -984,6 +1128,180 @@ const personalizedEvents = Object.values(eventsByCategory)
                                 p={1}
                                 fontSize={{ xl: 'sm', base: 'xs' }}
                                 fontFamily="Unbounded"
+                                border="1px solid rgba(12, 24, 70, 0.2)"
+                                boxShadow="0 6px 16px rgba(13, 18, 45, 0.2)"
+                              >
+                                <Text>{Number(event.price) === 0 ? 'Бесплатно' : `от ${event.price} руб`}</Text>
+                              </Box>
+                            </VStack>
+                    </Link>
+                  </motion.div>
+                ))}
+            </Flex>
+            {personalizedEvents.length > itemsPerPage && (
+            <HStack justify="flex-end" w={{ xl: '92%', lg: '88%' }} mt={4}>
+              <Button
+                onClick={handlePersonalizedPrev}
+                disabled={personalizedIndex === 0}
+                bg="transparent"
+                mr={2}
+                borderRadius="full"
+                boxShadow="0 0 0 2px white"
+                width={{ xl: '50px', sm: '45px', base: '40px' }}
+                height={{ xl: '50px', sm: '45px', base: '40px' }}
+                _disabled={{ cursor: 'default', opacity: 0.5 }}
+                _hover={{ bg: 'rgba(255,255,255,0.12)' }}
+              >
+                <FaArrowLeft color="white" />
+              </Button>
+
+              <Button
+                onClick={handlePersonalizedNext}
+                disabled={
+                  personalizedIndex + itemsPerPage >=
+                  personalizedEvents.length
+                }
+                bg="transparent"
+                borderRadius="full"
+                boxShadow="0 0 0 2px white"
+                width={{ xl: '50px', sm: '45px', base: '40px' }}
+                height={{ xl: '50px', sm: '45px', base: '40px' }}
+                _disabled={{ cursor: 'default', opacity: 0.5 }}
+                _hover={{ bg: 'rgba(255,255,255,0.12)' }}
+              >
+                <FaArrowRight color="white" />
+              </Button>
+            </HStack>
+          )}
+          </Box>
+        )} */}
+        <Box ref={categoriesRef}>
+        {hasVisibleEvents ? (
+          filteredCategories.map(category => {
+            const filteredEvents = filterEventsBySearchQuery(eventsByCategory[category.id] || []);
+            
+            if (selectedCategories.length > 0 && !selectedCategories.includes(category.id.toString())) {
+              return null;
+            }
+            if (filteredEvents.length === 0) {
+              return null;
+            }
+          
+            return (
+              <Box
+                mt={4}
+                id={`category-${category.id}`}
+                scrollMarginTop="120px"
+                key={category.id}
+                w={{base: "700px", xl: "1100px"}}
+                
+                p={4}
+                color="white"
+                userSelect="none"
+                zIndex={0}
+                bg="rgba(17, 23, 58, 0.5)"
+                border="1px solid rgba(255,255,255,0.15)"
+                borderRadius="24px"
+                boxShadow="0 14px 30px rgba(7, 11, 34, 0.24)"
+              >
+                <Heading
+                  lineHeight={1}
+                  fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
+                  fontFamily="Unbounded"
+                  color="white"
+                  textAlign="center"
+                  textShadow="0 8px 22px rgba(0,0,0,0.3)"
+                >
+                  {category.name}
+                </Heading>
+                <Flex justify="center" gap={8} mt={{ base: '35px', lg: '20px', xl: '60px' }} zIndex={2}>
+                  {filteredEvents.length ? (
+                    filteredEvents
+                      .slice(categoryIndexes[category.id] || 0, (categoryIndexes[category.id] || 0) + itemsPerPage)
+                      .map((event, index) => (
+                        <motion.div
+                          key={`${event.id}-${index}`}
+                          initial={{ opacity: 0, x: 50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -50 }}
+                          transition={{ duration: 0.5, delay: index * 0.2 }}
+                        >
+                          <Link to={`/event/${event.id}`}>
+                            <VStack
+                              align="center"
+                              textAlign="center"
+                              mb={{ xl: 0, md: 0.1 }}
+                              gap={1}
+                              height="100%"
+                              w={{ xl: '240px', sm: '200px', base: '140px' }}
+                              position="relative"
+                              transition="all .22s ease"
+                              _hover={{
+                                transform: 'translateY(-4px)',
+                                filter: 'drop-shadow(0 14px 24px rgba(8, 14, 40, 0.42))',
+                              }}
+                            >
+                              <Image
+                                src={event.pictures_main || EventImage}
+                                alt={event.name}
+                                width="100%"
+                                height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
+                                borderRadius="6px"
+                                objectFit="cover"
+                                boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.src = EventImage;
+                                }}
+                              />
+                              <Box
+                                position="absolute"
+                                bottom={{  xl: '0px', md: '0.1px', base: '0px' }}
+                                bgImage={`url(${wave})`}
+                                bgSize="cover"
+                                width={{ xl: '240px', sm: '200px', base: '140px' }}
+                                height="150px"
+                                p={2}
+                                borderRadius="md"
+                                textAlign="left"
+                                fontFamily="Unbounded"
+                                color="white"
+                                
+                              >
+                                <Text
+                                  fontWeight="hairline"
+                                  mt={7}
+                                  ml={2}
+                                  fontSize={{ lg: '14px', base: '12px' }}
+                                  style={{
+                                    display: '-webkit-box',
+                                    overflow: 'hidden',
+                                    WebkitBoxOrient: 'vertical',
+                                    WebkitLineClamp: 2,
+                                  }}
+                                >
+                                  {event.name}
+                                </Text>
+                                <Text fontSize={{ lg: '12px', base: '10px' }} ml={2}>
+                                {
+                                  organizationsMap[event.organization] ||
+                                  'Неизвестная организация'
+                                }
+                                </Text>
+                              </Box>
+                              <Box
+                                position="absolute"
+                                bottom="10px"
+                                right="10px"
+                                bgColor="white"
+                                color="black"
+                                borderRadius="xl"
+                                p={1}
+                                fontSize={{ xl: 'sm', base: 'xs' }}
+                                fontFamily="Unbounded"
+                                border="1px solid rgba(12, 24, 70, 0.2)"
+                                boxShadow="0 6px 16px rgba(13, 18, 45, 0.2)"
                               >
                                 <Text>{Number(event.price) === 0 ? 'Бесплатно' : `от ${event.price} руб`}</Text>
                               </Box>
@@ -998,7 +1316,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                   )}
                 </Flex>
                 {filteredEvents.length > 0 && (
-                  <HStack justify="flex-end" w={{ xl: '105%', lg: '88%' }} mt={4}>
+                  <HStack justify="flex-end" w={{ xl: '100%', lg: '88%' }} mt={4}>
                     <Button
                       onClick={() => handlePrev(category.id)}
                       disabled={(categoryIndexes[category.id] || 0) === 0}
@@ -1009,6 +1327,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                       width={{ xl: '50px',  sm: '45px', base: '40px' }}
                       height={{ xl: '50px', sm: '45px', base: '40px' }}
                       _disabled={{ cursor: 'default', opacity: 0.5 }}
+                      _hover={{ bg: 'rgba(255,255,255,0.12)' }}
                     >
                       <FaArrowLeft color="white"/>
                     </Button>
@@ -1021,6 +1340,7 @@ const personalizedEvents = Object.values(eventsByCategory)
                       width={{ xl: '50px',  sm: '45px', base: '40px' }}
                       height={{ xl: '50px', sm: '45px', base: '40px' }}
                       _disabled={{ cursor: 'default', opacity: 0.5 }}
+                      _hover={{ bg: 'rgba(255,255,255,0.12)' }}
                     >
                       <FaArrowRight color="white"/>
                     </Button>

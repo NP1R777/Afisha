@@ -1,5 +1,16 @@
 # React + TypeScript + Vite
 
+## API configuration
+
+Admin panel and frontend API requests use `VITE_API_URL` when it is provided.
+
+1. Copy `.env.example` to `.env`.
+2. Set `VITE_API_URL` to your backend URL.
+
+If `VITE_API_URL` is not set, the app falls back to:
+- `http://localhost:8000` in development mode;
+- `https://afisha.itcube-norilsk.tech/api` in production mode.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

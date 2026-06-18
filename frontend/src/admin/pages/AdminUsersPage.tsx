@@ -127,7 +127,12 @@ const AdminUsersPage: React.FC = () => {
       setEditForm((prev) => ({ ...prev, password: '' }));
       await loadData();
     } catch (err: any) {
-      setError(err?.message || 'Не удалось сохранить изменения пользователя');
+      const detail = err?.response?.data?.detail;
+      setError(
+        typeof detail === 'string'
+          ? detail
+          : (err?.message || 'Не удалось сохранить изменения пользователя')
+      );
     } finally {
       setSaving(false);
     }

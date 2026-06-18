@@ -1,4 +1,5 @@
 import re
+import random
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, Optional
@@ -11,6 +12,7 @@ from src.parser.schemas import ParsedEventCreate
 from src.parser.utils import (
     absolute_url,
     clean_text,
+    extract_first_time,
     normalize_age_limit,
     normalize_duration,
     normalize_event_date,
@@ -163,6 +165,13 @@ class SourceParseError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class NorthdramaDetailData:
+    description: Optional[str] = None
+    duration: Optional[str] = None
+    gallery_images: tuple[str, ...] = ()
+
+
 def _is_vk_source(config: SourceConfig) -> bool:
     source = config.url.lower()
     return "vk.com/" in source or "vk.ru/" in source or config.key.endswith("_vk")
@@ -216,6 +225,8 @@ def _event_payload(
     age_limit: Optional[str] = None,
     external_url: Optional[str] = None,
     pictures_main: Optional[str] = None,
+    pictures_two: Optional[str] = None,
+    start_time: Optional[str] = None,
 ) -> Optional[ParsedEventCreate]:
     normalized_name = clean_text(name)
     if not normalized_name:
@@ -227,6 +238,9 @@ def _event_payload(
         name=normalized_name,
         description=clean_text(description),
         date_event=normalize_event_date(date_event),
+        start_time=extract_first_time(start_time)
+        or extract_first_time(date_event)
+        or extract_first_time(duration),
         duration=normalize_duration(duration),
         city=clean_text(city) or config.city,
         price=normalize_price(price),
@@ -235,6 +249,7 @@ def _event_payload(
         age_limit=normalize_age_limit(age_limit),
         external_url=clean_text(external_url),
         pictures_main=clean_text(pictures_main),
+        pictures_two=clean_text(pictures_two),
     )
 
 
@@ -442,6 +457,7 @@ def _parse_northdrama(config: SourceConfig, *, max_events: int) -> list[ParsedEv
     soup = BeautifulSoup(response.text, "html.parser")
 
     events: list[ParsedEventCreate] = []
+    detail_cache: dict[str, NorthdramaDetailData] = {}
     for day_item in soup.select("li.performances-timelist__item"):
         day = clean_text(day_item.select_one(".performances-timelist__day").get_text(" ", strip=True) if day_item.select_one(".performances-timelist__day") else None)
         month = clean_text(day_item.select_one(".performances-timelist__month").get_text(" ", strip=True) if day_item.select_one(".performances-timelist__month") else None)
@@ -449,20 +465,175 @@ def _parse_northdrama(config: SourceConfig, *, max_events: int) -> list[ParsedEv
 
         for event_item in day_item.select("li.performances__item"):
             title_link = event_item.select_one("a.performances__title")
+            event_url = absolute_url(config.url, title_link.get("href")) if title_link else None
+            if event_url:
+                detail_data = detail_cache.get(event_url)
+                if detail_data is None:
+                    detail_data = _parse_northdrama_detail_page(
+                        session=session,
+                        detail_url=event_url,
+                        verify_ssl=config.verify_ssl,
+                    )
+                    detail_cache[event_url] = detail_data
+            else:
+                detail_data = NorthdramaDetailData()
+
+            afisha_time = (
+                event_item.select_one(".performances__time").get_text(" ", strip=True)
+                if event_item.select_one(".performances__time")
+                else None
+            )
+            pictures_two = random.choice(detail_data.gallery_images) if detail_data.gallery_images else None
+
             payload = _event_payload(
                 config,
                 name=title_link.get_text(" ", strip=True) if title_link else None,
+                description=detail_data.description,
                 date_event=date_raw,
-                duration=event_item.select_one(".performances__time").get_text(" ", strip=True) if event_item.select_one(".performances__time") else None,
+                duration=detail_data.duration,
+                start_time=afisha_time,
                 price=event_item.select_one(".performances__price").get_text(" ", strip=True) if event_item.select_one(".performances__price") else None,
                 age_limit=event_item.select_one(".mark").get_text(" ", strip=True) if event_item.select_one(".mark") else None,
-                external_url=absolute_url(config.url, title_link.get("href")) if title_link else None,
+                external_url=event_url,
+                pictures_main=_extract_northdrama_afisha_image(event_item, base_url=config.url),
+                pictures_two=pictures_two,
             )
             if payload:
                 events.append(payload)
             if len(events) >= max_events:
                 return events
     return events
+
+
+def _extract_northdrama_afisha_image(event_item, *, base_url: str) -> Optional[str]:
+    for node in event_item.select("img"):
+        if _is_small_image(node):
+            continue
+        for attr in ("data-src", "data-lazy-src", "data-original", "srcset", "src"):
+            candidate = _normalize_image_url(node.get(attr), base_url=base_url)
+            if candidate and _looks_like_main_poster(candidate):
+                return candidate
+
+    for node in event_item.select("[style]"):
+        style = clean_text(node.get("style"))
+        if not style:
+            continue
+        match = re.search(r"url\((['\"]?)(.+?)\1\)", style)
+        if not match:
+            continue
+        candidate = _normalize_image_url(match.group(2), base_url=base_url)
+        if candidate and _looks_like_main_poster(candidate):
+            return candidate
+    return None
+
+
+def _parse_northdrama_detail_page(
+    *,
+    session: requests.Session,
+    detail_url: str,
+    verify_ssl: bool,
+) -> NorthdramaDetailData:
+    try:
+        response = session.get(detail_url, timeout=30, verify=verify_ssl)
+        response.raise_for_status()
+    except requests.RequestException:
+        return NorthdramaDetailData()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    description = _extract_section_text_by_heading(soup, heading_title="Описание")
+    if not description:
+        description = _fetch_page_summary_from_soup(soup)
+
+    duration = _extract_value_by_heading_label(soup, label="Время")
+    gallery_images = tuple(_extract_northdrama_gallery_images(soup, base_url=detail_url))
+    return NorthdramaDetailData(
+        description=description,
+        duration=duration,
+        gallery_images=gallery_images,
+    )
+
+
+def _extract_section_text_by_heading(soup: BeautifulSoup, *, heading_title: str) -> Optional[str]:
+    target = heading_title.lower()
+    heading = soup.find(
+        lambda tag: tag.name in {"h1", "h2", "h3", "h4"}
+        and clean_text(tag.get_text(" ", strip=True))
+        and clean_text(tag.get_text(" ", strip=True)).lower() == target
+    )
+    if not heading:
+        return None
+
+    text_parts: list[str] = []
+    for sibling in heading.find_next_siblings():
+        if sibling.name in {"h1", "h2", "h3", "h4"}:
+            break
+        chunk = clean_text(sibling.get_text(" ", strip=True))
+        if chunk:
+            text_parts.append(chunk)
+    return clean_text("\n".join(text_parts))
+
+
+def _extract_value_by_heading_label(soup: BeautifulSoup, *, label: str) -> Optional[str]:
+    target = label.lower()
+    heading = soup.find(
+        lambda tag: clean_text(tag.get_text(" ", strip=True))
+        and clean_text(tag.get_text(" ", strip=True)).lower() == target
+    )
+    if heading:
+        for sibling in heading.find_next_siblings():
+            if clean_text(sibling.get_text(" ", strip=True)):
+                if sibling.name in {"h1", "h2", "h3", "h4"}:
+                    break
+                return clean_text(sibling.get_text(" ", strip=True))
+
+    text_blob = soup.get_text("\n", strip=True)
+    match = re.search(rf"{re.escape(label)}\s*\n+([^\n]+)", text_blob, flags=re.IGNORECASE)
+    if match:
+        return clean_text(match.group(1))
+    return None
+
+
+def _extract_northdrama_gallery_images(soup: BeautifulSoup, *, base_url: str) -> list[str]:
+    results: list[str] = []
+    seen: set[str] = set()
+
+    def _append_candidate(raw_value: Optional[str], node=None) -> None:
+        candidate = _normalize_image_url(raw_value, base_url=base_url)
+        if not candidate:
+            return
+        if candidate in seen:
+            return
+        if node is not None and _is_small_image(node):
+            return
+        seen.add(candidate)
+        results.append(candidate)
+
+    gallery_heading = soup.find(
+        lambda tag: tag.name in {"h1", "h2", "h3", "h4"}
+        and clean_text(tag.get_text(" ", strip=True))
+        and clean_text(tag.get_text(" ", strip=True)).lower() == "галерея"
+    )
+    if gallery_heading:
+        for sibling in gallery_heading.find_next_siblings():
+            if sibling.name in {"h1", "h2", "h3", "h4"}:
+                break
+            for image in sibling.select("img"):
+                for attr in ("data-src", "data-lazy-src", "data-original", "srcset", "src"):
+                    _append_candidate(image.get(attr), node=image)
+
+    for selector in (
+        ".gallery img",
+        ".gallery__item img",
+        ".swiper-slide img",
+        ".fotorama img",
+        ".splide__slide img",
+        "[data-fancybox] img",
+    ):
+        for image in soup.select(selector):
+            for attr in ("data-src", "data-lazy-src", "data-original", "srcset", "src"):
+                _append_candidate(image.get(attr), node=image)
+
+    return results
 
 
 def _parse_gck(config: SourceConfig, *, max_events: int) -> list[ParsedEventCreate]:

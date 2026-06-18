@@ -4,11 +4,12 @@ from datetime import date, datetime
 from jose import jwt, JWTError
 from database.models import Events, RoleEnum, Roles, User, UserGroupsEvent, UserToEvent
 from sqlalchemy import and_, delete, select
+from sqlalchemy.orm import selectinload
 from core.settings import AppSettings
 from core.session import get_db, get_settings
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.user.auth import create_refresh_token, create_access_token
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, Request
 from src.dependencies.autentification import get_token_payload, get_current_user
 from src.user.schemas import (UserIn, UserOut, TokenResponse, UserUpdate,
                               UserUpdatePreferences, UserUpdateLikeEvents,
@@ -77,6 +78,45 @@ def _serialize_user_admin_payload(
         "created_at": user.created_at,
         "update_at": user.update_at,
         "deleted_at": user.deleted_at,
+    }
+
+
+def _serialize_user_liked_event_payload(event: Events) -> dict:
+    city_value = event.city.value if event.city else None
+    normalized_location = event.address or city_value
+    sorted_slots = sorted(
+        event.time_slots,
+        key=lambda value: (value.date_event, value.start_time),
+    )
+    first_slot = sorted_slots[0] if sorted_slots else None
+    return {
+        "id": event.id,
+        "name": event.name,
+        "description": event.description,
+        "organization": event.organization,
+        "city": city_value,
+        "price": event.price,
+        "address": event.address,
+        "location": normalized_location,
+        "age_limit": event.age_limit,
+        "pictures_main": event.pictures_main,
+        "pictures_two": event.pictures_two,
+        "picture_url": event.pictures_main,
+        "external_url": event.external_url,
+        "date_event": first_slot.date_event if first_slot else None,
+        "start_time": first_slot.start_time if first_slot else None,
+        "time_slots": [
+            {
+                "id": slot.id,
+                "event_id": slot.event_id,
+                "date_event": slot.date_event,
+                "start_time": slot.start_time,
+            }
+            for slot in sorted_slots
+        ],
+        "created_at": event.created_at,
+        "update_at": event.update_at,
+        "deleted_at": event.deleted_at,
     }
 
 @router.post(
@@ -458,17 +498,20 @@ async def get_like_events(user_id: int,
     if not user_data:
         raise HTTPException(status_code=404, detail="Пользователь не найден в базе!")
     else:
-        return (
+        liked_events = (
             await db_connect.execute(
                 select(Events)
                 .join(UserToEvent, UserToEvent.event_id == Events.id)
                 .where(
                     UserToEvent.user_id == user_id,
                     UserToEvent.deleted_at.is_(None),
+                    Events.deleted_at.is_(None),
                 )
+                .options(selectinload(Events.time_slots))
                 .order_by(Events.id.desc())
             )
         ).scalars().all()
+        return [_serialize_user_liked_event_payload(event) for event in liked_events]
 
 
 @router.get(
@@ -531,7 +574,8 @@ async def get_all_user(db_connect: AsyncSession = Depends(get_db)):
 )
 async def change_user_role(
     user_id: int,
-    payload: UserUpdateRole,
+    payload: UserUpdateRole | None = None,
+    role: str | None = Query(default=None),
     db_connect: AsyncSession = Depends(get_db),
 ):
     user = (
@@ -553,7 +597,19 @@ async def change_user_role(
             )
         )
     ).scalar_one_or_none()
-    next_role = RoleEnum(payload.role)
+    resolved_role = (payload.role if payload else None) or role
+    normalized_role = (resolved_role or "").strip().lower()
+    if normalized_role == "organizer":
+        normalized_role = "organizator"
+    if not normalized_role:
+        raise HTTPException(status_code=422, detail="Не передана роль пользователя.")
+    try:
+        next_role = RoleEnum(normalized_role)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Роль должна быть одной из: user, admin, organizator.",
+        ) from exc
     if role_row is None:
         role_row = Roles(user_id=user_id, role=next_role)
         db_connect.add(role_row)

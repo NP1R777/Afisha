@@ -10,6 +10,7 @@ class ParsedEventCreate(BaseModel):
     name: str
     description: Optional[str] = None
     date_event: Optional[str] = None
+    start_time: Optional[str] = None
     duration: Optional[str] = None
     city: Optional[str] = None
     price: Optional[str] = None
@@ -18,6 +19,7 @@ class ParsedEventCreate(BaseModel):
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
     pictures_main: Optional[str] = None
+    pictures_two: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -37,6 +39,23 @@ class ParseDistributeRequest(BaseModel):
 
 class ParseCategoryBackfillRequest(BaseModel):
     limit: int = Field(default=1000, ge=1, le=10000)
+
+
+class ParseImageBackfillRequest(BaseModel):
+    limit: int = Field(default=500, ge=1, le=5000)
+    offset: int = Field(default=0, ge=0)
+    force: bool = False
+
+
+class ParseManualResolveRequest(BaseModel):
+    target_type: Literal["event", "news", "rejected"]
+    group_ids: list[int] = Field(default_factory=list)
+    error_text: Optional[str] = None
+
+
+class ParseStatusUpdateRequest(BaseModel):
+    process_status: Literal["new", "rejected", "error"]
+    error_text: Optional[str] = None
 
 
 class ParseRunStats(BaseModel):
@@ -63,6 +82,7 @@ class ParsedEventOut(BaseModel):
     name: str
     description: Optional[str] = None
     date_event: Optional[str] = None
+    start_time: Optional[str] = None
     duration: Optional[str] = None
     city: Optional[str] = None
     price: Optional[str] = None
@@ -71,6 +91,7 @@ class ParsedEventOut(BaseModel):
     age_limit: Optional[str] = None
     external_url: Optional[str] = None
     pictures_main: Optional[str] = None
+    pictures_two: Optional[str] = None
     target_type: Optional[Literal["event", "news", "unknown"]] = None
     process_status: Optional[Literal["new", "processed", "rejected", "error"]] = None
     processed_at: Optional[datetime] = None
@@ -102,6 +123,40 @@ class ParseCategoryBackfillResponse(BaseModel):
     linked: int
     without_match: int
     errors: int
+
+
+class ParseImageBackfillResponse(BaseModel):
+    requested: int
+    uploaded_main: int
+    uploaded_two: int
+    fallback_main: int
+    fallback_two: int
+    already_minio_main: int
+    already_minio_two: int
+    default_applied_main: int
+    default_applied_two: int
+    errors: int
+
+
+class ParseManualResolveResponse(BaseModel):
+    parsed_event_id: int
+    target_type: Literal["event", "news", "unknown"]
+    process_status: Literal["new", "processed", "rejected", "error"]
+    event_id: Optional[int] = None
+    news_id: Optional[int] = None
+    message: str
+
+
+class ParseStatusUpdateResponse(BaseModel):
+    parsed_event_id: int
+    target_type: Literal["event", "news", "unknown"]
+    process_status: Literal["new", "processed", "rejected", "error"]
+    error_text: Optional[str] = None
+
+
+class ParseDeleteResponse(BaseModel):
+    parsed_event_id: int
+    message: str
 
 
 class ParsedEventListResponse(BaseModel):

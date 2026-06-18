@@ -2,6 +2,7 @@ import re
 from datetime import datetime, time, timedelta
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -22,12 +23,19 @@ from database.models import (
 from src.parser.schemas import (
     ParseCategoryBackfillRequest,
     ParseCategoryBackfillResponse,
+    ParseDeleteResponse,
     ParseDistributeRequest,
     ParseDistributeResponse,
+    ParseImageBackfillRequest,
+    ParseImageBackfillResponse,
     ParseLaunchRequest,
     ParseLaunchResponse,
+    ParseManualResolveRequest,
+    ParseManualResolveResponse,
     ParseRunStats,
     ParseSourceInfo,
+    ParseStatusUpdateRequest,
+    ParseStatusUpdateResponse,
     ParsedEventListResponse,
     ParsedEventOut,
 )
@@ -36,6 +44,12 @@ from src.parser.sources import (
     ParserRuntimeConfig,
     parse_source,
     resolve_source_keys,
+)
+from src.parser.utils import extract_first_time, normalize_event_date
+from src.storage.minio_images import (
+    ImageUploadResult,
+    is_minio_public_url,
+    upload_image_from_url,
 )
 
 
@@ -76,6 +90,7 @@ async def run_parse_and_store(
     total_inserted = 0
     total_duplicates = 0
     total_errors = 0
+    image_url_cache: dict[tuple[str, str], str | None] = {}
     runtime_config = ParserRuntimeConfig(
         vmuzey_proxy=settings.vmuzey_proxy,
         vmuzey_cookies=settings.vmuzey_cookies,
@@ -101,15 +116,34 @@ async def run_parse_and_store(
             errors += 1
 
         for parsed_item in parsed_items:
+            parsed_date = (parsed_item.date_event or "").strip()
+            parsed_start = (parsed_item.start_time or "").strip()
             duplicate_query = await db_connect.execute(
                 select(ParsedEvent.id).where(
+                    ParsedEvent.source_key == parsed_item.source_key,
                     ParsedEvent.name == parsed_item.name,
-                    ParsedEvent.date_event == parsed_item.date_event,
+                    func.coalesce(ParsedEvent.date_event, "") == parsed_date,
+                    func.coalesce(ParsedEvent.start_time, "") == parsed_start,
                 )
             )
             if duplicate_query.scalar_one_or_none():
                 duplicates += 1
                 continue
+
+            parsed_item.pictures_main = _resolve_image_url_for_storage(
+                settings=settings,
+                image_url=parsed_item.pictures_main,
+                default_image_url=settings.default_event_card_image_url,
+                image_url_cache=image_url_cache,
+                object_prefix="events/main",
+            )
+            parsed_item.pictures_two = _resolve_image_url_for_storage(
+                settings=settings,
+                image_url=parsed_item.pictures_two,
+                default_image_url=settings.default_event_detail_image_url,
+                image_url_cache=image_url_cache,
+                object_prefix="events/detail",
+            )
 
             db_connect.add(
                 ParsedEvent(
@@ -118,6 +152,7 @@ async def run_parse_and_store(
                     name=parsed_item.name,
                     description=parsed_item.description,
                     date_event=parsed_item.date_event,
+                    start_time=parsed_item.start_time,
                     duration=parsed_item.duration,
                     city=parsed_item.city,
                     price=parsed_item.price,
@@ -126,6 +161,7 @@ async def run_parse_and_store(
                     age_limit=parsed_item.age_limit,
                     external_url=parsed_item.external_url,
                     pictures_main=parsed_item.pictures_main,
+                    pictures_two=parsed_item.pictures_two,
                     target_type=parsed_item.target_type or "unknown",
                     process_status=parsed_item.process_status or "new",
                     processed_at=parsed_item.processed_at,
@@ -157,6 +193,78 @@ async def run_parse_and_store(
         total_duplicates=total_duplicates,
         total_errors=total_errors,
         stats=stats,
+    )
+
+
+async def backfill_event_images_to_minio(
+    db_connect: AsyncSession,
+    request: ParseImageBackfillRequest,
+    settings: AppSettings,
+) -> ParseImageBackfillResponse:
+    query = (
+        select(Events)
+        .where(Events.deleted_at.is_(None))
+        .order_by(Events.id.asc())
+        .offset(request.offset)
+        .limit(request.limit)
+    )
+    rows = (await db_connect.execute(query)).scalars().all()
+
+    uploaded_main = 0
+    uploaded_two = 0
+    fallback_main = 0
+    fallback_two = 0
+    already_minio_main = 0
+    already_minio_two = 0
+    default_applied_main = 0
+    default_applied_two = 0
+    errors = 0
+    result_cache: dict[tuple[str, str], ImageUploadResult] = {}
+
+    for event in rows:
+        main_result = _backfill_single_event_image(
+            settings=settings,
+            current_url=event.pictures_main,
+            default_image_url=settings.default_event_card_image_url,
+            object_prefix="events/main",
+            result_cache=result_cache,
+            force=request.force,
+        )
+        event.pictures_main = main_result["final_url"]
+        uploaded_main += int(main_result["uploaded"])
+        fallback_main += int(main_result["fallback"])
+        already_minio_main += int(main_result["already_minio"])
+        default_applied_main += int(main_result["default_applied"])
+        errors += int(main_result["error"])
+
+        detail_result = _backfill_single_event_image(
+            settings=settings,
+            current_url=event.pictures_two,
+            default_image_url=settings.default_event_detail_image_url,
+            object_prefix="events/detail",
+            result_cache=result_cache,
+            force=request.force,
+        )
+        event.pictures_two = detail_result["final_url"]
+        uploaded_two += int(detail_result["uploaded"])
+        fallback_two += int(detail_result["fallback"])
+        already_minio_two += int(detail_result["already_minio"])
+        default_applied_two += int(detail_result["default_applied"])
+        errors += int(detail_result["error"])
+
+    await db_connect.flush()
+
+    return ParseImageBackfillResponse(
+        requested=len(rows),
+        uploaded_main=uploaded_main,
+        uploaded_two=uploaded_two,
+        fallback_main=fallback_main,
+        fallback_two=fallback_two,
+        already_minio_main=already_minio_main,
+        already_minio_two=already_minio_two,
+        default_applied_main=default_applied_main,
+        default_applied_two=default_applied_two,
+        errors=errors,
     )
 
 
@@ -202,7 +310,7 @@ async def distribute_parsed_events(
 
             if target_type == ParsedTargetType.event:
                 if await _is_event_duplicate(db_connect, item):
-                    db_connect.delete(item)
+                    await db_connect.delete(item)
                     duplicates_deleted += 1
                     continue
 
@@ -216,7 +324,7 @@ async def distribute_parsed_events(
                 continue
 
             if await _is_news_duplicate(db_connect, item):
-                db_connect.delete(item)
+                await db_connect.delete(item)
                 duplicates_deleted += 1
                 continue
 
@@ -325,6 +433,8 @@ async def list_parsed_events(
     limit: int,
     offset: int = 0,
     source_key: str | None = None,
+    target_type: str | None = None,
+    process_status: str | None = None,
 ) -> ParsedEventListResponse:
     query = select(ParsedEvent).order_by(ParsedEvent.created_at.desc(), ParsedEvent.id.desc())
     count_query = select(func.count(ParsedEvent.id))
@@ -332,6 +442,16 @@ async def list_parsed_events(
     if source_key:
         query = query.where(ParsedEvent.source_key == source_key)
         count_query = count_query.where(ParsedEvent.source_key == source_key)
+
+    target_filter = _parse_target_type_value(target_type)
+    if target_filter:
+        query = query.where(ParsedEvent.target_type == target_filter)
+        count_query = count_query.where(ParsedEvent.target_type == target_filter)
+
+    status_filter = _parse_process_status_value(process_status)
+    if status_filter:
+        query = query.where(ParsedEvent.process_status == status_filter)
+        count_query = count_query.where(ParsedEvent.process_status == status_filter)
 
     total = (await db_connect.execute(count_query)).scalar() or 0
     rows = (await db_connect.execute(query.offset(offset).limit(limit))).scalars().all()
@@ -346,6 +466,7 @@ async def list_parsed_events(
                 name=item.name,
                 description=item.description,
                 date_event=item.date_event,
+                start_time=item.start_time,
                 duration=item.duration,
                 city=item.city,
                 price=item.price,
@@ -354,6 +475,7 @@ async def list_parsed_events(
                 age_limit=item.age_limit,
                 external_url=item.external_url,
                 pictures_main=item.pictures_main,
+                pictures_two=item.pictures_two,
                 target_type=item.target_type.value if item.target_type else None,
                 process_status=item.process_status.value if item.process_status else None,
                 processed_at=item.processed_at,
@@ -362,6 +484,139 @@ async def list_parsed_events(
             )
             for item in rows
         ],
+    )
+
+
+async def resolve_parsed_event_manually(
+    db_connect: AsyncSession,
+    *,
+    parsed_event_id: int,
+    request: ParseManualResolveRequest,
+) -> ParseManualResolveResponse:
+    item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
+    now_utc = datetime.utcnow()
+
+    if request.target_type == "rejected":
+        item.target_type = ParsedTargetType.unknown
+        item.process_status = ParsedProcessStatus.rejected
+        item.processed_at = now_utc
+        item.error_text = (request.error_text or "").strip() or None
+        item.deleted_at = None
+        await db_connect.flush()
+        return ParseManualResolveResponse(
+            parsed_event_id=item.id,
+            target_type=item.target_type.value,
+            process_status=item.process_status.value,
+            event_id=None,
+            news_id=None,
+            message="Запись помечена как отклоненная.",
+        )
+
+    if request.target_type == "event":
+        unique_group_ids = sorted(set(request.group_ids))
+        if not unique_group_ids:
+            raise HTTPException(status_code=400, detail="Для target_type=event нужно передать group_ids.")
+        await _validate_group_ids(db_connect=db_connect, group_ids=unique_group_ids)
+        duplicate_event_id = await _find_event_duplicate_id(db_connect, item)
+        if duplicate_event_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Событие уже существует в events (id={duplicate_event_id}).",
+            )
+
+        event_id = await _insert_event_from_parsed_manual(
+            db_connect=db_connect,
+            item=item,
+            group_ids=unique_group_ids,
+        )
+        item.target_type = ParsedTargetType.event
+        item.process_status = ParsedProcessStatus.processed
+        item.processed_at = now_utc
+        item.error_text = None
+        item.deleted_at = now_utc
+        await db_connect.flush()
+        return ParseManualResolveResponse(
+            parsed_event_id=item.id,
+            target_type=item.target_type.value,
+            process_status=item.process_status.value,
+            event_id=event_id,
+            news_id=None,
+            message="Событие успешно перенесено в events.",
+        )
+
+    duplicate_news_id = await _find_news_duplicate_id(db_connect, item)
+    if duplicate_news_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Новость уже существует в news (id={duplicate_news_id}).",
+        )
+
+    news_id = await _insert_news_from_parsed(db_connect, item)
+    item.target_type = ParsedTargetType.news
+    item.process_status = ParsedProcessStatus.processed
+    item.processed_at = now_utc
+    item.error_text = None
+    item.deleted_at = now_utc
+    await db_connect.flush()
+    return ParseManualResolveResponse(
+        parsed_event_id=item.id,
+        target_type=item.target_type.value,
+        process_status=item.process_status.value,
+        event_id=None,
+        news_id=news_id,
+        message="Запись успешно перенесена в news.",
+    )
+
+
+async def update_parsed_event_status(
+    db_connect: AsyncSession,
+    *,
+    parsed_event_id: int,
+    request: ParseStatusUpdateRequest,
+) -> ParseStatusUpdateResponse:
+    item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
+    next_status = _parse_process_status_value(request.process_status)
+    if not next_status:
+        raise HTTPException(status_code=400, detail="Некорректный статус parsed_event.")
+
+    now_utc = datetime.utcnow()
+    item.process_status = next_status
+
+    if next_status == ParsedProcessStatus.new:
+        item.target_type = ParsedTargetType.unknown
+        item.processed_at = None
+        item.error_text = None
+        item.deleted_at = None
+    elif next_status == ParsedProcessStatus.rejected:
+        item.target_type = ParsedTargetType.unknown
+        item.processed_at = now_utc
+        item.error_text = (request.error_text or "").strip() or None
+        item.deleted_at = None
+    else:
+        item.processed_at = now_utc
+        item.error_text = (request.error_text or "").strip() or "Статус обновлен вручную из админ-панели."
+        item.deleted_at = None
+
+    await db_connect.flush()
+    return ParseStatusUpdateResponse(
+        parsed_event_id=item.id,
+        target_type=item.target_type.value if item.target_type else "unknown",
+        process_status=item.process_status.value if item.process_status else "new",
+        error_text=item.error_text,
+    )
+
+
+async def delete_parsed_event_manually(
+    db_connect: AsyncSession,
+    *,
+    parsed_event_id: int,
+) -> ParseDeleteResponse:
+    item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
+    await db_connect.delete(item)
+    await db_connect.flush()
+    return ParseDeleteResponse(
+        parsed_event_id=parsed_event_id,
+        message="Запись удалена из parsed_event.",
     )
 
 
@@ -378,6 +633,101 @@ async def _cleanup_soft_deleted_parsed(db_connect: AsyncSession) -> int:
 
 def _normalize_text(value: Optional[str]) -> str:
     return " ".join((value or "").strip().split()).lower()
+
+
+def _resolve_image_url_for_storage(
+    *,
+    settings: AppSettings,
+    image_url: str | None,
+    default_image_url: str | None,
+    image_url_cache: dict[tuple[str, str], str | None],
+    object_prefix: str,
+) -> str | None:
+    default_url = _resolve_default_image_url(default_image_url)
+    source_url = (image_url or "").strip() or default_url
+    if not source_url:
+        return None
+    cache_key = (source_url, object_prefix)
+    if cache_key in image_url_cache:
+        return image_url_cache[cache_key]
+
+    result = upload_image_from_url(
+        settings=settings,
+        image_url=source_url,
+        object_prefix=object_prefix,
+    )
+    final_url = (result.final_url or source_url).strip() or None
+    image_url_cache[cache_key] = final_url
+    return final_url
+
+
+def _resolve_default_image_url(default_image_url: str | None) -> str | None:
+    normalized = (default_image_url or "").strip()
+    return normalized or None
+
+
+def _backfill_single_event_image(
+    *,
+    settings: AppSettings,
+    current_url: str | None,
+    default_image_url: str | None,
+    object_prefix: str,
+    result_cache: dict[tuple[str, str], ImageUploadResult],
+    force: bool,
+) -> dict[str, bool | str | None]:
+    normalized_current = (current_url or "").strip()
+    default_url = _resolve_default_image_url(default_image_url)
+    source_url = normalized_current or default_url
+    if not source_url:
+        return {
+            "final_url": None,
+            "uploaded": False,
+            "fallback": False,
+            "already_minio": False,
+            "default_applied": False,
+            "error": False,
+        }
+
+    if not force and is_minio_public_url(source_url, settings):
+        return {
+            "final_url": source_url,
+            "uploaded": False,
+            "fallback": False,
+            "already_minio": True,
+            "default_applied": bool(default_url and source_url == default_url and not normalized_current),
+            "error": False,
+        }
+
+    cache_key = (source_url, object_prefix)
+    if cache_key in result_cache:
+        result = result_cache[cache_key]
+    else:
+        result = upload_image_from_url(
+            settings=settings,
+            image_url=source_url,
+            object_prefix=object_prefix,
+        )
+        result_cache[cache_key] = result
+
+    if not result.final_url:
+        return {
+            "final_url": source_url,
+            "uploaded": False,
+            "fallback": False,
+            "already_minio": False,
+            "default_applied": bool(default_url and source_url == default_url and not normalized_current),
+            "error": True,
+        }
+
+    final_url = result.final_url
+    return {
+        "final_url": final_url,
+        "uploaded": result.uploaded,
+        "fallback": bool(result.fallback_used and not result.uploaded),
+        "already_minio": False,
+        "default_applied": bool(default_url and source_url == default_url and not normalized_current),
+        "error": False,
+    }
 
 
 def _normalize_category_key(name: str) -> Optional[str]:
@@ -552,6 +902,13 @@ def _map_city(value: Optional[str]) -> Optional[CityEnum]:
 
 def _extract_schedule(item: ParsedEvent) -> list[tuple[datetime, time]]:
     seen: set[tuple[datetime, time]] = set()
+    normalized_date = normalize_event_date(item.date_event)
+    normalized_start_time = extract_first_time(item.start_time)
+    if normalized_date and normalized_start_time:
+        schedule_pair = _build_schedule_pair(normalized_date, normalized_start_time)
+        if schedule_pair:
+            seen.add(schedule_pair)
+
     candidates = [item.date_event, item.duration, item.description]
 
     for source in candidates:
@@ -559,16 +916,30 @@ def _extract_schedule(item: ParsedEvent) -> list[tuple[datetime, time]]:
             continue
         for match in DATE_TIME_PATTERN.finditer(source):
             date_part = match.group(1)
-            time_part = match.group(2) or "00:00"
-            try:
-                event_date = datetime.strptime(date_part, "%d.%m.%Y")
-                start_time = datetime.strptime(time_part, "%H:%M").time()
-            except ValueError:
+            time_part = match.group(2)
+            if not time_part:
                 continue
-            event_dt = datetime.combine(event_date.date(), start_time)
-            seen.add((event_dt, start_time))
+            schedule_pair = _build_schedule_pair(date_part, time_part)
+            if schedule_pair:
+                seen.add(schedule_pair)
 
     return sorted(seen, key=lambda item_data: item_data[0])
+
+
+def _build_schedule_pair(date_value: str, time_value: str) -> tuple[datetime, time] | None:
+    normalized_date = normalize_event_date(date_value)
+    normalized_time = extract_first_time(time_value)
+    if not normalized_date or not normalized_time:
+        return None
+
+    try:
+        event_date = datetime.strptime(normalized_date, "%d.%m.%Y")
+        start_time = datetime.strptime(normalized_time, "%H:%M").time()
+    except ValueError:
+        return None
+
+    event_dt = datetime.combine(event_date.date(), start_time)
+    return event_dt, start_time
 
 
 async def _get_or_create_organization_id(
@@ -604,6 +975,11 @@ async def _get_or_create_organization_id(
 
 
 async def _is_event_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bool:
+    duplicate = await _find_event_duplicate_id(db_connect, item)
+    return duplicate is not None
+
+
+async def _find_event_duplicate_id(db_connect: AsyncSession, item: ParsedEvent) -> int | None:
     item_name = _normalize_text(item.name)
     item_address = _normalize_text(item.address)
     item_org = _normalize_text(item.organization)
@@ -629,11 +1005,15 @@ async def _is_event_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bo
         if org_ids:
             query = query.where(Events.organization.in_(org_ids))
 
-    duplicate = (await db_connect.execute(query.limit(1))).scalar_one_or_none()
-    return duplicate is not None
+    return (await db_connect.execute(query.limit(1))).scalar_one_or_none()
 
 
 async def _is_news_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bool:
+    duplicate = await _find_news_duplicate_id(db_connect, item)
+    return duplicate is not None
+
+
+async def _find_news_duplicate_id(db_connect: AsyncSession, item: ParsedEvent) -> int | None:
     item_name = _normalize_text(item.name)
     item_org = _normalize_text(item.organization)
     item_address = _normalize_text(item.address)
@@ -647,8 +1027,7 @@ async def _is_news_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> boo
     if item_address:
         query = query.where(func.coalesce(func.lower(News.address), "") == item_address)
 
-    duplicate = (await db_connect.execute(query.limit(1))).scalar_one_or_none()
-    return duplicate is not None
+    return (await db_connect.execute(query.limit(1))).scalar_one_or_none()
 
 
 async def _insert_event_from_parsed(
@@ -656,7 +1035,7 @@ async def _insert_event_from_parsed(
     item: ParsedEvent,
     *,
     group_lookup: dict[str, list[int]],
-) -> None:
+) -> int:
     organization_id = await _get_or_create_organization_id(
         db_connect,
         name=item.organization,
@@ -671,6 +1050,7 @@ async def _insert_event_from_parsed(
         address=item.address,
         age_limit=item.age_limit,
         pictures_main=item.pictures_main,
+        pictures_two=item.pictures_two,
         external_url=item.external_url,
     )
     db_connect.add(event)
@@ -708,17 +1088,122 @@ async def _insert_event_from_parsed(
         )
 
     await db_connect.flush()
+    return event.id
 
 
-async def _insert_news_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> None:
-    db_connect.add(
-        News(
-            name=item.name,
-            address=item.address,
-            organizator=item.organization,
-        )
+async def _insert_event_from_parsed_manual(
+    db_connect: AsyncSession,
+    *,
+    item: ParsedEvent,
+    group_ids: list[int],
+) -> int:
+    organization_id = await _get_or_create_organization_id(
+        db_connect,
+        name=item.organization,
+        address=item.address,
     )
+    event = Events(
+        name=item.name,
+        description=item.description,
+        organization=organization_id,
+        city=_map_city(item.city),
+        price=_parse_price_value(item.price),
+        address=item.address,
+        age_limit=item.age_limit,
+        pictures_main=item.pictures_main,
+        pictures_two=item.pictures_two,
+        external_url=item.external_url,
+    )
+    db_connect.add(event)
     await db_connect.flush()
+
+    for group_id in group_ids:
+        db_connect.add(EventGroupsEvent(event_id=event.id, groups_id=group_id))
+
+    for event_dt, start_time in _extract_schedule(item):
+        db_connect.add(
+            TimesEvent(
+                event_id=event.id,
+                date_event=event_dt,
+                start_time=start_time,
+            )
+        )
+
+    await db_connect.flush()
+    return event.id
+
+
+async def _insert_news_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> int:
+    news = News(
+        name=item.name,
+        address=item.address,
+        organizator=item.organization,
+    )
+    db_connect.add(news)
+    await db_connect.flush()
+    return news.id
+
+
+async def _get_active_parsed_event_or_404(
+    *,
+    db_connect: AsyncSession,
+    parsed_event_id: int,
+) -> ParsedEvent:
+    item = (
+        await db_connect.execute(
+            select(ParsedEvent).where(
+                ParsedEvent.id == parsed_event_id,
+                ParsedEvent.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Parsed event не найден.")
+    return item
+
+
+async def _validate_group_ids(
+    *,
+    db_connect: AsyncSession,
+    group_ids: list[int],
+) -> None:
+    rows = (
+        await db_connect.execute(
+            select(GroupsEvent.id).where(
+                GroupsEvent.id.in_(group_ids),
+                GroupsEvent.deleted_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    existing_ids = set(rows)
+    missing_ids = [group_id for group_id in group_ids if group_id not in existing_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не найдены категории groups_event: {', '.join(str(group_id) for group_id in missing_ids)}.",
+        )
+
+
+def _parse_target_type_value(value: str | None) -> ParsedTargetType | None:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return None
+    try:
+        return ParsedTargetType(normalized)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in ParsedTargetType)
+        raise HTTPException(status_code=400, detail=f"Некорректный target_type. Разрешено: {allowed}.") from exc
+
+
+def _parse_process_status_value(value: str | None) -> ParsedProcessStatus | None:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return None
+    try:
+        return ParsedProcessStatus(normalized)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in ParsedProcessStatus)
+        raise HTTPException(status_code=400, detail=f"Некорректный process_status. Разрешено: {allowed}.") from exc
 
 
 def list_sources() -> list[ParseSourceInfo]:

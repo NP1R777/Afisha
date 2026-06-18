@@ -2,11 +2,17 @@ import axios from '../../shared/lib/axios';
 import type {
   AdminCategory,
   AdminEvent,
+  AdminParsedEvent,
+  AdminParsedEventListResponse,
   AdminSession,
   AdminUser,
   ParserBackfillPayload,
   ParserDistributePayload,
+  ParserResolvePayload,
   ParserRunPayload,
+  ParserStatusUpdatePayload,
+  ParsedProcessStatus,
+  ParsedTargetType,
   UserRole,
 } from '../types/models';
 
@@ -98,6 +104,60 @@ function parseEvent(item: unknown): AdminEvent {
         start_time: String(rawSlot.start_time || ''),
       };
     }),
+  };
+}
+
+function normalizeParsedTargetType(value: unknown): ParsedTargetType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'event' || normalized === 'news' || normalized === 'unknown') {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeParsedProcessStatus(value: unknown): ParsedProcessStatus | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === 'new' ||
+    normalized === 'processed' ||
+    normalized === 'rejected' ||
+    normalized === 'error'
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+function parseParsedEvent(item: unknown): AdminParsedEvent {
+  const raw = (item || {}) as UnknownRecord;
+  return {
+    id: Number(raw.id || 0),
+    source_key: String(raw.source_key || ''),
+    source_name: String(raw.source_name || ''),
+    name: String(raw.name || ''),
+    description: raw.description ? String(raw.description) : null,
+    date_event: raw.date_event ? String(raw.date_event) : null,
+    start_time: raw.start_time ? String(raw.start_time) : null,
+    duration: raw.duration ? String(raw.duration) : null,
+    city: raw.city ? String(raw.city) : null,
+    price: raw.price !== undefined && raw.price !== null ? String(raw.price) : null,
+    address: raw.address ? String(raw.address) : null,
+    organization: raw.organization !== undefined && raw.organization !== null ? String(raw.organization) : null,
+    age_limit: raw.age_limit ? String(raw.age_limit) : null,
+    external_url: raw.external_url ? String(raw.external_url) : null,
+    pictures_main: raw.pictures_main ? String(raw.pictures_main) : null,
+    pictures_two: raw.pictures_two ? String(raw.pictures_two) : null,
+    target_type: normalizeParsedTargetType(raw.target_type),
+    process_status: normalizeParsedProcessStatus(raw.process_status),
+    processed_at: raw.processed_at ? String(raw.processed_at) : null,
+    error_text: raw.error_text ? String(raw.error_text) : null,
+    created_at: raw.created_at ? String(raw.created_at) : null,
   };
 }
 
@@ -255,8 +315,9 @@ export async function changeUserRole(
   role: UserRole,
   session: AdminSession | null = null
 ): Promise<void> {
+  const roleParam = encodeURIComponent(role);
   await axios.patch(
-    `/user/change_role?user_id=${userId}`,
+    `/user/change_role?user_id=${userId}&role=${roleParam}`,
     { role },
     {
       headers: buildAuthHeaders(session),
@@ -319,15 +380,60 @@ export async function backfillParserCategories(
 }
 
 export async function fetchParsedEvents(
-  params: { limit?: number; offset?: number; source_key?: string },
+  params: {
+    limit?: number;
+    offset?: number;
+    source_key?: string;
+    target_type?: ParsedTargetType;
+    process_status?: ParsedProcessStatus;
+  },
   session: AdminSession | null = null
-): Promise<unknown> {
+): Promise<AdminParsedEventListResponse> {
   const query = new URLSearchParams();
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.offset !== undefined) query.set('offset', String(params.offset));
   if (params.source_key) query.set('source_key', params.source_key);
+  if (params.target_type) query.set('target_type', params.target_type);
+  if (params.process_status) query.set('process_status', params.process_status);
 
   const response = await axios.get(`/parser/events?${query.toString()}`, {
+    headers: buildAuthHeaders(session),
+  });
+  const payload = (response.data || {}) as UnknownRecord;
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  return {
+    total: Number(payload.total || 0),
+    items: items.map(parseParsedEvent),
+  };
+}
+
+export async function resolveParsedEvent(
+  parsedEventId: number,
+  payload: ParserResolvePayload,
+  session: AdminSession | null = null
+): Promise<unknown> {
+  const response = await axios.post(`/parser/events/${parsedEventId}/resolve`, payload, {
+    headers: buildAuthHeaders(session),
+  });
+  return response.data;
+}
+
+export async function updateParsedEventStatus(
+  parsedEventId: number,
+  payload: ParserStatusUpdatePayload,
+  session: AdminSession | null = null
+): Promise<unknown> {
+  const response = await axios.patch(`/parser/events/${parsedEventId}/status`, payload, {
+    headers: buildAuthHeaders(session),
+  });
+  return response.data;
+}
+
+export async function deleteParsedEvent(
+  parsedEventId: number,
+  session: AdminSession | null = null
+): Promise<unknown> {
+  const response = await axios.delete(`/parser/events/${parsedEventId}`, {
     headers: buildAuthHeaders(session),
   });
   return response.data;

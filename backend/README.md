@@ -156,13 +156,19 @@ alembic upgrade head
 - `POST /parser/run` — запуск парсинга вручную;
 - `POST /parser/distribute` — перенос записей из `parsed_event` в `events/news` по rule-based классификации;
 - `POST /parser/categories/backfill` — ручная автопривязка категорий для `events` без категорий;
-- `GET /parser/events` — просмотр собранных событий из staging-таблицы.
+- `POST /parser/images/backfill` — ручная загрузка `events.pictures_main` и `events.pictures_two` в MinIO (batch-режим);
+- `GET /parser/events` — просмотр собранных событий из staging-таблицы (доступны фильтры `source_key`, `target_type`, `process_status`);
+- `POST /parser/events/{parsed_event_id}/resolve` — ручной перенос записи: в `events`, `news` или отметка как `rejected`;
+- `PATCH /parser/events/{parsed_event_id}/status` — ручная смена `process_status` (`new`, `rejected`, `error`) без переноса.
+- `DELETE /parser/events/{parsed_event_id}` — удаление записи из `parsed_event` вручную (например, если это дубликат).
 
 При переносе:
 - `unknown` остаются в `parsed_event` со статусом `new`;
 - успешно перенесенные записи помечаются `deleted_at`, и удаляются физически после 3 дней при следующем запуске переноса;
 - дубли в целевых таблицах удаляются из `parsed_event` сразу (без soft delete).
 - при переносе в `events` автоматически создаются связи в `event_groups_event`, если по правилам удалось определить категорию.
+- при `POST /parser/run` изображения из `pictures_main` и `pictures_two` загружаются в MinIO. Если загрузка неуспешна, сохраняется fallback на исходную внешнюю ссылку.
+- если `pictures_main`/`pictures_two` отсутствуют у источника, в них подставляются дефолтные ссылки из env (`DEFAULT_EVENT_CARD_IMAGE_URL`, `DEFAULT_EVENT_DETAIL_IMAGE_URL`).
 
 ### Подключенные источники
 
@@ -194,11 +200,29 @@ alembic upgrade head
 VMUZEY_PROXY=
 VMUZEY_COOKIES=
 VMUZEY_USER_AGENT=
+
+# MinIO images
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=afisha-images
+MINIO_SECURE=false
+MINIO_PUBLIC_BASE_URL=http://localhost:9000
+MINIO_MAX_IMAGE_SIZE_MB=10
+MINIO_REQUEST_TIMEOUT_SEC=30
+DEFAULT_EVENT_CARD_IMAGE_URL=
+DEFAULT_EVENT_DETAIL_IMAGE_URL=
 ```
 
 - `VMUZEY_PROXY` — URL прокси в формате `http://user:pass@host:port`;
 - `VMUZEY_COOKIES` — cookie-строка вида `name=value; name2=value2`;
 - `VMUZEY_USER_AGENT` — пользовательский User-Agent для запросов к vmuzey.
+- основной MinIO для проекта берётся из `docker-compose.milvus.yml` (единый MinIO для Milvus и картинок).
+- `MINIO_ENDPOINT=localhost:9000` используйте при запуске backend на хосте; если backend запущен в docker в общей сети с MinIO — используйте `minio:9000`.
+- `MINIO_PUBLIC_BASE_URL` — публичная база URL для картинок, которую получает фронт.
+- разрешены MIME: `image/jpeg`, `image/png`, `image/webp`, максимальный размер файла: `10 MB`.
+- `DEFAULT_EVENT_CARD_IMAGE_URL` — дефолтная афиша (для карточки), используется если `pictures_main` не найден.
+- `DEFAULT_EVENT_DETAIL_IMAGE_URL` — дефолт для страницы события, используется если `pictures_two` не найден.
 
 ### Пример запуска парсинга
 

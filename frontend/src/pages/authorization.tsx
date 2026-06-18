@@ -21,7 +21,7 @@ interface LoginModalProps {
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openRegisterModal, onLoginSuccess }) => {
-  const { setUsername, setUserId, login, setCategories } = useUser();
+  const { setUsername, setUserId, setRole, login, setCategories } = useUser();
 
   const {
     register,
@@ -54,6 +54,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openReg
         if (categoriesResponse.status === 200) {
           const categoriesData = categoriesResponse.data;
           setCategories(categoriesData.preferences);
+          setRole(categoriesData.role || null);
 
           // categoriesData.preferences
         } else {

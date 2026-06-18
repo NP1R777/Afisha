@@ -41,11 +41,19 @@ interface Category {
 
 const Account = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { username, userId, setEmail, setBirthdate, categories, setCategories,setUsername } = useUser();
+  const {
+    username,
+    userId,
+    role,
+    setEmail,
+    setBirthdate,
+    categories,
+    setCategories,
+    setUsername
+  } = useUser();
   const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
-  const [isOrganizer, setIsOrganizer] = useState(false);
   const [isOrganizerRegisterOpen, setIsOrganizerRegisterOpen] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
@@ -59,13 +67,6 @@ const Account = () => {
   7: 'Норильский колледж искусств',
 };
 
-useEffect(() => {
-  const organizerFlag = localStorage.getItem('isOrganizer');
-
-  if (organizerFlag) {
-    setIsOrganizer(JSON.parse(organizerFlag));
-  }
-}, []);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => {
@@ -223,12 +224,6 @@ useEffect(() => {
     return name;
   };
 
-  const handleOrganizerRegisterSuccess = async () => {
-  await fetchUserData(); // обновляем данные пользователя
-  setIsOrganizer(true); // сразу переключаем интерфейс
-  setIsOrganizerRegisterOpen(false);
-};
-
   return (
     <ContainerFluid>
       <Toaster />
@@ -373,14 +368,16 @@ useEffect(() => {
                   bg: '#4C6BE6',
                   color: 'white',
                 }}
-                onClick={isOrganizer ? openModal : openOrganizerRegisterModal}
+                onClick={role === 'organizator' ? openModal : openOrganizerRegisterModal}
               >
-                {isOrganizer ? 'Создать мероприятие' : 'Стать организатором'}
+                {role === 'organizator'
+                  ? 'Создать мероприятие'
+                  : 'Стать организатором'}
               </Button>
             </Flex>
           </Box>
         </Box>
-        {!isOrganizer ? (
+        {role !== 'organizator' ? (
         <Box width="100%" mt={15}>
           <Flex direction="column" align="center">
             <Text fontSize={{ base: '24px', md: '49px' }} color="white" fontWeight="bold" userSelect="none" mb={6}>

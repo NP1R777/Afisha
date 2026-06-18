@@ -58,75 +58,6 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         {
             title: 'На всякого мудреца довольно простоты',
             category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-11',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-12',
-            time: '20:30',
-        },{
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-13',
-            time: '20:30',
-        },
-        {
-            title: 'Крадотелетарадыр',
-            category: 'theatre', 
-            organizer: 'Заполярный театр драмы',
-            date: '2026-06-14',
-            time: '12:00',
-        },
-        {
-            title: 'Тартюф',
-            category: 'theatre', 
-            organizer: 'Заполярный театр драмы',
-            date: '2026-06-14',
-            time: '18:00',
-        },
-        {
-            title: '#ЛЮБЛЮНЕМОГУ#',
-            category: 'theatre', 
-            organizer: 'Заполярный театр драмы',
-            date: '2026-06-14',
-            time: '18:00',
-        },
-        {
-            title: 'Движение севера',
-            category: 'theatre', 
-            organizer: 'Городской центр культуры',
-            date: '2026-06-14',
-            time: '18:00',
-        },
-                {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'theatre', 
-            organizer: 'Кинотеатр "Родина"',
-            date: '2026-06-15',
-            time: '20:30',
-        },
-                {
-            title: 'Та сторона, где ветер',
-            category: 'museum', 
-            organizer: 'Кинотеатр "Родина"',
-            date: '2026-06-16',
-            time: '21:30',
-        },
-        {
-            title: 'Волки и овцы',
-            category: 'museum', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-18',
-            time: '10:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
             organizer: 'Кинотеатр "Родина"',
             date: '2026-06-21',
             time: '20:30',
@@ -157,34 +88,6 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
             category: 'cinema', 
             organizer: 'Дворец спорта "Арктика"',
             date: '2026-06-30',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-18',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Дворец спорта "Арктика"',
-            date: '2026-06-18',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-15',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Дворец спорта "Арктика"',
-            date: '2026-06-15',
             time: '20:30',
         },
         {
@@ -271,7 +174,6 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
             date: '2026-06-28',
             time: '20:30',
         },
-
     ];
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);//фильтр по категориям
 
@@ -461,15 +363,15 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                             };
 
                             if (column === 0) {
-                                // левый край
+                                
                                 tooltipStyle.left = "0";
                                 tooltipStyle.transform = "translateY(-120%)";
                             } else if (column === 6) {
-                                // правый край
+                                
                                 tooltipStyle.right = "0";
                                 tooltipStyle.transform = "translateY(-120%)";
                             } else {
-                                // центр
+                                
                                 tooltipStyle.left = "50%";
                                 tooltipStyle.transform = "translate(-50%, -120%)";
                             }
@@ -520,11 +422,11 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
 
                                 if (isFutureMonth) {
                                     if (eventsCount <= 1) {
-                                        bgColor = '#6F8CFF'; // красный
+                                        bgColor = '#6F8CFF';
                                     } else if (eventsCount <= 3) {
-                                        bgColor = '#0021A6'; // желтый
+                                        bgColor = '#0021A6';
                                     } else {
-                                        bgColor = '#000E47'; // зеленый
+                                        bgColor = '#000E47';
                                     }
 
                                     textColor = 'white';

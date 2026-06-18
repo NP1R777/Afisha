@@ -2,6 +2,7 @@ import { Button, Flex, HStack, Image, Input, Separator, Stack, Text,Box } from '
 import { useEffect, useState } from 'react';
 import { LuSearch } from 'react-icons/lu';
 import { Outlet, useNavigate } from 'react-router-dom';
+import axios from '../shared/lib/axios';
 import { useUser } from '../addition/context';
 import { ContainerFluid } from '../components/ui/container';
 import { InputGroup } from '../components/ui/input-group';
@@ -12,7 +13,7 @@ import AiAssistantModal from '../modal/assistant';
 import { useLocation } from 'react-router-dom';
 
 const Layout = () => {
-  const { isAuthenticated, setUsername, setSearchQuery } = useUser();
+  const { isAuthenticated, userId, role, setRole, setUsername, setSearchQuery } = useUser();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const navigate = useNavigate();
@@ -77,10 +78,41 @@ const Layout = () => {
     }
   };
 
+  useEffect(() => {
+    let isCancelled = false;
+    const loadRole = async () => {
+      if (!isAuthenticated || !userId || role) {
+        return;
+      }
+      try {
+        const response = await axios.get(`/user/get_user?user_id=${userId}`);
+        const value = response.data?.role;
+        if (!isCancelled && (value === 'user' || value === 'admin' || value === 'organizator')) {
+          setRole(value);
+        }
+      } catch {
+        // silent fallback for anonymous/invalid sessions
+      }
+    };
+    void loadRole();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAuthenticated, role, setRole, userId]);
+
   return (
     <>
       <ContainerFluid zIndex={2} position="fixed" left={0} right={0} top={5}>
-        <Flex align="center" p={3} bg="#22212C" boxShadow="md" borderRadius="xl" margin="0 auto">
+        <Flex
+          align="center"
+          p={3}
+          bg="rgba(23, 28, 66, 0.82)"
+          boxShadow="0 12px 28px rgba(8, 12, 34, 0.35)"
+          border="1px solid rgba(255,255,255,0.18)"
+          borderRadius="2xl"
+          margin="0 auto"
+          backdropFilter="blur(7px)"
+        >
           <Image
             mr={2}
             src="/icons/logo-filled.svg"
@@ -96,13 +128,13 @@ const Layout = () => {
               <Input
                 variant="outline"
                 placeholder="Поиск"
-                bg="gray.700"
+                bg="rgba(255,255,255,0.12)"
                 h="40px"
                 color="white"
                 flex="1"
                 borderRadius={{ xl: 'xl', lg: 'xl', base: 'lg' }}
-                border="none"
-                _focus={{ border: 'none', boxShadow: 'none' }}
+                border="1px solid rgba(255,255,255,0.2)"
+                _focus={{ border: '1px solid rgba(180, 202, 255, 0.75)', boxShadow: '0 0 0 3px rgba(130, 155, 235, 0.25)' }}
                 _placeholder={{ color: 'gray.300' }}
                 fontSize="14px"
                 fontFamily="Unbounded"
@@ -112,7 +144,15 @@ const Layout = () => {
             </InputGroup>
           </HStack>
           {isAuthenticated ? (
-            <Button bg="transparent" p={{ lg: 3,md: 3, base: 0 }} onClick={handleProfileClick} _hover={{ bg: 'transparent' }}>
+            <Button
+              bg="transparent"
+              border="none"
+              p={{ lg: 3,md: 3, base: 1 }}
+              borderRadius="full"
+              onClick={handleProfileClick}
+              _hover={{ bg: 'transparent' }}
+              _active={{ bg: 'transparent' }}
+            >
               <Image
                 src="/icons/profile.svg"
                 alt="User Icon"
@@ -144,19 +184,27 @@ const Layout = () => {
         <Outlet />
       </Flex>
       <ContainerFluid mt="24px">
-        <Stack>
-          <Separator mt={5} borderColor="black" />
-          <HStack mt={3} align="center" mb={5} justify="space-between" w="100%">
+        <Stack
+            bg="rgba(23, 28, 66, 0.82)"
+            border="1px solid rgba(255,255,255,0.18)"
+            borderRadius="20px"
+            px={{ base: 3, md: 5 }}
+            py={3}
+            boxShadow="0 12px 28px rgba(8, 12, 34, 0.35)"
+            backdropFilter="blur(7px)"
+          >
+          <HStack mt={3} align="center" mb={2} justify="space-between" w="100%">
             <Text
               fontFamily="Unbounded"
-              color="black"
+              color="gray.300"
               fontSize={{ base: '13px', lg: '15px', xl: '18px' }}
               textAlign="left"
+              lineHeight={1.5}
             >
               © {new Date().getFullYear()} "Афиша Норильска" – сайт создан студентами 4 курса Сологубовой Владой и Захаровым Ильёй
             </Text>
             <Image
-              src="/icons/logo-outlined.svg"
+              src="/icons/logo-filled.svg"
               alt="logo"
               boxSize="40px"
               objectFit="contain"
