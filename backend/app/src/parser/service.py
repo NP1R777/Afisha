@@ -942,14 +942,29 @@ def _build_schedule_pair(date_value: str, time_value: str) -> tuple[datetime, ti
     return event_dt, start_time
 
 
+def _resolve_source_link(source_key: Optional[str]) -> Optional[str]:
+    """Return the official website of a parser source, used as the
+    organizer link stored in ``info_organization.organizator``."""
+    if not source_key:
+        return None
+    source = SOURCE_CONFIGS.get(source_key)
+    if not source:
+        return None
+    return (source.url or "").strip() or None
+
+
 async def _get_or_create_organization_id(
     db_connect: AsyncSession,
     name: Optional[str],
     address: Optional[str],
+    *,
+    source_key: Optional[str] = None,
 ) -> Optional[int]:
     normalized_name = (name or "").strip()
     if not normalized_name:
         return None
+
+    source_link = _resolve_source_link(source_key)
 
     existing = (
         await db_connect.execute(
@@ -962,12 +977,18 @@ async def _get_or_create_organization_id(
     if existing:
         if not existing.address and address:
             existing.address = address
+        # Promote the placeholder organizer link (empty or a duplicate of the
+        # name) to the real source website when we know it.
+        if source_link and (
+            not existing.organizator or existing.organizator == existing.name_org
+        ):
+            existing.organizator = source_link
         return existing.id
 
     org = InfoOrganization(
         name_org=normalized_name,
         address=address,
-        organizator=normalized_name,
+        organizator=source_link or normalized_name,
     )
     db_connect.add(org)
     await db_connect.flush()
@@ -1040,6 +1061,7 @@ async def _insert_event_from_parsed(
         db_connect,
         name=item.organization,
         address=item.address,
+        source_key=item.source_key,
     )
     event = Events(
         name=item.name,
@@ -1101,6 +1123,7 @@ async def _insert_event_from_parsed_manual(
         db_connect,
         name=item.organization,
         address=item.address,
+        source_key=item.source_key,
     )
     event = Events(
         name=item.name,
@@ -1134,10 +1157,17 @@ async def _insert_event_from_parsed_manual(
 
 
 async def _insert_news_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> int:
+    organization_id = await _get_or_create_organization_id(
+        db_connect,
+        name=item.organization,
+        address=item.address,
+        source_key=item.source_key,
+    )
     news = News(
         name=item.name,
         address=item.address,
         organizator=item.organization,
+        organization=organization_id,
     )
     db_connect.add(news)
     await db_connect.flush()

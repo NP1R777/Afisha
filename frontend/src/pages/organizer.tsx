@@ -11,12 +11,19 @@ import wave from '../pictures/wave31.png';
 import { Calendar } from '../modal/org_calendar';
 import { useUser } from "../addition/context";
 
+interface TimeSlot {
+    date_event: string;
+    start_time: string;
+}
+
 interface OrganizerEventCard {
     id: number;
     name: string;
     location: string;
     price: number | null;
     pictures_url: string;
+    organization: number | string;
+    time_slots?: TimeSlot[]; // 👈 ВАЖНО
 }
 
 interface OrganizerNewsCard {
@@ -45,7 +52,8 @@ const Organizer = () => {
 
     const [currentIndex, setCurrentIndex] = React.useState(0); 
     const itemsPerPage = 4; 
-    const visibleEvents = events.slice(currentIndex, currentIndex + itemsPerPage);
+    // const visibleEvents = events.slice(currentIndex, currentIndex + itemsPerPage); убраа и добавила нижнее для филтрации вручную
+
 
     const [newsIndex, setNewsIndex] = React.useState(0);
 
@@ -83,6 +91,8 @@ const Organizer = () => {
                             item?.pictures_url ||
                             ''
                         ),
+                    organization: item?.organization,
+                    time_slots: item?.time_slots || [],
                 } as OrganizerEventCard;
             }).filter((item: OrganizerEventCard) => Number.isFinite(item.id) && item.id > 0);
 
@@ -95,7 +105,7 @@ const Organizer = () => {
                 name: String(item?.name || ''),
                 location: String(item?.address || item?.organizator || 'Новость без адреса'),
             } as OrganizerNewsCard)).filter((item: OrganizerNewsCard) => Number.isFinite(item.id) && item.id > 0);
-
+            
             setEvents(normalizedEvents);
             setNewsEvents(normalizedNews);
             setCurrentIndex(0);
@@ -123,6 +133,28 @@ const Organizer = () => {
             setLoadingContent(false);
         }
     }, []);
+    const filteredEvents = React.useMemo(() => {
+    return events.filter(
+        (event) => Number(event.organization) === 1
+    );
+}, [events]);
+
+const visibleEvents = filteredEvents.slice(
+    currentIndex,
+    currentIndex + itemsPerPage
+);
+
+const calendarEvents = React.useMemo(() => {
+  return events
+    .filter(e => Number(e.organization) === 1)
+    .flatMap(e =>
+      (e.time_slots || []).map(slot => ({
+        date: slot.date_event.split("T")[0], // 👉 2026-06-18
+        title: e.name,
+        time: slot.start_time.slice(0, 5) // 👉 21:25
+      }))
+    );
+}, [events]);
 
     React.useEffect(() => {
         let isCancelled = false;
@@ -156,7 +188,9 @@ const Organizer = () => {
     React.useEffect(() => {
         void loadOrganizerContent();
     }, [loadOrganizerContent]);
-
+React.useEffect(() => {
+  window.scrollTo(0, 0);
+}, []);
     return (
         <Flex w="100%">
             {Organizer_picture && (
@@ -280,11 +314,7 @@ const Organizer = () => {
                 {loadingContent ? (
                     <Flex justify="center" mt="20px"><Spinner color="white" /></Flex>
                 ) : null}
-                {contentError ? (
-                    <Box mt={3} bg="rgba(255, 93, 93, 0.2)" borderRadius="12px" p={3}>
-                        <Text color="#ffd8d8">{contentError}</Text>
-                    </Box>
-                ) : null}
+               
                 <Flex justify="center" gap={8} mt="40px" zIndex={2}>
                     {visibleEvents.map((event, index) => (
                     <motion.div
@@ -403,7 +433,7 @@ const Organizer = () => {
                     </Button>
                 </HStack> 
                 </Box>
-                <Box
+                {/* <Box
                 mt={9}
                 w={{base: "700px", xl: "1100px"}}
                 p={4}
@@ -514,7 +544,7 @@ const Organizer = () => {
                     </motion.div>
                     ))}
                     {!loadingContent && visibleNewsEvents.length === 0 ? (
-                        <Text color="white" fontSize="18px">Нет доступных новостей.</Text>
+                        <Text color="white" fontSize="18px">У организатора пока нет новостей</Text>
                     ) : null}
                 </Flex>
 
@@ -545,15 +575,11 @@ const Organizer = () => {
                         <FaArrowRight color="white" />
                     </Button>
                 </HStack>
-                </Box>
+                </Box> */}
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="40px" ml="55px" textAlign="center">
                     План мероприятий
                 </Text>
-                {/* <Calendar
-                    organizerName={organizerName}
-                    canManageEvents={roleResolved && isOrganizerRole}
-                    onEventCreated={loadOrganizerContent}
-                /> */}
+                <Calendar />
             </Box>
         </Flex>
     );

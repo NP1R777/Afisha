@@ -9,14 +9,76 @@ const months = [
 ];
 const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-const testEvents = [
-  { date: "2026-01-12", title: "Спектакль Гамлет", time: "18:00" },
-  { date: "2026-01-12", title: "Балет Лебединое озеро", time: "20:00" },
-  { date: "2026-03-18", title: "Ревизор", time: "19:00" },
-  { date: "2026-07-01", title: "Концерт симфонический", time: "17:30" },
-  { date: "2026-12-05", title: "Щелкунчик", time: "18:00" }
-];
+// const testEvents = [
+//   { date: "2026-01-12", title: "Спектакль Гамлет", time: "18:00" },
+//   { date: "2026-01-12", title: "Балет Лебединое озеро", time: "20:00" },
+//   { date: "2026-03-18", title: "Ревизор", time: "19:00" },
+//   { date: "2026-07-01", title: "Концерт симфонический", time: "17:30" },
+//   { date: "2026-12-05", title: "Щелкунчик", time: "18:00" }
+// ];
 
+const mockEvents = [
+  {
+    organization: 1,
+    name: "Спектакль Гамлет",
+    time_slots: [
+      {
+        date_event: "2026-06-19T00:00:00",
+        start_time: "18:00:00",
+      },
+    ],
+  },
+  {
+    organization: 1,
+    name: "Ханума",
+    time_slots: [
+      {
+        date_event: "2026-06-20T00:00:00",
+        start_time: "20:00:00",
+      },
+    ],
+  },
+  {
+    organization: 1,
+    name: "Зелёная коляска",
+    time_slots: [
+      {
+        date_event: "2026-06-20T00:00:00",
+        start_time: "18:00:00",
+      },
+    ],
+  },
+  {
+    organization: 1,
+    name: "Сон в летнюю ночь",
+    time_slots: [
+      {
+        date_event: "2026-06-18T00:00:00",
+        start_time: "18:00:00",
+      },
+    ],
+  },
+  {
+    organization: 1,
+    name: "Преступник со справкой",
+    time_slots: [
+      {
+        date_event: "2026-06-21T00:00:00",
+        start_time: "17:30:00",
+      },
+    ],
+  },
+  {
+    organization: 1,
+    name: "Капитанская дочка",
+    time_slots: [
+      {
+        date_event: "2026-06-27T00:00:00",
+        start_time: "18:00:00",
+      },
+    ],
+  },
+];
 type Day = { value: number; isCurrentMonth: boolean };
 
 // Генерация дней для месяца
@@ -42,17 +104,44 @@ function generateDaysForMonth(monthIndex: number): Day[] {
   return daysArray;
 }
 
-// Получение событий для конкретного дня
-function getEventsForDay(day: Day, monthIndex: number) {
-  if (!day.isCurrentMonth) return [];
-  const month = String(monthIndex + 1).padStart(2, "0");
-  const date = String(day.value).padStart(2, "0");
-  const fullDate = `2026-${month}-${date}`;
-  return testEvents.filter(e => e.date === fullDate);
-}
+
+
+type CalendarEvent = {
+  date: string;
+  title: string;
+  time: string;
+  organization?: number | string;
+};
+
+type Props = {
+  events: any[]; // временно, потому что API сложный
+};
 
 export const Calendar: React.FC = () => {
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const orgEvents = React.useMemo(() => {
+  return mockEvents.filter(e => Number(e.organization) === 1);
+}, []);
+
+const calendarEvents = React.useMemo(() => {
+  return mockEvents.flatMap(e =>
+    (e.time_slots || []).map((slot: any) => ({
+      date: slot.date_event.split("T")[0],
+      title: e.name,
+      time: slot.start_time.slice(0, 5),
+    }))
+  );
+}, []);
+
+  const getEventsForDay = (day: Day, monthIndex: number) => {
+    if (!day.isCurrentMonth) return [];
+
+    const month = String(monthIndex + 1).padStart(2, "0");
+    const date = String(day.value).padStart(2, "0");
+    const fullDate = `2026-${month}-${date}`;
+
+    return calendarEvents.filter(e => e.date === fullDate);
+  };
 
   return (
     <Box bg="#6B84EA" w="95%" py={7} borderRadius="20px" mt={10} ml="auto">
