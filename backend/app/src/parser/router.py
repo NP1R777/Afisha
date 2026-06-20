@@ -72,7 +72,11 @@ async def distribute_parser_events(
     db_connect: AsyncSession = Depends(get_db),
     settings: AppSettings = Depends(get_settings),
 ) -> ParseDistributeResponse:
-    result = await distribute_parsed_events(db_connect=db_connect, request=payload)
+    result = await distribute_parsed_events(
+        db_connect=db_connect,
+        request=payload,
+        settings=settings,
+    )
     try:
         await sync_events_vector_index(
             db_connect=db_connect,
@@ -151,6 +155,7 @@ async def resolve_parsed_event(
         db_connect=db_connect,
         parsed_event_id=parsed_event_id,
         request=payload,
+        settings=settings,
     )
     if result.target_type == "event" and result.process_status == "processed":
         try:

@@ -3,9 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from core.session import get_db
+from core.session import get_db, get_settings
+from core.settings import AppSettings
 from database.models import Events, News, InfoOrganization
 from src.event.router import _serialize_event
+from src.parser.sources import DEFAULT_ORGANIZATION_DESCRIPTION
 
 router = APIRouter()
 
@@ -48,6 +50,7 @@ async def get_organization_page(
     events_limit: int = Query(default=50, ge=1, le=200),
     news_limit: int = Query(default=50, ge=1, le=200),
     db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
 ):
     organization = (
         await db_connect.execute(
@@ -95,6 +98,9 @@ async def get_organization_page(
         "name_org": organization.name_org,
         "address": organization.address,
         "organizator": organization.organizator,
+        "description": organization.description or DEFAULT_ORGANIZATION_DESCRIPTION,
+        "picture_org": organization.picture_org or settings.default_event_detail_image_url,
+        "external_url": organization.external_url or organization.organizator,
         "created_at": organization.created_at,
         "update_at": organization.update_at,
         "deleted_at": organization.deleted_at,
