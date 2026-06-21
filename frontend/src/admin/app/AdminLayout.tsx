@@ -1,6 +1,6 @@
 import { Box, Button, Flex, HStack, Text, VStack } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { FiActivity, FiCpu, FiDatabase, FiHome, FiLogOut, FiUsers } from 'react-icons/fi';
+import { FiActivity, FiBriefcase, FiCpu, FiDatabase, FiHome, FiLogOut, FiUsers } from 'react-icons/fi';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAdminAuth } from './AdminAuthContext';
 
@@ -9,6 +9,7 @@ const MotionBox = motion(Box);
 const navItems = [
   { to: '/admin/dashboard', label: 'Дашборд', icon: FiHome },
   { to: '/admin/events', label: 'Мероприятия', icon: FiActivity },
+  { to: '/admin/organizations', label: 'Организации', icon: FiBriefcase },
   { to: '/admin/users', label: 'Пользователи', icon: FiUsers },
   { to: '/admin/parser', label: 'Парсер', icon: FiDatabase },
   { to: '/admin/ai', label: 'AI Индексация', icon: FiCpu },
@@ -17,6 +18,7 @@ const navItems = [
 const pageTitles: Record<string, string> = {
   '/admin/dashboard': 'Панель администратора',
   '/admin/events': 'Управление мероприятиями',
+  '/admin/organizations': 'Управление организациями',
   '/admin/users': 'Управление пользователями',
   '/admin/parser': 'Управление парсером',
   '/admin/ai': 'Индексация AI / Embeddings',
