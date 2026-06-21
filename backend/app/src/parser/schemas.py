@@ -47,6 +47,12 @@ class ParseImageBackfillRequest(BaseModel):
     force: bool = False
 
 
+class ParseOrganizationBackfillRequest(BaseModel):
+    source_keys: Optional[list[str]] = None
+    include_reserve: bool = False
+    force: bool = False
+
+
 class ParseManualResolveRequest(BaseModel):
     target_type: Literal["event", "news", "rejected"]
     group_ids: list[int] = Field(default_factory=list)
@@ -136,6 +142,23 @@ class ParseImageBackfillResponse(BaseModel):
     default_applied_main: int
     default_applied_two: int
     errors: int
+
+
+class ParseOrganizationBackfillItem(BaseModel):
+    source_key: str
+    organization: str
+    organization_id: Optional[int] = None
+    created: bool = False
+    updated: bool = False
+    error: Optional[str] = None
+
+
+class ParseOrganizationBackfillResponse(BaseModel):
+    requested: int
+    created: int
+    updated: int
+    errors: int
+    items: list[ParseOrganizationBackfillItem]
 
 
 class ParseManualResolveResponse(BaseModel):
