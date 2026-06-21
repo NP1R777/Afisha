@@ -1,234 +1,169 @@
 import React from "react";
-import { Box, Grid, VStack, Text, Flex } from "@chakra-ui/react";
+import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 
-const days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const months = [
+const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const MONTHS = [
   "Январь", "Февраль", "Март", "Апрель",
   "Май", "Июнь", "Июль", "Август",
-  "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+  "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 ];
-const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-// const testEvents = [
-//   { date: "2026-01-12", title: "Спектакль Гамлет", time: "18:00" },
-//   { date: "2026-01-12", title: "Балет Лебединое озеро", time: "20:00" },
-//   { date: "2026-03-18", title: "Ревизор", time: "19:00" },
-//   { date: "2026-07-01", title: "Концерт симфонический", time: "17:30" },
-//   { date: "2026-12-05", title: "Щелкунчик", time: "18:00" }
-// ];
-
-const mockEvents = [
-  {
-    organization: 1,
-    name: "Спектакль Гамлет",
-    time_slots: [
-      {
-        date_event: "2026-06-19T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Ханума",
-    time_slots: [
-      {
-        date_event: "2026-06-20T00:00:00",
-        start_time: "20:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Зелёная коляска",
-    time_slots: [
-      {
-        date_event: "2026-06-20T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Сон в летнюю ночь",
-    time_slots: [
-      {
-        date_event: "2026-06-18T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Преступник со справкой",
-    time_slots: [
-      {
-        date_event: "2026-06-21T00:00:00",
-        start_time: "17:30:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Капитанская дочка",
-    time_slots: [
-      {
-        date_event: "2026-06-27T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-];
 type Day = { value: number; isCurrentMonth: boolean };
 
-// Генерация дней для месяца
-function generateDaysForMonth(monthIndex: number): Day[] {
-  const year = 2026;
-  const daysInMonth = monthLengths[monthIndex];
+type CalendarSlot = {
+  date_event: string;
+  start_time: string;
+};
+
+type CalendarSourceEvent = {
+  id: number;
+  name: string;
+  time_slots?: CalendarSlot[];
+};
+
+type CalendarEvent = {
+  eventId: number;
+  date: string;
+  title: string;
+  time: string;
+};
+
+type CalendarProps = {
+  events?: CalendarSourceEvent[];
+  organizerName?: string;
+  canManageEvents?: boolean;
+  onEventCreated?: () => void;
+};
+
+function generateDaysForMonth(year: number, monthIndex: number): Day[] {
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const startDay = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
   const daysArray: Day[] = [];
   const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
-  const prevMonthDays = monthLengths[prevMonthIndex];
+  const prevMonthYear = monthIndex === 0 ? year - 1 : year;
+  const prevMonthDays = new Date(prevMonthYear, prevMonthIndex + 1, 0).getDate();
 
-  for (let i = startDay - 1; i >= 0; i--) {
-    daysArray.push({ value: prevMonthDays - i, isCurrentMonth: false });
+  for (let index = startDay - 1; index >= 0; index -= 1) {
+    daysArray.push({ value: prevMonthDays - index, isCurrentMonth: false });
   }
-  for (let d = 1; d <= daysInMonth; d++) {
-    daysArray.push({ value: d, isCurrentMonth: true });
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    daysArray.push({ value: day, isCurrentMonth: true });
   }
   let nextMonthDay = 1;
   while (daysArray.length < 42) {
     daysArray.push({ value: nextMonthDay, isCurrentMonth: false });
-    nextMonthDay++;
+    nextMonthDay += 1;
   }
   return daysArray;
 }
 
+function formatDate(year: number, monthIndex: number, day: number): string {
+  const month = String(monthIndex + 1).padStart(2, "0");
+  const date = String(day).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+}
 
+function normalizeSlotDate(rawDate: string): string {
+  return (rawDate || "").split("T")[0];
+}
 
-type CalendarEvent = {
-  date: string;
-  title: string;
-  time: string;
-  organization?: number | string;
-};
+function normalizeSlotTime(rawTime: string): string {
+  return (rawTime || "").slice(0, 5);
+}
 
-type Props = {
-  events: any[]; // временно, потому что API сложный
-};
-
-export const Calendar: React.FC = () => {
+export const Calendar: React.FC<CalendarProps> = ({ events = [] }) => {
+  const currentYear = new Date().getFullYear();
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
-  const orgEvents = React.useMemo(() => {
-  return mockEvents.filter(e => Number(e.organization) === 1);
-}, []);
 
-const calendarEvents = React.useMemo(() => {
-  return mockEvents.flatMap(e =>
-    (e.time_slots || []).map((slot: any) => ({
-      date: slot.date_event.split("T")[0],
-      title: e.name,
-      time: slot.start_time.slice(0, 5),
-    }))
-  );
-}, []);
+  const calendarEvents = React.useMemo<CalendarEvent[]>(() => {
+    return events.flatMap((event) =>
+      (event.time_slots || []).map((slot) => ({
+        eventId: event.id,
+        date: normalizeSlotDate(slot.date_event),
+        title: event.name,
+        time: normalizeSlotTime(slot.start_time),
+      }))
+    );
+  }, [events]);
 
   const getEventsForDay = (day: Day, monthIndex: number) => {
-    if (!day.isCurrentMonth) return [];
-
-    const month = String(monthIndex + 1).padStart(2, "0");
-    const date = String(day.value).padStart(2, "0");
-    const fullDate = `2026-${month}-${date}`;
-
-    return calendarEvents.filter(e => e.date === fullDate);
+    if (!day.isCurrentMonth) {
+      return [];
+    }
+    const fullDate = formatDate(currentYear, monthIndex, day.value);
+    return calendarEvents.filter((event) => event.date === fullDate);
   };
 
   return (
     <Box bg="#6B84EA" w="95%" py={7} borderRadius="20px" mt={10} ml="auto">
       <VStack gap={6} align="center">
         <Box bg="#A3B3F2" color="white" px={4} py={2} borderRadius="20px">
-          <Text fontSize="xl" textAlign="center">2026 год</Text>
+          <Text fontSize="xl" textAlign="center">{currentYear} год</Text>
         </Box>
-        <Grid templateColumns="repeat(4, 1fr)" gap={6}>
-          {Array.from({ length: 12 }).map((_, i) => (
+        <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", xl: "repeat(4, 1fr)" }} gap={6}>
+          {MONTHS.map((monthName, monthIndex) => (
             <Box
-              key={i}
+              key={monthName}
               bg="#A3B3F2"
               borderRadius="20px"
               p={4}
               color="white"
-              w="270px"
+              w={{ base: "100%", sm: "270px" }}
               boxShadow="lg"
             >
               <Text fontWeight="bold" mb={2} textAlign="center">
-                {months[i]}
+                {monthName}
               </Text>
               <Grid templateColumns="repeat(7, 1fr)" gap={1} mb={2}>
-                {days.map(d => (
-                  <Text key={d} fontSize="xs" textAlign="center" opacity={0.8}>
-                    {d}
+                {DAYS.map((dayName) => (
+                  <Text key={dayName} fontSize="xs" textAlign="center" opacity={0.8}>
+                    {dayName}
                   </Text>
                 ))}
               </Grid>
               <Grid templateColumns="repeat(7, 1fr)" gap={1}>
-                {generateDaysForMonth(i).map((day, idx) => {
-                  const eventsForDay = getEventsForDay(day, i);
+                {generateDaysForMonth(currentYear, monthIndex).map((day, dayIndex) => {
+                  const eventsForDay = getEventsForDay(day, monthIndex);
                   const active = eventsForDay.length > 0;
-                  const month = String(i + 1).padStart(2, "0");
-                  const date = String(day.value).padStart(2, "0");
-                  const fullDate = `2026-${month}-${date}`;
+                  const fullDate = formatDate(currentYear, monthIndex, day.value);
 
                   return (
-                    <Box key={idx} position="relative">
-                      <Box
-                        textAlign="center"
-                        fontSize="sm"
-                        p={1}
-                        borderRadius="6px"
-                        bg={active ? "#6B84EA" : "transparent"}
-                        color={
-                          active
-                            ? "white"
-                            : day.isCurrentMonth
-                            ? "white"
-                            : "gray.400"
-                        }
-                        cursor={active ? "pointer" : "default"}
-                        _hover={active ? { bg: "#4C6BE6" } : {}}
-                        onMouseEnter={() => active && setHoveredDate(fullDate)}
-                        onMouseLeave={() => setHoveredDate(null)}
-                      >
-                        {day.value}
-                      </Box>
-
-                      {/* Всплывающий блок с мероприятиями */}
-                      {active && hoveredDate === fullDate && (
+                    <Box
+                      key={`${monthName}-${dayIndex}`}
+                      h="32px"
+                      lineHeight="32px"
+                      textAlign="center"
+                      borderRadius="md"
+                      cursor={active ? "pointer" : "default"}
+                      bg={active ? "#3D5AFE" : "transparent"}
+                      color={day.isCurrentMonth ? "white" : "whiteAlpha.500"}
+                      fontWeight={active ? "bold" : "normal"}
+                      position="relative"
+                      onMouseEnter={() => active && setHoveredDate(fullDate)}
+                      onMouseLeave={() => setHoveredDate(null)}
+                    >
+                      {day.value}
+                      {hoveredDate === fullDate && active && (
                         <Box
                           position="absolute"
-                          bottom="120%"
+                          top="36px"
                           left="50%"
                           transform="translateX(-50%)"
-                          bg="#4C6BE6"
-                          color="white"
-                          p={3}
-                          borderRadius="10px"
-                          w="250px"
-                          zIndex={10}
-                          boxShadow="lg"
+                          bg="white"
+                          color="black"
+                          borderRadius="lg"
+                          p={2}
+                          minW="210px"
+                          zIndex={20}
+                          boxShadow="xl"
+                          textAlign="left"
                         >
-                          <Text textAlign="center" fontWeight="bold" fontSize="sm" mb={2}>
-                            {fullDate.split("-").reverse().join(".")}
-                          </Text>
-                          <VStack align="start" gap={2}>
-                            {eventsForDay.map((event, idx) => (
-                              <Box key={idx} w="100%">
-                                <Flex justify="space-between" align="center" fontSize="sm">
-                                  <Text fontWeight="medium">{event.title}</Text>
-                                  <Text alignSelf="flex-start">{event.time}</Text>
-                                </Flex>
-                              </Box>
-                            ))}
-                          </VStack>
+                          {eventsForDay.map((event) => (
+                            <Box key={`${event.eventId}-${event.time}`} mb={1}>
+                              <Text fontSize="12px" fontWeight="bold">{event.title}</Text>
+                              <Text fontSize="11px">{event.time || "Время не указано"}</Text>
+                            </Box>
+                          ))}
                         </Box>
                       )}
                     </Box>
@@ -238,6 +173,9 @@ const calendarEvents = React.useMemo(() => {
             </Box>
           ))}
         </Grid>
+        {!calendarEvents.length ? (
+          <Text color="white" opacity={0.85}>У организатора пока нет запланированных мероприятий.</Text>
+        ) : null}
       </VStack>
     </Box>
   );
