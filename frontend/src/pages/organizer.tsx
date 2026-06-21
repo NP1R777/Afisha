@@ -39,8 +39,26 @@ interface OrganizationDetails {
   picture_org: string | null;
   external_url: string | null;
   organizator: string | null;
-  events: any[];
-  news: any[];
+  events: OrganizationEventResponse[];
+  news: OrganizationNewsResponse[];
+}
+
+interface OrganizationEventResponse {
+  id?: number;
+  name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  price?: number | string | null;
+  pictures_main?: string | null;
+  pictures_url?: string | null;
+  time_slots?: TimeSlot[];
+}
+
+interface OrganizationNewsResponse {
+  id?: number;
+  name?: string | null;
+  address?: string | null;
+  organizator?: string | null;
 }
 
 interface OrganizationsListResponse {
@@ -56,27 +74,36 @@ const CITY_LABELS: Record<string, string> = {
   dudinka: "Дудинка",
 };
 
-function normalizeEvent(item: any): OrganizerEventCard {
+function normalizeEvent(item: OrganizationEventResponse): OrganizerEventCard {
   const cityRaw = (item?.city || "").toString().toLowerCase();
+  const priceValue = Number(item.price);
   return {
     id: Number(item?.id),
     name: String(item?.name || ""),
     location: String(item?.address || CITY_LABELS[cityRaw] || "Адрес не указан"),
     price:
-      item?.price !== null && item?.price !== undefined && !Number.isNaN(Number(item.price))
-        ? Number(item.price)
+      item?.price !== null && item?.price !== undefined && !Number.isNaN(priceValue)
+        ? priceValue
         : null,
     pictures_url: String(item?.pictures_main || item?.pictures_url || ""),
     time_slots: Array.isArray(item?.time_slots) ? item.time_slots : [],
   };
 }
 
-function normalizeNews(item: any): OrganizerNewsCard {
+function normalizeNews(item: OrganizationNewsResponse): OrganizerNewsCard {
   return {
     id: Number(item?.id),
     name: String(item?.name || ""),
     location: String(item?.address || item?.organizator || "Новость без адреса"),
   };
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    return typeof detail === "string" ? detail : error.message || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
 }
 
 const Organizer = () => {
@@ -119,11 +146,11 @@ const Organizer = () => {
       setContentError(null);
       try {
         await loadFirstOrganization();
-      } catch (err: any) {
+      } catch (err: unknown) {
         setOrganization(null);
         setEvents([]);
         setNewsEvents([]);
-        setContentError(err?.message || "Не удалось найти организацию.");
+        setContentError(getErrorMessage(err, "Не удалось найти организацию."));
       } finally {
         setLoadingContent(false);
       }
@@ -156,12 +183,11 @@ const Organizer = () => {
       setNewsEvents(normalizedNews);
       setCurrentIndex(0);
       setNewsIndex(0);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
+    } catch (err: unknown) {
       setOrganization(null);
       setEvents([]);
       setNewsEvents([]);
-      setContentError(typeof detail === "string" ? detail : err?.message || "Не удалось загрузить данные организации.");
+      setContentError(getErrorMessage(err, "Не удалось загрузить данные организации."));
     } finally {
       setLoadingContent(false);
     }
