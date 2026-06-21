@@ -30,6 +30,9 @@ type CalendarEvent = {
 
 type CalendarProps = {
   events?: CalendarSourceEvent[];
+  organizerName?: string;
+  canManageEvents?: boolean;
+  onEventCreated?: () => void;
 };
 
 function generateDaysForMonth(year: number, monthIndex: number): Day[] {
