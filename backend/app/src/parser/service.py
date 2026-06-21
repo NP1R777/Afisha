@@ -32,6 +32,9 @@ from src.parser.schemas import (
     ParseLaunchResponse,
     ParseManualResolveRequest,
     ParseManualResolveResponse,
+    ParseOrganizationBackfillItem,
+    ParseOrganizationBackfillRequest,
+    ParseOrganizationBackfillResponse,
     ParseRunStats,
     ParseSourceInfo,
     ParseStatusUpdateRequest,
@@ -268,6 +271,66 @@ async def backfill_event_images_to_minio(
         default_applied_main=default_applied_main,
         default_applied_two=default_applied_two,
         errors=errors,
+    )
+
+
+async def backfill_organization_info(
+    db_connect: AsyncSession,
+    request: ParseOrganizationBackfillRequest,
+    settings: AppSettings,
+) -> ParseOrganizationBackfillResponse:
+    source_keys = resolve_source_keys(
+        source_keys=request.source_keys,
+        include_reserve=request.include_reserve,
+    )
+    organization_info_cache: dict[str, OrganizationSourceInfo] = {}
+    organization_image_cache: dict[tuple[str, str], str | None] = {}
+    items: list[ParseOrganizationBackfillItem] = []
+    created = 0
+    updated = 0
+    errors = 0
+
+    for source_key in source_keys:
+        source = SOURCE_CONFIGS[source_key]
+        try:
+            organization_id, was_created, was_updated = await _upsert_organization_info(
+                db_connect=db_connect,
+                name=source.organization,
+                address=None,
+                source_key=source_key,
+                settings=settings,
+                organization_info_cache=organization_info_cache,
+                organization_image_cache=organization_image_cache,
+                force=request.force,
+            )
+            created += int(was_created)
+            updated += int(was_updated)
+            items.append(
+                ParseOrganizationBackfillItem(
+                    source_key=source_key,
+                    organization=source.organization,
+                    organization_id=organization_id,
+                    created=was_created,
+                    updated=was_updated,
+                )
+            )
+        except Exception as exc:
+            errors += 1
+            items.append(
+                ParseOrganizationBackfillItem(
+                    source_key=source_key,
+                    organization=source.organization,
+                    error=str(exc)[:500],
+                )
+            )
+
+    await db_connect.flush()
+    return ParseOrganizationBackfillResponse(
+        requested=len(source_keys),
+        created=created,
+        updated=updated,
+        errors=errors,
+        items=items,
     )
 
 
@@ -1032,7 +1095,26 @@ def _resolve_organization_picture_url(
     )
 
 
-async def _get_or_create_organization_id(
+def _should_update_value(
+    current_value: str | None,
+    next_value: str | None,
+    *,
+    force: bool,
+    fallback_value: str | None = None,
+) -> bool:
+    normalized_current = (current_value or "").strip()
+    normalized_next = (next_value or "").strip()
+    if not normalized_next:
+        return False
+    if force:
+        return normalized_current != normalized_next
+    if not normalized_current:
+        return True
+    normalized_fallback = (fallback_value or "").strip()
+    return bool(normalized_fallback and normalized_current == normalized_fallback)
+
+
+async def _upsert_organization_info(
     db_connect: AsyncSession,
     name: Optional[str],
     address: Optional[str],
@@ -1041,10 +1123,11 @@ async def _get_or_create_organization_id(
     settings: AppSettings,
     organization_info_cache: dict[str, OrganizationSourceInfo],
     organization_image_cache: dict[tuple[str, str], str | None],
-) -> Optional[int]:
+    force: bool = False,
+) -> tuple[Optional[int], bool, bool]:
     normalized_name = (name or "").strip()
     if not normalized_name:
-        return None
+        return None, False, False
 
     source_info = _get_organization_source_info(
         source_key=source_key,
@@ -1053,11 +1136,13 @@ async def _get_or_create_organization_id(
     )
     source_link = source_info.external_url or _resolve_source_link(source_key)
     description = (source_info.description or "").strip() or DEFAULT_ORGANIZATION_DESCRIPTION
+    organization_address = (source_info.address or address or "").strip() or None
     picture_org = _resolve_organization_picture_url(
         settings=settings,
         picture_url=source_info.picture_url,
         organization_image_cache=organization_image_cache,
     )
+    default_picture = _resolve_default_image_url(settings.default_event_detail_image_url)
 
     existing = (
         await db_connect.execute(
@@ -1068,27 +1153,40 @@ async def _get_or_create_organization_id(
         )
     ).scalar_one_or_none()
     if existing:
-        if not existing.address and address:
-            existing.address = address
-        if (
-            not existing.description
-            or existing.description == DEFAULT_ORGANIZATION_DESCRIPTION
+        changed = False
+        if _should_update_value(existing.address, organization_address, force=force):
+            existing.address = organization_address
+            changed = True
+        if _should_update_value(
+            existing.description,
+            description,
+            force=force,
+            fallback_value=DEFAULT_ORGANIZATION_DESCRIPTION,
         ):
             existing.description = description
-        if not existing.picture_org and picture_org:
+            changed = True
+        if _should_update_value(
+            existing.picture_org,
+            picture_org,
+            force=force,
+            fallback_value=default_picture,
+        ):
             existing.picture_org = picture_org
-        if source_link and not existing.external_url:
+            changed = True
+        if _should_update_value(existing.external_url, source_link, force=force):
             existing.external_url = source_link
+            changed = True
         # Keep legacy `organizator` useful until frontend moves to external_url.
         if source_link and (
             not existing.organizator or existing.organizator == existing.name_org
         ):
             existing.organizator = source_link
-        return existing.id
+            changed = True
+        return existing.id, False, changed
 
     org = InfoOrganization(
         name_org=normalized_name,
-        address=address,
+        address=organization_address,
         organizator=source_link or normalized_name,
         description=description,
         picture_org=picture_org,
@@ -1096,7 +1194,29 @@ async def _get_or_create_organization_id(
     )
     db_connect.add(org)
     await db_connect.flush()
-    return org.id
+    return org.id, True, True
+
+
+async def _get_or_create_organization_id(
+    db_connect: AsyncSession,
+    name: Optional[str],
+    address: Optional[str],
+    *,
+    source_key: Optional[str] = None,
+    settings: AppSettings,
+    organization_info_cache: dict[str, OrganizationSourceInfo],
+    organization_image_cache: dict[tuple[str, str], str | None],
+) -> Optional[int]:
+    organization_id, _, _ = await _upsert_organization_info(
+        db_connect=db_connect,
+        name=name,
+        address=address,
+        source_key=source_key,
+        settings=settings,
+        organization_info_cache=organization_info_cache,
+        organization_image_cache=organization_image_cache,
+    )
+    return organization_id
 
 
 async def _is_event_duplicate(db_connect: AsyncSession, item: ParsedEvent) -> bool:
