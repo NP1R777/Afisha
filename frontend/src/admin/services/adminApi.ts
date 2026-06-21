@@ -2,6 +2,9 @@ import axios from '../../shared/lib/axios';
 import type {
   AdminCategory,
   AdminEvent,
+  AdminOrganization,
+  AdminOrganizationListResponse,
+  AdminOrganizationPayload,
   AdminParsedEvent,
   AdminParsedEventListResponse,
   AdminSession,
@@ -104,6 +107,22 @@ function parseEvent(item: unknown): AdminEvent {
         start_time: String(rawSlot.start_time || ''),
       };
     }),
+  };
+}
+
+function parseOrganization(item: unknown): AdminOrganization {
+  const raw = (item || {}) as UnknownRecord;
+  return {
+    id: Number(raw.id || 0),
+    name_org: String(raw.name_org || ''),
+    address: raw.address ? String(raw.address) : null,
+    organizator: raw.organizator ? String(raw.organizator) : null,
+    description: raw.description ? String(raw.description) : null,
+    picture_org: raw.picture_org ? String(raw.picture_org) : null,
+    external_url: raw.external_url ? String(raw.external_url) : null,
+    created_at: raw.created_at ? String(raw.created_at) : null,
+    update_at: raw.update_at ? String(raw.update_at) : null,
+    deleted_at: raw.deleted_at ? String(raw.deleted_at) : null,
   };
 }
 
@@ -306,6 +325,56 @@ export async function updateEvent(
 
 export async function deleteEvent(eventId: number, session: AdminSession | null = null): Promise<void> {
   await axios.delete(`/event/${eventId}`, {
+    headers: buildAuthHeaders(session),
+  });
+}
+
+export async function fetchOrganizations(
+  params: { limit?: number; offset?: number; q?: string } = {},
+  session: AdminSession | null = null
+): Promise<AdminOrganizationListResponse> {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.offset !== undefined) query.set('offset', String(params.offset));
+  if (params.q) query.set('q', params.q);
+
+  const response = await axios.get(`/organizations?${query.toString()}`, {
+    headers: buildAuthHeaders(session),
+  });
+  const payload = (response.data || {}) as UnknownRecord;
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  return {
+    total: Number(payload.total || 0),
+    items: items.map(parseOrganization),
+  };
+}
+
+export async function createOrganization(
+  payload: Required<Pick<AdminOrganizationPayload, 'name_org'>> & AdminOrganizationPayload,
+  session: AdminSession | null = null
+): Promise<AdminOrganization> {
+  const response = await axios.post('/organization', payload, {
+    headers: buildAuthHeaders(session),
+  });
+  return parseOrganization(response.data);
+}
+
+export async function updateOrganization(
+  organizationId: number,
+  payload: AdminOrganizationPayload,
+  session: AdminSession | null = null
+): Promise<AdminOrganization> {
+  const response = await axios.patch(`/organization/${organizationId}`, payload, {
+    headers: buildAuthHeaders(session),
+  });
+  return parseOrganization(response.data);
+}
+
+export async function deleteOrganization(
+  organizationId: number,
+  session: AdminSession | null = null
+): Promise<void> {
+  await axios.delete(`/organization/${organizationId}`, {
     headers: buildAuthHeaders(session),
   });
 }
