@@ -1,5 +1,6 @@
 import React from "react";
-import axios from "../shared/lib/axios";
+import Axios from "axios";
+import apiClient from "../shared/lib/axios";
 import { Box, Button, Flex, HStack, Heading, Image, Spinner, Text, VStack } from "@chakra-ui/react";
 import fon from "../pictures/fon2.png";
 import { motion } from "framer-motion";
@@ -99,7 +100,7 @@ function normalizeNews(item: OrganizationNewsResponse): OrganizerNewsCard {
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  if (axios.isAxiosError(error)) {
+  if (Axios.isAxiosError(error)) {
     const detail = error.response?.data?.detail;
     return typeof detail === "string" ? detail : error.message || fallback;
   }
@@ -130,7 +131,7 @@ const Organizer = () => {
   const organizerDescription = organization?.description || "Информация об организации отсутствует";
 
   const loadFirstOrganization = React.useCallback(async () => {
-    const response = await axios.get<OrganizationsListResponse>("/organizations", {
+    const response = await apiClient.get<OrganizationsListResponse>("/organizations", {
       params: { limit: 1 },
     });
     const firstOrganization = response.data?.items?.[0];
@@ -169,7 +170,7 @@ const Organizer = () => {
     setLoadingContent(true);
     setContentError(null);
     try {
-      const response = await axios.get<OrganizationDetails>(`/organization/${parsedOrganizationId}`);
+      const response = await apiClient.get<OrganizationDetails>(`/organization/${parsedOrganizationId}`);
       const payload = response.data;
       const normalizedEvents = (Array.isArray(payload.events) ? payload.events : [])
         .map(normalizeEvent)
@@ -203,7 +204,7 @@ const Organizer = () => {
         return;
       }
       try {
-        const response = await axios.get(`/user/get_user?user_id=${userId}`);
+        const response = await apiClient.get(`/user/get_user?user_id=${userId}`);
         const value = response.data?.role;
         if (!isCancelled && (value === "user" || value === "admin" || value === "organizator")) {
           setRole(value);
