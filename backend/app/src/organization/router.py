@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,6 +13,51 @@ from src.event.router import _serialize_event
 from src.parser.sources import DEFAULT_ORGANIZATION_DESCRIPTION
 
 router = APIRouter()
+
+
+class OrganizationCreate(BaseModel):
+    name_org: str
+    address: str | None = None
+    organizator: str | None = None
+    description: str | None = None
+    picture_org: str | None = None
+    external_url: str | None = None
+
+
+class OrganizationUpdate(BaseModel):
+    name_org: str | None = None
+    address: str | None = None
+    organizator: str | None = None
+    description: str | None = None
+    picture_org: str | None = None
+    external_url: str | None = None
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+async def _ensure_unique_organization_name(
+    db_connect: AsyncSession,
+    *,
+    name_org: str,
+    exclude_id: int | None = None,
+) -> None:
+    query = select(InfoOrganization.id).where(
+        func.lower(InfoOrganization.name_org) == name_org.lower(),
+        InfoOrganization.deleted_at.is_(None),
+    )
+    if exclude_id is not None:
+        query = query.where(InfoOrganization.id != exclude_id)
+    existing_id = (await db_connect.execute(query.limit(1))).scalar_one_or_none()
+    if existing_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Организация с таким названием уже существует.",
+        )
 
 
 def _serialize_news(item: News) -> dict:
@@ -90,6 +138,34 @@ async def list_organizations(
     }
 
 
+@router.post(
+    "/organization",
+    summary="Создание организации",
+)
+async def create_organization(
+    payload: OrganizationCreate,
+    db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
+):
+    name_org = payload.name_org.strip()
+    if not name_org:
+        raise HTTPException(status_code=422, detail="name_org не может быть пустым.")
+    await _ensure_unique_organization_name(db_connect, name_org=name_org)
+
+    organization = InfoOrganization(
+        name_org=name_org,
+        address=_normalize_optional_text(payload.address),
+        organizator=_normalize_optional_text(payload.organizator),
+        description=_normalize_optional_text(payload.description),
+        picture_org=_normalize_optional_text(payload.picture_org),
+        external_url=_normalize_optional_text(payload.external_url),
+    )
+    db_connect.add(organization)
+    await db_connect.flush()
+    await db_connect.refresh(organization)
+    return _serialize_organization(organization, settings=settings)
+
+
 @router.get(
     "/organization/{org_id:int}",
     description=(
@@ -155,3 +231,71 @@ async def get_organization_page(
         "events": serialized_events,
         "news": [_serialize_news(item) for item in news_rows],
     }
+
+
+@router.patch(
+    "/organization/{org_id:int}",
+    summary="Обновление организации",
+)
+async def update_organization(
+    org_id: int,
+    payload: OrganizationUpdate,
+    db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
+):
+    organization = (
+        await db_connect.execute(
+            select(InfoOrganization).where(
+                InfoOrganization.id == org_id,
+                InfoOrganization.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if organization is None:
+        raise HTTPException(status_code=404, detail="Организатор не найден")
+
+    payload_data = payload.dict(exclude_unset=True)
+    if "name_org" in payload_data:
+        next_name = (payload_data["name_org"] or "").strip()
+        if not next_name:
+            raise HTTPException(status_code=422, detail="name_org не может быть пустым.")
+        await _ensure_unique_organization_name(
+            db_connect,
+            name_org=next_name,
+            exclude_id=org_id,
+        )
+        organization.name_org = next_name
+    for field_name in ("address", "organizator", "description", "picture_org", "external_url"):
+        if field_name in payload_data:
+            setattr(organization, field_name, _normalize_optional_text(payload_data[field_name]))
+
+    organization.update_at = datetime.utcnow()
+    await db_connect.flush()
+    await db_connect.refresh(organization)
+    return _serialize_organization(organization, settings=settings)
+
+
+@router.delete(
+    "/organization/{org_id:int}",
+    summary="Удаление организации",
+)
+async def delete_organization(
+    org_id: int,
+    db_connect: AsyncSession = Depends(get_db),
+):
+    organization = (
+        await db_connect.execute(
+            select(InfoOrganization).where(
+                InfoOrganization.id == org_id,
+                InfoOrganization.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if organization is None:
+        raise HTTPException(status_code=404, detail="Организатор не найден")
+
+    now = datetime.utcnow()
+    organization.deleted_at = now
+    organization.update_at = now
+    await db_connect.flush()
+    return {"message": "Организация успешно удалена"}
