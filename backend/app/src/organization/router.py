@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -31,6 +31,63 @@ def _event_sort_key(event: dict):
         return (0, time_slots[0]["date_event"])
     # Events without scheduled shows go last, newest first.
     return (1, -event["id"])
+
+
+def _serialize_organization(
+    organization: InfoOrganization,
+    *,
+    settings: AppSettings,
+) -> dict:
+    return {
+        "id": organization.id,
+        "name_org": organization.name_org,
+        "address": organization.address,
+        "organizator": organization.organizator,
+        "description": organization.description or DEFAULT_ORGANIZATION_DESCRIPTION,
+        "picture_org": organization.picture_org or settings.default_event_detail_image_url,
+        "external_url": organization.external_url or organization.organizator,
+        "created_at": organization.created_at,
+        "update_at": organization.update_at,
+        "deleted_at": organization.deleted_at,
+    }
+
+
+@router.get(
+    "/organizations",
+    summary="Список организаций",
+)
+async def list_organizations(
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    q: str | None = Query(default=None, description="Поиск по названию организации"),
+    db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
+):
+    query = select(InfoOrganization).where(InfoOrganization.deleted_at.is_(None))
+    count_query = select(func.count(InfoOrganization.id)).where(InfoOrganization.deleted_at.is_(None))
+
+    normalized_query = " ".join((q or "").strip().lower().split())
+    if normalized_query:
+        search_filter = func.lower(InfoOrganization.name_org).like(f"%{normalized_query}%")
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
+
+    total = (await db_connect.execute(count_query)).scalar() or 0
+    rows = (
+        await db_connect.execute(
+            query.order_by(InfoOrganization.name_org.asc(), InfoOrganization.id.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            _serialize_organization(organization, settings=settings)
+            for organization in rows
+        ],
+    }
 
 
 @router.get(
@@ -94,16 +151,7 @@ async def get_organization_page(
     serialized_events = serialized_events[:events_limit]
 
     return {
-        "id": organization.id,
-        "name_org": organization.name_org,
-        "address": organization.address,
-        "organizator": organization.organizator,
-        "description": organization.description or DEFAULT_ORGANIZATION_DESCRIPTION,
-        "picture_org": organization.picture_org or settings.default_event_detail_image_url,
-        "external_url": organization.external_url or organization.organizator,
-        "created_at": organization.created_at,
-        "update_at": organization.update_at,
-        "deleted_at": organization.deleted_at,
+        **_serialize_organization(organization, settings=settings),
         "events": serialized_events,
         "news": [_serialize_news(item) for item in news_rows],
     }

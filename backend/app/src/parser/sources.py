@@ -33,6 +33,8 @@ class SourceConfig:
     city: str = "Норильск"
     reserve: bool = False
     verify_ssl: bool = True
+    organization_info_url: Optional[str] = None
+    organization_external_url: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,7 @@ class OrganizationSourceInfo:
     description: str
     picture_url: Optional[str]
     external_url: Optional[str]
+    address: Optional[str] = None
 
 
 DEFAULT_ORGANIZATION_DESCRIPTION = "Информация об организации отсутствует"
@@ -59,6 +62,8 @@ SOURCE_CONFIGS: dict[str, SourceConfig] = {
         url="https://www.northdrama.ru/afisha",
         organization="Заполярный театр драмы",
         city="Норильск",
+        organization_info_url="https://www.northdrama.ru/teatr-sejchas#theatre-page__about-theatre",
+        organization_external_url="https://northdrama.ru",
     ),
     "gck": SourceConfig(
         key="gck",
@@ -66,6 +71,8 @@ SOURCE_CONFIGS: dict[str, SourceConfig] = {
         url="http://www.gcknorilsk.ru/",
         organization="Городской центр культуры",
         city="Норильск",
+        organization_info_url="http://www.gcknorilsk.ru/o-nas/informaciya-ob-uchrezhdenii/",
+        organization_external_url="http://www.gcknorilsk.ru/",
     ),
     "norilsk_official": SourceConfig(
         key="norilsk_official",
@@ -318,9 +325,10 @@ def parse_organization_source_info(
     runtime_config: Optional[ParserRuntimeConfig] = None,
 ) -> OrganizationSourceInfo:
     runtime_config = runtime_config or ParserRuntimeConfig()
-    external_url = _organization_external_url(config.url)
+    info_url = config.organization_info_url or config.url
+    external_url = config.organization_external_url or _organization_external_url(info_url)
 
-    is_vmuzey = "vmuzey.com" in (config.url or "").lower()
+    is_vmuzey = "vmuzey.com" in (info_url or "").lower()
     session = _build_session(
         user_agent=runtime_config.vmuzey_user_agent if is_vmuzey else None,
         proxy_url=runtime_config.vmuzey_proxy if is_vmuzey else None,
@@ -329,7 +337,7 @@ def parse_organization_source_info(
     session.headers.update({"Accept-Language": "ru-RU,ru;q=0.9"})
 
     try:
-        response = session.get(config.url, timeout=30, verify=config.verify_ssl)
+        response = session.get(info_url, timeout=30, verify=config.verify_ssl)
         response.raise_for_status()
     except requests.RequestException:
         return OrganizationSourceInfo(
@@ -339,9 +347,22 @@ def parse_organization_source_info(
         )
 
     soup = BeautifulSoup(response.text, "html.parser")
+    if config.key == "northdrama":
+        return _parse_northdrama_organization_info(
+            soup=soup,
+            base_url=info_url,
+            external_url=external_url,
+        )
+    if config.key == "gck":
+        return _parse_gck_organization_info(
+            soup=soup,
+            base_url=info_url,
+            external_url=external_url,
+        )
+
     return OrganizationSourceInfo(
         description=_extract_organization_description(soup) or DEFAULT_ORGANIZATION_DESCRIPTION,
-        picture_url=_extract_organization_image_from_soup(soup, base_url=config.url),
+        picture_url=_extract_organization_image_from_soup(soup, base_url=info_url),
         external_url=external_url,
     )
 
@@ -397,6 +418,132 @@ def _extract_organization_image_from_soup(soup: BeautifulSoup, *, base_url: str)
             candidate = _normalize_image_url(node.get(attr), base_url=base_url)
             if candidate:
                 return candidate
+    return None
+
+
+def _parse_northdrama_organization_info(
+    *,
+    soup: BeautifulSoup,
+    base_url: str,
+    external_url: Optional[str],
+) -> OrganizationSourceInfo:
+    about_anchor = (
+        soup.select_one("#theatre-page__about-theatre")
+        or soup.select_one(".theatre-page__about-theatre")
+    )
+    section = _nearest_text_container(about_anchor) if about_anchor else None
+    search_root = section or soup
+
+    text_block = _first_non_empty_text(
+        search_root.select("p, .text, .content, .theatre-page__text, .page-content")
+    )
+    if not text_block and about_anchor:
+        text_block = _first_non_empty_text(
+            about_anchor.find_all_next(["p", "div"], limit=12)
+        )
+
+    image_node = None
+    if about_anchor:
+        image_node = about_anchor.find_next("img")
+    if image_node is None and section is not None:
+        image_node = section.find("img")
+    picture_url = _image_url_from_node(image_node, base_url=base_url)
+    if not picture_url:
+        picture_url = _extract_organization_image_from_soup(search_root, base_url=base_url)
+
+    return OrganizationSourceInfo(
+        description=text_block or DEFAULT_ORGANIZATION_DESCRIPTION,
+        picture_url=picture_url,
+        external_url=external_url,
+    )
+
+
+def _parse_gck_organization_info(
+    *,
+    soup: BeautifulSoup,
+    base_url: str,
+    external_url: Optional[str],
+) -> OrganizationSourceInfo:
+    content_root = (
+        soup.select_one("main")
+        or soup.select_one("article")
+        or soup.select_one(".content")
+        or soup.select_one(".page-content")
+        or soup.body
+        or soup
+    )
+    raw_text = clean_text(content_root.get_text(" ", strip=True))
+    stop_phrase = (
+        "Оказание муниципальных услуг Городской центр культуры осуществляет "
+        "в соответствии с муниципальным заданием."
+    )
+    description = _text_before_phrase(raw_text, stop_phrase) or raw_text
+    address = _extract_gck_address(raw_text)
+
+    return OrganizationSourceInfo(
+        description=description or DEFAULT_ORGANIZATION_DESCRIPTION,
+        picture_url=_extract_organization_image_from_soup(content_root, base_url=base_url),
+        external_url=external_url,
+        address=address,
+    )
+
+
+def _nearest_text_container(node):
+    current = node
+    while current is not None:
+        if current.name in {"section", "article", "main"}:
+            return current
+        class_text = " ".join(current.get("class", []))
+        if any(marker in class_text for marker in ("about", "content", "theatre-page")):
+            return current
+        current = current.parent
+    return None
+
+
+def _first_non_empty_text(nodes: Iterable) -> Optional[str]:
+    for node in nodes:
+        value = clean_text(node.get_text(" ", strip=True))
+        if value:
+            return value
+    return None
+
+
+def _image_url_from_node(node, *, base_url: str) -> Optional[str]:
+    if node is None:
+        return None
+    for attr in ("data-src", "data-lazy-src", "data-original", "srcset", "src"):
+        candidate = _normalize_image_url(node.get(attr), base_url=base_url)
+        if candidate:
+            return candidate
+    return None
+
+
+def _text_before_phrase(text: str, phrase: str) -> str:
+    normalized_text = clean_text(text)
+    normalized_phrase = clean_text(phrase)
+    if not normalized_text or not normalized_phrase:
+        return normalized_text
+    lowered_text = normalized_text.lower()
+    lowered_phrase = normalized_phrase.lower()
+    index = lowered_text.find(lowered_phrase)
+    if index == -1:
+        return normalized_text
+    return normalized_text[:index].strip()
+
+
+def _extract_gck_address(text: str) -> Optional[str]:
+    normalized = clean_text(text)
+    if not normalized:
+        return None
+    patterns = (
+        r"(?:адрес(?: учреждения)?|местонахождение)[:\s]+([^.;]+(?:\d+[^\.;]*)?)",
+        r"(?:6633\d{2},\s*)?Красноярский край[^.;]+(?:\d+[^\.;]*)?",
+        r"г\.\s*Норильск[^.;]+(?:\d+[^\.;]*)?",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if match:
+            return clean_text(match.group(1) if match.lastindex else match.group(0))
     return None
 
 
