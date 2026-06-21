@@ -29,7 +29,7 @@ type CalendarEvent = {
 };
 
 type CalendarProps = {
-  events: CalendarSourceEvent[];
+  events?: CalendarSourceEvent[];
 };
 
 function generateDaysForMonth(year: number, monthIndex: number): Day[] {
@@ -68,7 +68,7 @@ function normalizeSlotTime(rawTime: string): string {
   return (rawTime || "").slice(0, 5);
 }
 
-export const Calendar: React.FC<CalendarProps> = ({ events }) => {
+export const Calendar: React.FC<CalendarProps> = ({ events = [] }) => {
   const currentYear = new Date().getFullYear();
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
 
