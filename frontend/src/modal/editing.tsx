@@ -24,7 +24,7 @@ interface EditingModalProps {
 }
 
 const EditingModal: React.FC<EditingModalProps> = ({ isOpen, onRequestClose, onCreateSuccess }) => {
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { userId, username, email, date_of_birth, setUsername, setEmail, setBirthdate, logout } = useUser();
   const navigate = useNavigate();
 
@@ -45,40 +45,46 @@ const EditingModal: React.FC<EditingModalProps> = ({ isOpen, onRequestClose, onC
   };
 
   const onSubmit = handleSubmit(async data => {
-    const updatedData: FormValues = {
-      username: username || '',
-      password: 'string',
-      email: email || '',
-      date_of_birth: date_of_birth ? date_of_birth.split('.').reverse().join('-') : '',
-      preferences: [0],
-    };
-
-    if (data.username !== username) {
-      updatedData.username = data.username;
-    }
-    if (data.email !== email) {
-      updatedData.email = data.email;
-    }
-    if (data.date_of_birth !== (date_of_birth ? date_of_birth.split('.').reverse().join('-') : '')) {
-      updatedData.date_of_birth = data.date_of_birth;
-    }
-    if (data.password) {
-      updatedData.password = data.password;
-    }
-
-    console.log('Отправляемые данные:', updatedData);
-    console.log('Отправляемые данные перед запросом:', JSON.stringify(updatedData));
     try {
-      await axios.patch(`/user/change_data?user_id=${userId}`, updatedData);
+      const updatedData: Partial<FormValues> = {};
+
+      if (data.username && data.username !== username) {
+        updatedData.username = data.username;
+      }
+
+      if (data.email && data.email !== email) {
+        updatedData.email = data.email;
+      }
+
+      if (data.date_of_birth) {
+        updatedData.date_of_birth = data.date_of_birth; // уже YYYY-MM-DD из input type="date"
+      }
+
+      if (data.password && data.password.length > 0) {
+        updatedData.password = data.password;
+      }
+
+      console.log('Отправка:', updatedData);
+
+      await axios.patch(
+        `/user/change_data?user_id=${userId}`,
+        updatedData
+      );
+
+      // обновляем контекст
       setUsername(data.username);
       setEmail(data.email);
       setBirthdate(data.date_of_birth);
+
       onCreateSuccess();
       onRequestClose();
     } catch (error) {
-      console.error('Ошибка при обновлении данных:', error);
-      setErrorMessage('Ошибка при обновлении данных. Пожалуйста, проверьте правильность введенных данных.');
-    }
+    console.error(error);
+    setErrorMessage('Ошибка при обновлении, попробуйте повторно');
+    setTimeout(() => {
+    setErrorMessage(null);
+  }, 4000);
+  }
   });
 
   useEffect(() => {
@@ -157,11 +163,6 @@ const EditingModal: React.FC<EditingModalProps> = ({ isOpen, onRequestClose, onC
               mt={{ base: 4, sm:0}}
             />
           </Field>
-          {errorMessage && (
-            <Text color="red" fontSize="sm">
-              {errorMessage}
-            </Text>
-          )}
         </Flex>
         <form style={{ marginTop: '10px' }}>
           <Flex justify="center">
@@ -204,6 +205,11 @@ const EditingModal: React.FC<EditingModalProps> = ({ isOpen, onRequestClose, onC
                   max={maxDate}
                 />
               </Field>
+              {errorMessage && (
+                <Text color="red" fontSize="sm" mt={2}>
+                  {errorMessage}
+                </Text>
+              )}
               <Button
                 onClick={onSubmit}
                 type="submit"

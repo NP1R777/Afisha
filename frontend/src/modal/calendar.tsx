@@ -1,7 +1,8 @@
 import { Box, Button, Flex, Grid, Text, Image } from '@chakra-ui/react';
 import { RadioGroup } from "../components/ui/radio";
 import Modal from 'react-modal';
-import { useState } from 'react';
+import axios from '../shared/lib/axios';
+import { useState, useEffect } from 'react';
 import { SelectContent, SelectItem, SelectRoot, SelectTrigger } from '../components/ui/select';
 import { createListCollection } from '@ark-ui/react';
 import cloud from '../pictures/cloud.png';
@@ -16,11 +17,14 @@ interface Props {
 }
 
 type EventItem = {
-    title: string;
-    category: string;
+    slot_id: number;
+    event_id: number;
     date: string;
     time: string;
+    title: string;
+    age_limit: string | null;
     organizer: string;
+    is_organizer_event: boolean;
 };
 
 const EventCalendarModal = ({ isOpen, onClose }: Props) => {
@@ -38,6 +42,42 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         ],
     });
 
+    const fetchCalendarEvents = async () => {
+        try {
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const dateFrom =
+                `${year}-${String(month + 1).padStart(2,'0')}-01`;
+
+            const lastDay =
+                new Date(year, month + 1, 0).getDate();
+
+            const dateTo =
+                `${year}-${String(month + 1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+
+
+            const url =
+                `/event/calendar/events?date_from=${dateFrom}&date_to=${dateTo}` +
+                (selectedAge ? `&age_values=${selectedAge}` : '');
+
+            const response = await axios.get(url);
+
+            setEvents(response.data.items);
+
+        }
+        catch(error){
+            console.error(error);
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchCalendarEvents();
+        }
+    }, [isOpen, currentDate, selectedAge]);
+
     const handleAgeChange = (values: string[]) => {
         setSelectedAge(values[0] || '');
     };
@@ -54,133 +94,10 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         }, {} as Record<string, EventItem[]>);
     };
 
-    const events: EventItem[] = [
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Кинотеатр "Родина"',
-            date: '2026-06-21',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Кинотеатр "Родина"',
-            date: '2026-05-22',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-23',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Дворец спорта "Арктика"',
-            date: '2026-06-27',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Дворец спорта "Арктика"',
-            date: '2026-06-30',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-30',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-30',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-22',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-22',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-22',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-27',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-27',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-27',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-20',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-26',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-26',
-            time: '20:30',
-        },
-        {
-            title: 'На всякого мудреца довольно простоты',
-            category: 'cinema', 
-            organizer: 'Театр драмы им. В. Маяковского',
-            date: '2026-06-28',
-            time: '20:30',
-        },
-    ];
+    const [events, setEvents] = useState<EventItem[]>([]);
+    
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);//фильтр по категориям
 
-    const filteredEvents =
-        selectedCategories.length === 0
-            ? events
-            : events.filter(e => selectedCategories.includes(e.category));
 
     const formatDisplayDate = (dateStr: string) => {
         const [year, month, day] = dateStr.split('-');
@@ -199,11 +116,17 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         return `${year}-${m}-${d}`;
     };
 
-    const eventsByDate = filteredEvents.reduce((acc, event) => {
-        if (!acc[event.date]) acc[event.date] = [];
-        acc[event.date] = [...acc[event.date], event];
+    const eventsByDate = events.reduce((acc, event) => {
+
+        if (!acc[event.date]) {
+            acc[event.date] = [];
+        }
+
+        acc[event.date].push(event);
+
         return acc;
-    }, {} as Record<string, typeof events>);
+
+    }, {} as Record<string, EventItem[]>);
 
 
     const getCalendarDays = (date: Date): CalendarDay[] => {
@@ -624,7 +547,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                 pointerEvents={isAgeOpen ? 'auto' : 'none'}
                             >
                                 <Flex direction="column" gap={2}>
-                                    {['0', '6', '12', '16', '18'].map(age => (
+                                    {['', '0', '6', '12', '16', '18'].map(age => (
                                         <Flex
                                             key={age}
                                             align="center"
@@ -656,7 +579,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                             </Box>
 
                                             <Text color="black">
-                                                {age}+
+                                                {age ? `${age}+` : 'Все'}
                                             </Text>
                                         </Flex>
                                     ))}

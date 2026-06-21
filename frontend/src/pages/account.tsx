@@ -13,6 +13,8 @@ import { ContainerFluid } from '../components/ui/container';
 import { Toaster, toaster } from "../components/ui/toaster"
 import { Calendar } from '../modal/org_calendar';
 import OrganizerRegisterModal from '../modal/org_registration';
+import EventImage from '../pictures/picture1.png';
+import LoginModal from '../pages/authorization';
 
 interface Event {
   name: string;
@@ -20,6 +22,7 @@ interface Event {
   update_at: string;
   group_id: number;
   date_event: string;
+  start_time: string;
   duration: string;
   price: number;
   address: string;
@@ -57,6 +60,16 @@ const Account = () => {
   const [isOrganizerRegisterOpen, setIsOrganizerRegisterOpen] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+
+  const openLoginModal = () => {
+    setIsOrganizerRegisterOpen(false);
+    setIsLoginOpen(true);
+  };
+  const closeLoginModal = () => {
+    setIsLoginOpen(false);
+  };
+
   const organizationsMap: Record<number, string> = {
   1: 'Заполярный театр драмы',
   2: 'Администрация города Норильска',
@@ -68,8 +81,23 @@ const Account = () => {
   9: 'Культурно-досуговый центр имени В. Высоцкого',
 };
 
+const monthNames = [
+  'ЯНВАРЯ',
+  'ФЕВРАЛЯ',
+  'МАРТА',
+  'АПРЕЛЯ',
+  'МАЯ',
+  'ИЮНЯ',
+  'ИЮЛЯ',
+  'АВГУСТА',
+  'СЕНТЯБРЯ',
+  'ОКТЯБРЯ',
+  'НОЯБРЯ',
+  'ДЕКАБРЯ',
+];
 
   const openModal = () => setIsModalOpen(true);
+  
   const closeModal = () => {
     setIsModalOpen(false);
   };
@@ -395,7 +423,19 @@ const Account = () => {
                 width="100%"
                 align="center"
               >
-                {events.map((event, index) => (
+                {events.map((event, index) => {
+
+                const eventDate = new Date(event.date_event);
+
+                const day = !isNaN(eventDate.getTime())
+                  ? eventDate.getDate()
+                  : null;
+
+                const month = !isNaN(eventDate.getTime())
+                  ? monthNames[eventDate.getMonth()]
+                  : null;
+
+                return (
                   <Flex key={index} userSelect="none" direction={{ base: 'column', md: 'row' }}>
                     <Box
                       bg="#4C6BE6"
@@ -409,12 +449,15 @@ const Account = () => {
                     >
                       <Flex direction={{ base: 'column', md: 'row' }} align="center" height="100%" gap={4}>
                         <Image
-                          src={event.pictures_main}
+                          src={event.pictures_main || EventImage}
                           alt={event.name}
                           height={{ base: '260px', md: '195px' }}
                           width={{ base: '180px', md: '130px' }}
                           pointerEvents="none"
                           borderRadius={{ base: 'md', md: 'xl' }}
+                          onError={(e) => {
+                            e.currentTarget.src = EventImage;
+                          }}
                         />
                         <Flex direction="column" justify="space-between" flex="1" height="100%">
                           <Flex
@@ -453,18 +496,16 @@ const Account = () => {
                           >
                             <Flex align="center">
                               <Text fontSize="50px" mr={1}>
-                                {/* {new Date(event.date_event).getDate()} */}
-                                20
+                                {day ?? '—'}
                               </Text>
+
                               <Text fontSize="15px" color="#0E3EA0">
-                                {/* {new Date(event.date_event).toLocaleString('default', { month: 'long' }).toUpperCase()} */}
-                                ИЮНЯ
+                                {month ?? '—'}
                               </Text>
-                            </Flex>
-                            <Flex mt={5}>
+                             </Flex>
+                             <Flex mt={5}>
                               <Text fontSize="20px" textAlign="center" mb={2}>
-                                {/* {formatTime(event.duration)} */}
-                                18:00
+                                {formatTime(event.start_time)}
                               </Text>
                               <Text
                                 fontSize="15px"
@@ -499,7 +540,8 @@ const Account = () => {
                       </Flex>
                     </Box>
                   </Flex>
-                ))}
+                  );
+                })}
               </Flex>
             ) : (
               <Text
@@ -539,8 +581,16 @@ const Account = () => {
         <OrganizerRegisterModal
           isOpen={isOrganizerRegisterOpen}
           onRequestClose={closeOrganizerRegisterModal}
-          openLoginModal={() => {}}
+          openLoginModal={openLoginModal}
         />
+        <LoginModal
+          isOpen={isLoginOpen}
+          onRequestClose={closeLoginModal}
+          openRegisterModal={() => {}}
+          onLoginSuccess={() => {}}
+          showRegisterLink={false}
+        />
+        
       </Flex>
     </ContainerFluid>
   );

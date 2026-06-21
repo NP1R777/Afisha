@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from 'react';
 import assistant from '../pictures/assistant2.png';
 import background from '../pictures/background2.png';
 import axios from '../shared/lib/axios';
+import EventImage from '../pictures/picture1.png';
 
 interface Props {
     isOpen: boolean;
@@ -52,7 +53,7 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
         {
             id: 1,
             type: 'assistant',
-            text: 'Привет. Я твой ИИ помощник. Могу рассказать о мероприятиях, которые сейчас проходят в городе, найти интересное событие и ответить на вопросы. Чем могу помочь?',
+            text: 'Привет. Я твой ИИ помощник. Подскажу, какие мероприятия проходят в городе прямо сейчас, и подберу события с учётом твоих интересов. Чем могу помочь?',
         },
     ]);
 
@@ -239,17 +240,18 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                                                 p={2}
                                             >
                                                 <Flex gap={2} align="flex-start">
-                                                    {match.pictures_main ? (
-                                                        <Image
-                                                            src={match.pictures_main}
-                                                            alt={match.name}
-                                                            width="52px"
-                                                            height="52px"
-                                                            objectFit="cover"
-                                                            borderRadius="8px"
-                                                            flexShrink={0}
-                                                        />
-                                                    ) : null}
+                                                    <Image
+                                                        src={match.pictures_main || EventImage}
+                                                        alt={match.name}
+                                                        width="52px"
+                                                        height="52px"
+                                                        objectFit="cover"
+                                                        borderRadius="8px"
+                                                        flexShrink={0}
+                                                        onError={(e) => {
+                                                            (e.currentTarget as HTMLImageElement).src = EventImage;
+                                                        }}
+                                                    />
                                                     <Box minW={0} flex={1}>
                                                         <Text
                                                             fontSize="12px"
@@ -258,12 +260,16 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                                                         >
                                                             {match.name}
                                                         </Text>
-                                                        <Text fontSize="11px" color="#2F3A70" mt={1} lineClamp={1}>
-                                                            {formatEventDate(match) || match.city || 'Дата уточняется'}
-                                                        </Text>
-                                                        <Text fontSize="11px" color="#2F3A70" lineClamp={1}>
-                                                            {formatEventPrice(match.price)}
-                                                        </Text>
+                                                        {formatEventDate(match) && (
+                                                            <Text fontSize="11px" color="#2F3A70" mt={1} lineClamp={1}>
+                                                                {formatEventDate(match)}
+                                                            </Text>
+                                                        )}
+                                                        {match.price !== null && match.price !== undefined ? (
+                                                            <Text fontSize="11px" color="#2F3A70" lineClamp={1}>
+                                                                {formatEventPrice(match.price)}
+                                                            </Text>
+                                                        ) : null}
                                                         {match.address ? (
                                                             <Text fontSize="10px" color="#4A558A" lineClamp={1}>
                                                                 {match.address}

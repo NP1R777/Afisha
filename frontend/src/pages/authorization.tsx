@@ -18,9 +18,17 @@ interface LoginModalProps {
   onRequestClose: () => void;
   openRegisterModal: () => void;
   onLoginSuccess: () => void;
+  showRegisterLink?: boolean;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openRegisterModal, onLoginSuccess }) => {
+const LoginModal: React.FC<LoginModalProps> = ({
+    isOpen,
+    onRequestClose,
+    openRegisterModal,
+    onLoginSuccess,
+    showRegisterLink = true
+  }) => {
+
   const { setUsername, setUserId, setRole, login, setCategories } = useUser();
 
   const {
@@ -152,6 +160,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openReg
               </Flex>
             </Stack>
           </form>
+        {showRegisterLink && (
           <Text
             mt="3"
             color="#A0A0A4"
@@ -163,6 +172,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onRequestClose, openReg
           >
             Или создайте аккаунт тут
           </Text>
+        )}
         </Box>
       </Modal>
     </>

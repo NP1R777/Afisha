@@ -222,6 +222,8 @@ const Frame = () => {
   const eventsRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const categoriesRef = useRef<HTMLDivElement | null>(null);
+  const safeUserCategories = userCategories ?? [];
+  const userCategoriesStr = safeUserCategories.map(String);
 
   useEffect(() => {
     if (!searchQuery) return;
@@ -586,7 +588,6 @@ useEffect(() => {
   });
 }, [startDate, endDate]);
 
-  const userCategoriesStr = userCategories?.map(String) || [];
   const areFiltersApplied = 
   selectedCategories.length > 0 || 
   selectedDistricts.length > 0 || 
@@ -633,52 +634,40 @@ useEffect(() => {
   ).values()
 );
 
-const personalizedEvents = Object.values(eventsByCategory)
-  .flat()
-  .filter(event => {
-    if (!userCategories?.length) return false;
+const getEventNearestDate = (event: Event) => {
+  const timestamps = event.time_slots
+    .map(slot => new Date(slot.date_event).getTime())
+    .filter(Boolean);
 
-    const matchesUserCategory =
-      event.group_id != null &&
-      userCategoriesStr.includes(
-        event.group_id.toString()
-      );
+  return timestamps.length ? Math.min(...timestamps) : Infinity;
+};
 
-    const matchesSearch =
-      !searchQuery ||
-      event.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+const baseEvents = Object.values(eventsByCategory).flat();
 
-    const matchesDistrict =
-      selectedDistricts.length === 0 ||
-      selectedDistricts.includes(
-        event.city?.toLowerCase()
-      );
+const now = new Date().setHours(0, 0, 0, 0);
 
-    return (
-      matchesUserCategory &&
-      matchesSearch &&
-      matchesDistrict
-    );
-  })
-  .sort((a, b) => {
-    const dateA = a.time_slots?.[0]?.date_event
-      ? new Date(a.time_slots[0].date_event).getTime()
-      : 0;
+const personalizedEvents = isAuthenticated
+  ? baseEvents
+      .filter(event => {
+        const hasPrefs = safeUserCategories.length > 0;
 
-    const dateB = b.time_slots?.[0]?.date_event
-      ? new Date(b.time_slots[0].date_event).getTime()
-      : 0;
+        const matchesUserCategory =
+          !hasPrefs ||
+          userCategoriesStr.includes(String(event.group_id));
 
-    return dateA - dateB;
-  })
-  .slice(0, 12);
-  
-console.log(
-  'PERSONALIZED EVENT IDS:',
-  personalizedEvents.map(e => e.id)
-);
+        // 🔥 фильтр: только будущие события
+        const eventDates = event.time_slots
+          .map(slot => new Date(slot.date_event).getTime())
+          .filter(Boolean);
+
+        const hasFutureDate = eventDates.some(date => date >= now);
+
+        return matchesUserCategory && hasFutureDate;
+      })
+      .sort((a, b) => {
+        return getEventNearestDate(a) - getEventNearestDate(b);
+      })
+  : [];
 
   return (
     <ContainerFluid>
@@ -1009,17 +998,16 @@ console.log(
             города
           </Box>
         </Grid>
-        {/* {isAuthenticated &&
-          role === 'user' &&
-          personalizedEvents.length > 0 && (
+         {isAuthenticated && (
           <Box
             mt={9}
             w={{base: "700px", xl: "1100px"}}
                 p={4}
+              
                 color="white"
                 userSelect="none"
                 zIndex={0}
-                bg="rgba(13, 20, 58, 0.24)"
+                bg="rgba(17, 23, 58, 0.5)"
                 border="1px solid rgba(255,255,255,0.15)"
                 borderRadius="24px"
                 boxShadow="0 14px 30px rgba(7, 11, 34, 0.24)"
@@ -1030,7 +1018,7 @@ console.log(
               fontFamily="Unbounded"
               color="white"
               textAlign="center"
-              textShadow="0 8px 22px rgba(0,0,0,0.3)"
+              textShadow="0 8px 22px rgba(148, 146, 146, 0.3)"
             >
               Подборка для вас
             </Heading>
@@ -1066,7 +1054,7 @@ console.log(
                               transition="all .22s ease"
                               _hover={{
                                 transform: 'translateY(-4px)',
-                                filter: 'drop-shadow(0 14px 24px rgba(8, 14, 40, 0.42))',
+                                filter: 'drop-shadow(0 14px 24px rgba(51, 63, 120, 0.42))',
                               }}
                             >
                               <Image
@@ -1139,7 +1127,7 @@ console.log(
                 ))}
             </Flex>
             {personalizedEvents.length > itemsPerPage && (
-            <HStack justify="flex-end" w={{ xl: '92%', lg: '88%' }} mt={4}>
+            <HStack justify="flex-end" w={{ xl: '100%', lg: '88%' }} mt={4}>
               <Button
                 onClick={handlePersonalizedPrev}
                 disabled={personalizedIndex === 0}
@@ -1174,7 +1162,21 @@ console.log(
             </HStack>
           )}
           </Box>
-        )} */}
+        )}
+      {hasVisibleEvents && (
+        <Text
+          mt={10}
+          mb={6}
+          textAlign="center"
+          fontFamily="Unbounded"
+          fontSize={{ base: '18px', md: '28px', xl: '70px' }}
+          fontWeight="500"
+          color="white"
+          textShadow="0 8px 22px rgba(0,0,0,0.3)"
+        >
+          Все события по категориям
+        </Text>
+      )}
         <Box ref={categoriesRef}>
         {hasVisibleEvents ? (
           filteredCategories.map(category => {
@@ -1352,7 +1354,8 @@ console.log(
         ) : (
           <Text
             flex={1}
-            mt="16px"
+            mt="30px"
+            mb="30px"
             alignContent={'center'}
             color="white"
             fontSize={{ base: '24px', lg: '48px', xl: '64px' }}
@@ -1360,7 +1363,7 @@ console.log(
             width="100%"
             fontFamily="Unbounded"
           >
-            Упс, ничего не найдено
+            По вашим фильтрам ничего не найдено
           </Text>
         )}</Box>
       </Flex>

@@ -212,7 +212,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onRequestClose, o
               setIsOrganizerModalOpen(true);
             }}
           >
-            Подать заявку организатора
+            Подать заявку на организатора
           </Text>
           <Text
             color="#A0A0A4"

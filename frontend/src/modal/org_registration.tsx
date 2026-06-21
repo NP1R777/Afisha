@@ -5,6 +5,7 @@ import Modal from 'react-modal';
 import { Field } from '../components/ui/field';
 import { PasswordInput } from '../components/ui/password-input';
 import icon from '../pictures/icon.png';
+import { toaster } from '../components/ui/toaster';
 
 interface FormValues {
   username: string;
@@ -34,17 +35,23 @@ const OrganizerRegisterModal: React.FC<OrganizerRegisterModalProps> = ({
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const onSubmit = handleSubmit(async data => {
-    try {
-      console.log('Organizer registration:', data);
+const onSubmit = handleSubmit(async data => {
+  try {
+    console.log('Organizer registration:', data);
 
-      reset();
-      onRequestClose();
-    } catch (error) {
-      console.error(error);
-      setErrorMessage('Произошла ошибка. Попробуйте позже');
-    }
-  });
+    toaster.create({
+      title: 'Ваша заявка принята на проверку.',
+      duration: 5000,
+    });
+
+    reset();
+    onRequestClose();
+  } catch (error) {
+    console.error(error);
+
+    setErrorMessage('Произошла ошибка. Попробуйте позже');
+  }
+});
 
   const currentDate = new Date();
   currentDate.setFullYear(currentDate.getFullYear() - 7);
@@ -58,7 +65,7 @@ const OrganizerRegisterModal: React.FC<OrganizerRegisterModalProps> = ({
       isOpen={isOpen}
       onRequestClose={() => {
         reset();
-        setErrorMessage('');
+        setErrorMessage(null);
         onRequestClose();
       }}
       contentLabel="Organizer Register Modal"
@@ -208,19 +215,17 @@ const OrganizerRegisterModal: React.FC<OrganizerRegisterModalProps> = ({
           </Stack>
         </form>
 
-        {/* <Text
-          mt="4"
-          color="white"
-          cursor="pointer"
-          display="block"
-          _hover={{ textDecoration: 'underline' }}
+        <Text
+          color="#000000"
+          _hover={{ textDecoration: 'underline', cursor: 'pointer' }}
           onClick={() => {
-            onRequestClose();
-            openLoginModal();
+            onRequestClose();   // закрываем регистрацию организатора
+            openLoginModal();   // открываем авторизацию
           }}
+          style={{ marginTop: '16px', display: 'block' }}
         >
           Или войдите в аккаунт тут, если уже зарегистрированы
-        </Text> */}
+        </Text>
       </Box>
     </Modal>
   );

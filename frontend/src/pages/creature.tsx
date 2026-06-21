@@ -54,9 +54,11 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
 
   const districts = createListCollection({
     items: [
-      { label: 'Норильск', value: 'Норильск' },
-      { label: 'Талнах', value: 'Талнах' },
-      { label: 'Кайеркан', value: 'Кайеркан' },
+      { label: 'Норильск', value: 'norilsk' },
+      { label: 'Талнах', value: 'talnah' },
+      { label: 'Кайеркан', value: 'kayerkan' },
+      { label: 'Оганер', value: 'oganeer' },
+      { label: 'Дудинка', value: 'dudinka' }
     ],
   });
 
@@ -96,7 +98,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ isOpen, onRequestClose, onCre
       //   group_id: selectedCategoryId,
       // });
       toaster.create({
-        title: 'Созданное мероприятие отправлено на модерацию.',
+        title: 'Созданное мероприятие отправлено на проверку.',
         duration: 5000
       });
       onCreateSuccess();

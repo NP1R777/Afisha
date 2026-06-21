@@ -221,6 +221,7 @@ const Layout = () => {
         onRequestClose={() => setIsLoginOpen(false)}
         openRegisterModal={openRegisterModal}
         onLoginSuccess={handleLoginSuccess}
+        showRegisterLink={true}
       />
       <RegisterModal
         isOpen={isRegisterOpen}
