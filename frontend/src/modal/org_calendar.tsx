@@ -1,5 +1,8 @@
 import React from "react";
-import { Box, Grid, Text, VStack } from "@chakra-ui/react";
+import axios from "../shared/lib/axios";
+import { Box, Button, Flex, Grid, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import Modal from "react-modal";
+import CreateModal from "../pages/creature";
 
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MONTHS = [
@@ -7,33 +10,37 @@ const MONTHS = [
   "Май", "Июнь", "Июль", "Август",
   "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 ];
+const EXACT_AGE_VALUES = ["", "0", "6", "12", "16", "18"];
 
 type Day = { value: number; isCurrentMonth: boolean };
 
-type CalendarSlot = {
-  date_event: string;
-  start_time: string;
-};
-
-type CalendarSourceEvent = {
-  id: number;
-  name: string;
-  time_slots?: CalendarSlot[];
-};
-
-type CalendarEvent = {
-  eventId: number;
+type CalendarEventItem = {
+  slot_id: number;
+  event_id: number;
   date: string;
-  title: string;
   time: string;
+  title: string;
+  age_limit?: string | null;
+  organizer?: string | null;
+  is_organizer_event?: boolean;
 };
 
-type CalendarProps = {
-  events?: CalendarSourceEvent[];
+type CalendarEventsResponse = {
+  total: number;
+  items: CalendarEventItem[];
+};
+
+interface CalendarProps {
   organizerName?: string;
   canManageEvents?: boolean;
   onEventCreated?: () => void;
-};
+}
+
+function toDateString(year: number, monthIndex: number, day: number): string {
+  const month = String(monthIndex + 1).padStart(2, "0");
+  const date = String(day).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+}
 
 function generateDaysForMonth(year: number, monthIndex: number): Day[] {
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -57,115 +64,321 @@ function generateDaysForMonth(year: number, monthIndex: number): Day[] {
   return daysArray;
 }
 
-function formatDate(year: number, monthIndex: number, day: number): string {
-  const month = String(monthIndex + 1).padStart(2, "0");
-  const date = String(day).padStart(2, "0");
-  return `${year}-${month}-${date}`;
+function normalizeText(value: string | null | undefined): string {
+  return (value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function normalizeSlotDate(rawDate: string): string {
-  return (rawDate || "").split("T")[0];
-}
-
-function normalizeSlotTime(rawTime: string): string {
-  return (rawTime || "").slice(0, 5);
-}
-
-export const Calendar: React.FC<CalendarProps> = ({ events = [] }) => {
+export const Calendar: React.FC<CalendarProps> = ({
+  organizerName,
+  canManageEvents = false,
+  onEventCreated,
+}) => {
   const currentYear = new Date().getFullYear();
+  const [dateFrom, setDateFrom] = React.useState(`${currentYear}-01-01`);
+  const [dateTo, setDateTo] = React.useState(`${currentYear}-12-31`);
+  const [selectedAge, setSelectedAge] = React.useState("");
   const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  const [selectedDateForModal, setSelectedDateForModal] = React.useState<string | null>(null);
+  const [selectedDateForCreate, setSelectedDateForCreate] = React.useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
+  const [events, setEvents] = React.useState<CalendarEventItem[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = React.useState(0);
 
-  const calendarEvents = React.useMemo<CalendarEvent[]>(() => {
-    return events.flatMap((event) =>
-      (event.time_slots || []).map((slot) => ({
-        eventId: event.id,
-        date: normalizeSlotDate(slot.date_event),
-        title: event.name,
-        time: normalizeSlotTime(slot.start_time),
-      }))
-    );
+  const displayYear = React.useMemo(() => {
+    const parsed = Number(dateFrom.split("-")[0]);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : currentYear;
+  }, [currentYear, dateFrom]);
+
+  const organizerKey = React.useMemo(() => normalizeText(organizerName), [organizerName]);
+
+  React.useEffect(() => {
+    let isCancelled = false;
+
+    const loadEvents = async () => {
+      if (!dateFrom || !dateTo) {
+        setError("Выбери диапазон дат для загрузки календаря.");
+        setEvents([]);
+        return;
+      }
+      if (dateFrom > dateTo) {
+        setError("Дата начала не может быть больше даты окончания.");
+        setEvents([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        params.set("date_from", dateFrom);
+        params.set("date_to", dateTo);
+        if (selectedAge) {
+          params.set("age_values", selectedAge);
+        }
+        if (organizerName?.trim()) {
+          params.set("organizer_name", organizerName.trim());
+        }
+
+        const response = await axios.get(`/event/calendar/events?${params.toString()}`);
+        const payload = (response.data || {}) as CalendarEventsResponse;
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        if (!isCancelled) {
+          setEvents(items);
+        }
+      } catch (err: any) {
+        if (isCancelled) {
+          return;
+        }
+        const detail = err?.response?.data?.detail;
+        setError(typeof detail === "string" ? detail : err?.message || "Не удалось загрузить календарь.");
+        setEvents([]);
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadEvents();
+    return () => {
+      isCancelled = true;
+    };
+  }, [dateFrom, dateTo, selectedAge, organizerName, refreshToken]);
+
+  const eventsByDate = React.useMemo(() => {
+    const grouped: Record<string, CalendarEventItem[]> = {};
+    for (const item of events) {
+      if (!item.date) {
+        continue;
+      }
+      if (!grouped[item.date]) {
+        grouped[item.date] = [];
+      }
+      grouped[item.date].push(item);
+    }
+    for (const key of Object.keys(grouped)) {
+      grouped[key].sort((left, right) => {
+        if (left.time !== right.time) {
+          return left.time.localeCompare(right.time);
+        }
+        return left.title.localeCompare(right.title);
+      });
+    }
+    return grouped;
   }, [events]);
 
-  const getEventsForDay = (day: Day, monthIndex: number) => {
+  const resetFilters = () => {
+    setDateFrom(`${displayYear}-01-01`);
+    setDateTo(`${displayYear}-12-31`);
+    setSelectedAge("");
+  };
+
+  const selectedDayEvents = selectedDateForModal ? (eventsByDate[selectedDateForModal] || []) : [];
+  const isDateModalOpen = selectedDateForModal !== null;
+
+  const handleDayClick = (day: Day, monthIndex: number) => {
     if (!day.isCurrentMonth) {
-      return [];
+      return;
     }
-    const fullDate = formatDate(currentYear, monthIndex, day.value);
-    return calendarEvents.filter((event) => event.date === fullDate);
+    const clickedDate = toDateString(displayYear, monthIndex, day.value);
+    setSelectedDateForModal(clickedDate);
+  };
+
+  const closeDateModal = () => {
+    setSelectedDateForModal(null);
+  };
+
+  const handleOpenCreateEvent = () => {
+    setSelectedDateForCreate(selectedDateForModal);
+    closeDateModal();
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateSuccess = () => {
+    setRefreshToken((value) => value + 1);
+    if (onEventCreated) {
+      onEventCreated();
+    }
   };
 
   return (
     <Box bg="#6B84EA" w="95%" py={7} borderRadius="20px" mt={10} ml="auto">
-      <VStack gap={6} align="center">
+      <VStack gap={4} align="center">
         <Box bg="#A3B3F2" color="white" px={4} py={2} borderRadius="20px">
-          <Text fontSize="xl" textAlign="center">{currentYear} год</Text>
+          <Text fontSize="xl" textAlign="center">{displayYear} год</Text>
         </Box>
-        <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", xl: "repeat(4, 1fr)" }} gap={6}>
-          {MONTHS.map((monthName, monthIndex) => (
+
+        <HStack
+          w="100%"
+          justify="center"
+          gap={2}
+          flexWrap="wrap"
+          px={4}
+        >
+          <Input
+            type="date"
+            maxW="180px"
+            bg="white"
+            color="black"
+            value={dateFrom}
+            onChange={(event) => setDateFrom(event.target.value)}
+          />
+          <Text color="white" fontWeight="600">—</Text>
+          <Input
+            type="date"
+            maxW="180px"
+            bg="white"
+            color="black"
+            value={dateTo}
+            onChange={(event) => setDateTo(event.target.value)}
+          />
+          <select
+            value={selectedAge}
+            onChange={(event) => setSelectedAge(event.target.value)}
+            style={{
+              background: "white",
+              color: "black",
+              borderRadius: "6px",
+              height: "40px",
+              minWidth: "160px",
+              padding: "0 8px",
+            }}
+          >
+            <option value="">Все возраста</option>
+            {EXACT_AGE_VALUES.filter(Boolean).map((value) => (
+              <option key={value} value={value}>
+                {value}+
+              </option>
+            ))}
+          </select>
+          <Button bg="#4C6BE6" color="white" onClick={resetFilters}>
+            Сбросить
+          </Button>
+          {loading ? <Spinner color="white" size="sm" /> : null}
+        </HStack>
+
+        {error ? (
+          <Box bg="rgba(255, 93, 93, 0.2)" borderRadius="10px" px={3} py={2}>
+            <Text color="#ffe1e1" fontSize="sm">{error}</Text>
+          </Box>
+        ) : null}
+
+        {!canManageEvents ? (
+          <Box bg="rgba(255, 255, 255, 0.22)" borderRadius="10px" px={3} py={2}>
+            <Text color="white" fontSize="sm">
+              Клик по дате открывает список событий. Кнопка создания доступна только роли организатора.
+            </Text>
+          </Box>
+        ) : null}
+
+        <HStack color="white" gap={4} fontSize="xs">
+          <HStack gap={1}>
+            <Box w="10px" h="10px" borderRadius="full" bg="#6B84EA" />
+            <Text>События</Text>
+          </HStack>
+          <HStack gap={1}>
+            <Box w="10px" h="10px" borderRadius="full" bg="#2D4DDB" />
+            <Text>События организатора</Text>
+          </HStack>
+        </HStack>
+
+        <Grid templateColumns="repeat(4, 1fr)" gap={6}>
+          {Array.from({ length: 12 }).map((_, monthIndex) => (
             <Box
-              key={monthName}
+              key={monthIndex}
               bg="#A3B3F2"
               borderRadius="20px"
               p={4}
               color="white"
-              w={{ base: "100%", sm: "270px" }}
+              w="270px"
               boxShadow="lg"
             >
               <Text fontWeight="bold" mb={2} textAlign="center">
-                {monthName}
+                {MONTHS[monthIndex]}
               </Text>
               <Grid templateColumns="repeat(7, 1fr)" gap={1} mb={2}>
-                {DAYS.map((dayName) => (
-                  <Text key={dayName} fontSize="xs" textAlign="center" opacity={0.8}>
-                    {dayName}
+                {DAYS.map((day) => (
+                  <Text key={day} fontSize="xs" textAlign="center" opacity={0.8}>
+                    {day}
                   </Text>
                 ))}
               </Grid>
               <Grid templateColumns="repeat(7, 1fr)" gap={1}>
-                {generateDaysForMonth(currentYear, monthIndex).map((day, dayIndex) => {
-                  const eventsForDay = getEventsForDay(day, monthIndex);
-                  const active = eventsForDay.length > 0;
-                  const fullDate = formatDate(currentYear, monthIndex, day.value);
+                {generateDaysForMonth(displayYear, monthIndex).map((day, index) => {
+                  const fullDate = day.isCurrentMonth
+                    ? toDateString(displayYear, monthIndex, day.value)
+                    : "";
+                  const eventsForDay = fullDate ? eventsByDate[fullDate] || [] : [];
+                  const hasEvents = eventsForDay.length > 0;
+                  const hasOrganizerEvent = eventsForDay.some((item) => {
+                    if (item.is_organizer_event) {
+                      return true;
+                    }
+                    return organizerKey.length > 0 && normalizeText(item.organizer) === organizerKey;
+                  });
 
                   return (
-                    <Box
-                      key={`${monthName}-${dayIndex}`}
-                      h="32px"
-                      lineHeight="32px"
-                      textAlign="center"
-                      borderRadius="md"
-                      cursor={active ? "pointer" : "default"}
-                      bg={active ? "#3D5AFE" : "transparent"}
-                      color={day.isCurrentMonth ? "white" : "whiteAlpha.500"}
-                      fontWeight={active ? "bold" : "normal"}
-                      position="relative"
-                      onMouseEnter={() => active && setHoveredDate(fullDate)}
-                      onMouseLeave={() => setHoveredDate(null)}
-                    >
-                      {day.value}
-                      {hoveredDate === fullDate && active && (
+                    <Box key={`${monthIndex}-${index}`} position="relative">
+                      <Box
+                        textAlign="center"
+                        fontSize="sm"
+                        p={1}
+                        borderRadius="6px"
+                        bg={hasEvents ? (hasOrganizerEvent ? "#2D4DDB" : "#6B84EA") : "transparent"}
+                        color={day.isCurrentMonth ? "white" : "gray.400"}
+                        cursor={day.isCurrentMonth ? "pointer" : "default"}
+                        _hover={hasEvents ? { bg: hasOrganizerEvent ? "#20379D" : "#4C6BE6" } : {}}
+                        onMouseEnter={() => hasEvents && setHoveredDate(fullDate)}
+                        onMouseLeave={() => setHoveredDate((prev) => (prev === fullDate ? null : prev))}
+                        onClick={() => handleDayClick(day, monthIndex)}
+                      >
+                        {day.value}
+                      </Box>
+
+                      {hasEvents && hoveredDate === fullDate ? (
                         <Box
                           position="absolute"
-                          top="36px"
+                          bottom="120%"
                           left="50%"
                           transform="translateX(-50%)"
-                          bg="white"
-                          color="black"
-                          borderRadius="lg"
-                          p={2}
-                          minW="210px"
-                          zIndex={20}
-                          boxShadow="xl"
-                          textAlign="left"
+                          bg="#4C6BE6"
+                          color="white"
+                          p={3}
+                          borderRadius="10px"
+                          w="260px"
+                          zIndex={15}
+                          boxShadow="lg"
                         >
-                          {eventsForDay.map((event) => (
-                            <Box key={`${event.eventId}-${event.time}`} mb={1}>
-                              <Text fontSize="12px" fontWeight="bold">{event.title}</Text>
-                              <Text fontSize="11px">{event.time || "Время не указано"}</Text>
-                            </Box>
-                          ))}
+                          <Text textAlign="center" fontWeight="bold" fontSize="sm" mb={2}>
+                            {fullDate.split("-").reverse().join(".")}
+                          </Text>
+                          <VStack align="stretch" gap={2}>
+                            {eventsForDay.map((eventItem) => (
+                              <Box key={`hover-${eventItem.slot_id}`} bg="rgba(255,255,255,0.16)" p={2} borderRadius="8px">
+                                <Flex justify="space-between" align="center" gap={2}>
+                                  <Text
+                                    fontSize="12px"
+                                    style={{
+                                      display: "-webkit-box",
+                                      overflow: "hidden",
+                                      WebkitBoxOrient: "vertical",
+                                      WebkitLineClamp: 2,
+                                    }}
+                                  >
+                                    {eventItem.title}
+                                  </Text>
+                                  <Text fontSize="11px" whiteSpace="nowrap">{eventItem.time}</Text>
+                                </Flex>
+                                <Text fontSize="10px" opacity={0.9}>
+                                  {eventItem.organizer || "Организатор не указан"}
+                                </Text>
+                              </Box>
+                            ))}
+                          </VStack>
                         </Box>
-                      )}
+                      ) : null}
                     </Box>
                   );
                 })}
@@ -173,10 +386,124 @@ export const Calendar: React.FC<CalendarProps> = ({ events = [] }) => {
             </Box>
           ))}
         </Grid>
-        {!calendarEvents.length ? (
-          <Text color="white" opacity={0.85}>У организатора пока нет запланированных мероприятий.</Text>
-        ) : null}
       </VStack>
+
+      <Modal
+        isOpen={isDateModalOpen}
+        onRequestClose={closeDateModal}
+        contentLabel="События выбранной даты"
+        style={{
+          overlay: {
+            backgroundColor: "rgba(0, 0, 0, 0.55)",
+            zIndex: 1200,
+          },
+          content: {
+            top: "50%",
+            left: "50%",
+            right: "auto",
+            bottom: "auto",
+            marginRight: "-50%",
+            transform: "translate(-50%, -50%)",
+            border: "none",
+            borderRadius: "16px",
+            padding: "0",
+            background: "transparent",
+            maxWidth: "680px",
+            width: "92%",
+          },
+        }}
+      >
+        <Box bg="#1E2B73" p={4} borderRadius="16px" border="1px solid rgba(255,255,255,0.22)">
+          <Flex justify="space-between" align="center" mb={3}>
+            <Text color="white" fontWeight="700" fontSize="20px">
+              {selectedDateForModal ? selectedDateForModal.split("-").reverse().join(".") : "Выбранная дата"}
+            </Text>
+            <Button
+              size="sm"
+              bg="transparent"
+              color="white"
+              _hover={{ bg: "rgba(255,255,255,0.15)" }}
+              onClick={closeDateModal}
+            >
+              Закрыть
+            </Button>
+          </Flex>
+
+          {selectedDayEvents.length > 0 ? (
+            <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={3} mb={4}>
+              {selectedDayEvents.map((eventItem) => {
+                const isOrganizerEvent = eventItem.is_organizer_event || (
+                  organizerKey.length > 0 && normalizeText(eventItem.organizer) === organizerKey
+                );
+                return (
+                  <Box
+                    key={eventItem.slot_id}
+                    bg="rgba(255,255,255,0.16)"
+                    border={isOrganizerEvent ? "1px solid rgba(120, 175, 255, 0.85)" : "1px solid rgba(255,255,255,0.22)"}
+                    borderRadius="12px"
+                    p={3}
+                    cursor="pointer"
+                    _hover={{ bg: "rgba(255,255,255,0.24)" }}
+                    onClick={() => {
+                      window.location.href = `/event/${eventItem.event_id}`;
+                    }}
+                  >
+                    <Text
+                      color="white"
+                      fontWeight="700"
+                      fontSize="14px"
+                      style={{
+                        display: "-webkit-box",
+                        overflow: "hidden",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: 2,
+                      }}
+                    >
+                      {eventItem.title}
+                    </Text>
+                    <Text color="#DCE9FF" fontSize="12px" mt={1}>
+                      Время: {eventItem.time}
+                    </Text>
+                    <Text color="#DCE9FF" fontSize="12px">
+                      Организатор: {eventItem.organizer || "не указан"}
+                    </Text>
+                    {isOrganizerEvent ? (
+                      <Box mt={2} display="inline-block" bg="#2D4DDB" borderRadius="full" px={2} py={0.5}>
+                        <Text color="white" fontSize="10px">Ваше событие</Text>
+                      </Box>
+                    ) : null}
+                  </Box>
+                );
+              })}
+            </Grid>
+          ) : (
+            <Box mb={4} bg="rgba(255,255,255,0.14)" borderRadius="12px" p={3}>
+              <Text color="white">На выбранную дату пока нет мероприятий.</Text>
+            </Box>
+          )}
+
+          {canManageEvents ? (
+            <Flex justify="center">
+              <Button
+                bg="#4C6BE6"
+                color="white"
+                onClick={handleOpenCreateEvent}
+              >
+                Создать мероприятие
+              </Button>
+            </Flex>
+          ) : null}
+        </Box>
+      </Modal>
+
+      <CreateModal
+        isOpen={isCreateModalOpen}
+        onRequestClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedDateForCreate(null);
+        }}
+        onCreateSuccess={handleCreateSuccess}
+      />
     </Box>
   );
 };
