@@ -40,9 +40,12 @@ from src.parser.schemas import (
     ParsedEventOut,
 )
 from src.parser.sources import (
+    DEFAULT_ORGANIZATION_DESCRIPTION,
+    OrganizationSourceInfo,
     SOURCE_CONFIGS,
     ParserRuntimeConfig,
     parse_source,
+    parse_organization_source_info,
     resolve_source_keys,
 )
 from src.parser.utils import extract_first_time, normalize_event_date
@@ -271,9 +274,12 @@ async def backfill_event_images_to_minio(
 async def distribute_parsed_events(
     db_connect: AsyncSession,
     request: ParseDistributeRequest,
+    settings: AppSettings,
 ) -> ParseDistributeResponse:
     cleaned_deleted = await _cleanup_soft_deleted_parsed(db_connect)
     group_lookup = await _load_group_lookup(db_connect)
+    organization_info_cache: dict[str, OrganizationSourceInfo] = {}
+    organization_image_cache: dict[tuple[str, str], str | None] = {}
 
     query = (
         select(ParsedEvent)
@@ -314,7 +320,14 @@ async def distribute_parsed_events(
                     duplicates_deleted += 1
                     continue
 
-                await _insert_event_from_parsed(db_connect, item, group_lookup=group_lookup)
+                await _insert_event_from_parsed(
+                    db_connect,
+                    item,
+                    group_lookup=group_lookup,
+                    settings=settings,
+                    organization_info_cache=organization_info_cache,
+                    organization_image_cache=organization_image_cache,
+                )
                 item.target_type = ParsedTargetType.event
                 item.process_status = ParsedProcessStatus.processed
                 item.processed_at = now_utc
@@ -328,7 +341,13 @@ async def distribute_parsed_events(
                 duplicates_deleted += 1
                 continue
 
-            await _insert_news_from_parsed(db_connect, item)
+            await _insert_news_from_parsed(
+                db_connect,
+                item,
+                settings=settings,
+                organization_info_cache=organization_info_cache,
+                organization_image_cache=organization_image_cache,
+            )
             item.target_type = ParsedTargetType.news
             item.process_status = ParsedProcessStatus.processed
             item.processed_at = now_utc
@@ -492,9 +511,12 @@ async def resolve_parsed_event_manually(
     *,
     parsed_event_id: int,
     request: ParseManualResolveRequest,
+    settings: AppSettings,
 ) -> ParseManualResolveResponse:
     item = await _get_active_parsed_event_or_404(db_connect=db_connect, parsed_event_id=parsed_event_id)
     now_utc = datetime.utcnow()
+    organization_info_cache: dict[str, OrganizationSourceInfo] = {}
+    organization_image_cache: dict[tuple[str, str], str | None] = {}
 
     if request.target_type == "rejected":
         item.target_type = ParsedTargetType.unknown
@@ -528,6 +550,9 @@ async def resolve_parsed_event_manually(
             db_connect=db_connect,
             item=item,
             group_ids=unique_group_ids,
+            settings=settings,
+            organization_info_cache=organization_info_cache,
+            organization_image_cache=organization_image_cache,
         )
         item.target_type = ParsedTargetType.event
         item.process_status = ParsedProcessStatus.processed
@@ -551,7 +576,13 @@ async def resolve_parsed_event_manually(
             detail=f"Новость уже существует в news (id={duplicate_news_id}).",
         )
 
-    news_id = await _insert_news_from_parsed(db_connect, item)
+    news_id = await _insert_news_from_parsed(
+        db_connect,
+        item,
+        settings=settings,
+        organization_info_cache=organization_info_cache,
+        organization_image_cache=organization_image_cache,
+    )
     item.target_type = ParsedTargetType.news
     item.process_status = ParsedProcessStatus.processed
     item.processed_at = now_utc
@@ -943,8 +974,6 @@ def _build_schedule_pair(date_value: str, time_value: str) -> tuple[datetime, ti
 
 
 def _resolve_source_link(source_key: Optional[str]) -> Optional[str]:
-    """Return the official website of a parser source, used as the
-    organizer link stored in ``info_organization.organizator``."""
     if not source_key:
         return None
     source = SOURCE_CONFIGS.get(source_key)
@@ -953,18 +982,82 @@ def _resolve_source_link(source_key: Optional[str]) -> Optional[str]:
     return (source.url or "").strip() or None
 
 
+def _get_organization_source_info(
+    *,
+    source_key: Optional[str],
+    settings: AppSettings,
+    organization_info_cache: dict[str, OrganizationSourceInfo],
+) -> OrganizationSourceInfo:
+    if not source_key:
+        return OrganizationSourceInfo(
+            description=DEFAULT_ORGANIZATION_DESCRIPTION,
+            picture_url=None,
+            external_url=None,
+        )
+    if source_key in organization_info_cache:
+        return organization_info_cache[source_key]
+
+    source = SOURCE_CONFIGS.get(source_key)
+    if not source:
+        info = OrganizationSourceInfo(
+            description=DEFAULT_ORGANIZATION_DESCRIPTION,
+            picture_url=None,
+            external_url=None,
+        )
+    else:
+        info = parse_organization_source_info(
+            source,
+            runtime_config=ParserRuntimeConfig(
+                vmuzey_proxy=settings.vmuzey_proxy,
+                vmuzey_cookies=settings.vmuzey_cookies,
+                vmuzey_user_agent=settings.vmuzey_user_agent,
+            ),
+        )
+    organization_info_cache[source_key] = info
+    return info
+
+
+def _resolve_organization_picture_url(
+    *,
+    settings: AppSettings,
+    picture_url: str | None,
+    organization_image_cache: dict[tuple[str, str], str | None],
+) -> str | None:
+    return _resolve_image_url_for_storage(
+        settings=settings,
+        image_url=picture_url,
+        default_image_url=settings.default_event_detail_image_url,
+        image_url_cache=organization_image_cache,
+        object_prefix="organizations",
+    )
+
+
 async def _get_or_create_organization_id(
     db_connect: AsyncSession,
     name: Optional[str],
     address: Optional[str],
     *,
     source_key: Optional[str] = None,
+    settings: AppSettings,
+    organization_info_cache: dict[str, OrganizationSourceInfo],
+    organization_image_cache: dict[tuple[str, str], str | None],
 ) -> Optional[int]:
     normalized_name = (name or "").strip()
     if not normalized_name:
         return None
 
-    source_link = _resolve_source_link(source_key)
+    source_info = _get_organization_source_info(
+        source_key=source_key,
+        settings=settings,
+        organization_info_cache=organization_info_cache,
+    )
+    source_link = source_info.external_url or _resolve_source_link(source_key)
+    description = (source_info.description or "").strip() or DEFAULT_ORGANIZATION_DESCRIPTION
+    picture_org = _resolve_organization_picture_url(
+        settings=settings,
+        picture_url=source_info.picture_url,
+        organization_image_cache=organization_image_cache,
+    )
 
     existing = (
         await db_connect.execute(
@@ -977,8 +1070,16 @@ async def _get_or_create_organization_id(
     if existing:
         if not existing.address and address:
             existing.address = address
-        # Promote the placeholder organizer link (empty or a duplicate of the
-        # name) to the real source website when we know it.
+        if (
+            not existing.description
+            or existing.description == DEFAULT_ORGANIZATION_DESCRIPTION
+        ):
+            existing.description = description
+        if not existing.picture_org and picture_org:
+            existing.picture_org = picture_org
+        if source_link and not existing.external_url:
+            existing.external_url = source_link
+        # Keep legacy `organizator` useful until frontend moves to external_url.
         if source_link and (
             not existing.organizator or existing.organizator == existing.name_org
         ):
@@ -989,6 +1090,9 @@ async def _get_or_create_organization_id(
         name_org=normalized_name,
         address=address,
         organizator=source_link or normalized_name,
+        description=description,
+        picture_org=picture_org,
+        external_url=source_link,
     )
     db_connect.add(org)
     await db_connect.flush()
@@ -1056,12 +1160,18 @@ async def _insert_event_from_parsed(
     item: ParsedEvent,
     *,
     group_lookup: dict[str, list[int]],
+    settings: AppSettings,
+    organization_info_cache: dict[str, OrganizationSourceInfo],
+    organization_image_cache: dict[tuple[str, str], str | None],
 ) -> int:
     organization_id = await _get_or_create_organization_id(
         db_connect,
         name=item.organization,
         address=item.address,
         source_key=item.source_key,
+        settings=settings,
+        organization_info_cache=organization_info_cache,
+        organization_image_cache=organization_image_cache,
     )
     event = Events(
         name=item.name,
@@ -1118,12 +1228,18 @@ async def _insert_event_from_parsed_manual(
     *,
     item: ParsedEvent,
     group_ids: list[int],
+    settings: AppSettings,
+    organization_info_cache: dict[str, OrganizationSourceInfo],
+    organization_image_cache: dict[tuple[str, str], str | None],
 ) -> int:
     organization_id = await _get_or_create_organization_id(
         db_connect,
         name=item.organization,
         address=item.address,
         source_key=item.source_key,
+        settings=settings,
+        organization_info_cache=organization_info_cache,
+        organization_image_cache=organization_image_cache,
     )
     event = Events(
         name=item.name,
@@ -1156,12 +1272,22 @@ async def _insert_event_from_parsed_manual(
     return event.id
 
 
-async def _insert_news_from_parsed(db_connect: AsyncSession, item: ParsedEvent) -> int:
+async def _insert_news_from_parsed(
+    db_connect: AsyncSession,
+    item: ParsedEvent,
+    *,
+    settings: AppSettings,
+    organization_info_cache: dict[str, OrganizationSourceInfo],
+    organization_image_cache: dict[tuple[str, str], str | None],
+) -> int:
     organization_id = await _get_or_create_organization_id(
         db_connect,
         name=item.organization,
         address=item.address,
         source_key=item.source_key,
+        settings=settings,
+        organization_info_cache=organization_info_cache,
+        organization_image_cache=organization_image_cache,
     )
     news = News(
         name=item.name,

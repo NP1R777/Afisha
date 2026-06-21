@@ -3,6 +3,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, Optional
+from urllib.parse import urlparse
 
 import requests
 import urllib3
@@ -39,6 +40,16 @@ class ParserRuntimeConfig:
     vmuzey_proxy: Optional[str] = None
     vmuzey_cookies: Optional[str] = None
     vmuzey_user_agent: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class OrganizationSourceInfo:
+    description: str
+    picture_url: Optional[str]
+    external_url: Optional[str]
+
+
+DEFAULT_ORGANIZATION_DESCRIPTION = "Информация об организации отсутствует"
 
 
 SOURCE_CONFIGS: dict[str, SourceConfig] = {
@@ -299,6 +310,94 @@ def parse_source(
         runtime_config=runtime_config,
     )
     return events[:max_events]
+
+
+def parse_organization_source_info(
+    config: SourceConfig,
+    *,
+    runtime_config: Optional[ParserRuntimeConfig] = None,
+) -> OrganizationSourceInfo:
+    runtime_config = runtime_config or ParserRuntimeConfig()
+    external_url = _organization_external_url(config.url)
+
+    is_vmuzey = "vmuzey.com" in (config.url or "").lower()
+    session = _build_session(
+        user_agent=runtime_config.vmuzey_user_agent if is_vmuzey else None,
+        proxy_url=runtime_config.vmuzey_proxy if is_vmuzey else None,
+        cookies_raw=runtime_config.vmuzey_cookies if is_vmuzey else None,
+    )
+    session.headers.update({"Accept-Language": "ru-RU,ru;q=0.9"})
+
+    try:
+        response = session.get(config.url, timeout=30, verify=config.verify_ssl)
+        response.raise_for_status()
+    except requests.RequestException:
+        return OrganizationSourceInfo(
+            description=DEFAULT_ORGANIZATION_DESCRIPTION,
+            picture_url=None,
+            external_url=external_url,
+        )
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    return OrganizationSourceInfo(
+        description=_extract_organization_description(soup) or DEFAULT_ORGANIZATION_DESCRIPTION,
+        picture_url=_extract_organization_image_from_soup(soup, base_url=config.url),
+        external_url=external_url,
+    )
+
+
+def _organization_external_url(source_url: str) -> Optional[str]:
+    normalized = clean_text(source_url)
+    if not normalized:
+        return None
+    parsed = urlparse(normalized)
+    if not parsed.netloc:
+        return normalized.rstrip("/") or None
+    scheme = parsed.scheme or "https"
+    netloc = parsed.netloc
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+    return f"{scheme}://{netloc}".rstrip("/") or None
+
+
+def _extract_organization_description(soup: BeautifulSoup) -> Optional[str]:
+    selectors = (
+        ("meta[property='og:description']", "content"),
+        ("meta[name='description']", "content"),
+        ("meta[name='twitter:description']", "content"),
+        ("meta[property='twitter:description']", "content"),
+    )
+    for selector, attr in selectors:
+        node = soup.select_one(selector)
+        value = clean_text(node.get(attr) if node else None)
+        if value:
+            return value
+    return None
+
+
+def _extract_organization_image_from_soup(soup: BeautifulSoup, *, base_url: str) -> Optional[str]:
+    metadata_sources: tuple[tuple[str, str], ...] = (
+        ("meta[property='og:image']", "content"),
+        ("meta[property='og:image:url']", "content"),
+        ("meta[name='twitter:image']", "content"),
+        ("meta[property='twitter:image']", "content"),
+        ("meta[itemprop='image']", "content"),
+        ("link[rel='image_src']", "href"),
+    )
+    for selector, attr in metadata_sources:
+        node = soup.select_one(selector)
+        candidate = _normalize_image_url(node.get(attr) if node else None, base_url=base_url)
+        if candidate:
+            return candidate
+
+    for node in soup.select("main img, article img, .content img, img"):
+        if _is_small_image(node):
+            continue
+        for attr in ("data-src", "data-lazy-src", "data-original", "srcset", "src"):
+            candidate = _normalize_image_url(node.get(attr), base_url=base_url)
+            if candidate:
+                return candidate
+    return None
 
 
 def _enrich_events_with_main_images(

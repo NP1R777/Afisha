@@ -141,6 +141,9 @@ class InfoOrganization(Base):
     name_org: str = Column(String, nullable=False)
     address: str = Column(String, nullable=True)
     organizator: str = Column(String, nullable=True)
+    description: str = Column(Text, nullable=True)
+    picture_org: str = Column(String, nullable=True)
+    external_url: str = Column(Text, nullable=True)
 
     events = relationship("Events", back_populates="organization_rel")
     news = relationship("News", back_populates="organization_rel")
