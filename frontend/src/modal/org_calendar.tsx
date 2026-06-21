@@ -503,7 +503,6 @@ export const Calendar: React.FC<CalendarProps> = ({
           setSelectedDateForCreate(null);
         }}
         onCreateSuccess={handleCreateSuccess}
-        initialDate={selectedDateForCreate}
       />
     </Box>
   );
