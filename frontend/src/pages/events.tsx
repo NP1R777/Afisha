@@ -16,7 +16,7 @@ interface EventDetails {
   id: number;
   name: string;
   description: string;
-  location: string;
+  organization: number;
   group_id: string;
   external_url: string;
   date_event: string[];
@@ -25,8 +25,8 @@ interface EventDetails {
   address: string;
   city: string;
   age_limit: string;
-  picture_url: string;
-  horizontal_picture_url?: string;
+  pictures_main: string;
+  pictures_two: string | null;
   time_slots: {
     id?: number;
     event_id?: number;
@@ -46,18 +46,17 @@ const Events = () => {
   const [favorites, setFavorites] = useState<{ [key: number]: boolean }>({});
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
-  const formatScheduleValue = (rawValue: string | undefined): string => {
-    const normalized = (rawValue || '').trim();
-    if (!normalized) {
-      return '—';
-    }
+  const districtMap: Record<string, string> = {
+      norilsk: 'Норильск',
+      talnah: 'Талнах',
+      kayerkan: 'Кайеркан',
+      oganeer: 'Оганер',
+      dudinka: 'Дудинка',
+    };
 
-    const timeMatch = normalized.match(/^(\d{1,2}:\d{2})(?::\d{2})?$/);
-    if (timeMatch) {
-      return timeMatch[1];
-    }
-    return normalized;
-  };
+  const formatScheduleValue = (rawValue?: string) => {
+  return rawValue?.slice(0, 5) || '—';
+};
 
   const parseDateParts = (rawDate: string | undefined): { day: number; month: number } => {
     const normalized = (rawDate || '').trim();
@@ -94,11 +93,13 @@ const Events = () => {
 
   const formatPrice = (rawPrice: number | null): string => {
     if (rawPrice === null || Number.isNaN(rawPrice)) {
-      return 'Не указана';
+      return '';
     }
+
     if (rawPrice === 0) {
       return 'Бесплатно';
     }
+
     return `от ${rawPrice} ₽`;
   };
 
@@ -132,6 +133,18 @@ const Events = () => {
     }
 
     return grouped;
+  };
+
+  const organizationsMap: Record<number, string> = {
+    1: 'Заполярный театр драмы',
+    2: 'Администрация города Норильска',
+    3: 'Кинотеатр Родина',
+    4: 'Городской центр культуры',
+    5: 'Талнахская детская школа искусств',
+    6: 'Норильская детская школа искусств',
+    7: 'Норильский колледж искусств',
+    8: 'Афиша Северного города',
+    9: 'Культурно-досуговый центр имени В. Высоцкого',
   };
 
   const toggleFavorite = async (index: number) => {
@@ -413,11 +426,11 @@ const Events = () => {
       <Toaster />
       <RegisterModal isOpen={isRegisterOpen} onRequestClose={() => setIsRegisterOpen(false)} openLoginModal={openLoginModal} />
 
-      {eventDetails.horizontal_picture_url && (
+      {eventDetails.pictures_two && (
         <Box position="absolute" top={0} left={0} width="100%" height='100%' maxWidth="1960px"
         >
           <Image
-            src={eventDetails.horizontal_picture_url}
+            src={eventDetails. pictures_two}
             alt="Изображение мероприятия"
             objectFit="cover"
             objectPosition="top center"
@@ -467,7 +480,7 @@ const Events = () => {
               flexShrink={0}
             >
               <Image
-                src={eventDetails.picture_url}
+                src={eventDetails.pictures_main}
                 alt={eventDetails.name}
                 objectFit="cover"
                 width="100%"
@@ -529,17 +542,19 @@ const Events = () => {
                     {formattedAgeLimit}
                   </Text>
                 </Box>
-                <Box
-                  bg="rgba(138, 174, 255, 0.25)"
-                  border="1px solid rgba(199,220,255,0.4)"
-                  borderRadius="full"
-                  px={3}
-                  py={1}
-                >
-                  <Text color="white" fontSize={{ base: '10px', md: '13px', lg: '15px' }}>
-                    {formattedPrice}
-                  </Text>
-                </Box>
+                {formattedPrice && (
+                  <Box
+                    bg="rgba(138, 174, 255, 0.25)"
+                    border="1px solid rgba(199,220,255,0.4)"
+                    borderRadius="full"
+                    px={3}
+                    py={1}
+                  >
+                    <Text color="white" fontSize={{ base: '10px', md: '13px', lg: '15px' }}>
+                      {formattedPrice}
+                    </Text>
+                  </Box>
+                )}
                 {eventDetails.duration ? (
                   <Box
                     bg="rgba(255,255,255,0.10)"
@@ -734,25 +749,6 @@ const Events = () => {
                 </Button>
               ) : null}
             </VStack>
-
-            <VStack align="start" gap={2} mt={4}>
-              <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
-                Возраст: {formattedAgeLimit}
-              </Text>
-              <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
-                Стоимость: {formattedPrice}
-              </Text>
-              {eventDetails.duration ? (
-                <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
-                  Время / длительность: {eventDetails.duration}
-                </Text>
-              ) : null}
-              {eventDetails.city ? (
-                <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white">
-                  Город: {eventDetails.city}
-                </Text>
-              ) : null}
-            </VStack>
           </Box>
         </motion.div>
 
@@ -773,14 +769,21 @@ const Events = () => {
             <Text fontSize={{ "2xl": '40px', lg: '32px', md: "26px", base: "22px" }} color="white" fontWeight="700">
               Адрес
             </Text>
-            <Text fontSize={{ "2xl": '21px', lg: '17px', md: "15px", base: "14px" }} color="white" mt={3}>
-              {eventDetails.location || 'Адрес не указан'}
+            <Text fontSize={{ "2xl": '24px', lg: '17px', md: "15px", base: "14px" }} color="white" mt={3}>
+              {organizationsMap[Number(eventDetails.organization)] ||
+                eventDetails.organization ||
+                'Адрес не указан'}
             </Text>
-            {eventDetails.address && eventDetails.address !== eventDetails.location ? (
+            {eventDetails.address ? (
               <Text fontSize={{ "2xl": '21px', lg: '17px', md: "15px", base: "14px" }} color="white" mt={1}>
                 {eventDetails.address}
               </Text>
             ) : null}
+            {eventDetails.city ? (
+                <Text fontSize={{ "2xl": '20px', lg: '17px', md: "15px", base: "14px" }} color="white" mt={1}>
+                  Район {districtMap[eventDetails.city?.toLowerCase()] || eventDetails.city}
+                </Text>
+              ) : null}
 
             <Button
               mt={4}
@@ -798,7 +801,7 @@ const Events = () => {
                 transform: 'translateY(-1px)',
                 boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
               }}
-              onClick={() => navigate('/organizer')}
+              onClick={() => navigate(`/organizer/${eventDetails.organization}`)}
             >
               Страница организатора
             </Button>
