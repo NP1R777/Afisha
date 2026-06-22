@@ -21,6 +21,7 @@ import cross from '../pictures/cross.png';
 import EventImage from '../pictures/picture.png';
 import EventCalendarModal from '../modal/calendar';
 
+
 interface Event {
   id?: number;
   external_url: string;
@@ -675,10 +676,11 @@ const personalizedEvents = isAuthenticated
         <ContainerFluid position="fixed" zIndex={1} top={{ base: "90px" }} >
           <Flex
             justify={{ base: "center", md: "space-between" }}
-            align="center"
+            direction={{ base: "column", md: "row" }}
+            align={{ base: "flex-start", md: "center" }}
             flexWrap={{ base: "wrap", md: "nowrap" }}
             gap={{ base: 2, md: 0 }}
-            textAlign={{ base: "center", md: "left" }}
+            textAlign={{ base: "left", md: "left" }}
             fontFamily="Unbounded"
             w="100%"
             bg="rgba(22, 27, 66, 0.45)"
@@ -689,14 +691,17 @@ const personalizedEvents = isAuthenticated
             boxShadow="0 10px 28px rgba(7, 11, 34, 0.33)"
             backdropFilter="blur(6px)"
           >
-            <HStack gap={{ xl: '4', lg: '4', base: '1' }} >
+            <HStack w={{ base: "100%", md: "auto" }}
+                justify={{ base: "space-between", md: "flex-start" }} 
+                gap={{ base: '1', lg: '4', xl: '4' }}>
               <Box
-                
+                ml={{ base: "0px", md: "0" }}
                 bg="white"
                 borderRadius="full"
                 color="black"
                 py={{ base: '4px', md: '6px' }}
                 px={{ base: '8px',  sm:"20px", md: '26px' }}
+                
                 position="relative"
                 height={{ base: '36px', md: '40px' }}
                 display="flex"
@@ -708,6 +713,7 @@ const personalizedEvents = isAuthenticated
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 _hover={{ bg: 'gray.50', boxShadow: '0 10px 20px rgba(13, 18, 45, 0.22)' }}
                 transition="all 0.2s"
+                
               >
                             
               <DatePicker
@@ -760,12 +766,11 @@ const personalizedEvents = isAuthenticated
                   </Text>
                 }
               />
-
               {(startDate || endDate) && (
                   <Button
                     position="absolute"
                     p={0}
-                    right={{ base: '-16px', sm:"-9px", md: '-4px' }}
+                    right={{ base: '-30px', sm:"-9px", md: '-4px' }}
                     top="0"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -775,7 +780,7 @@ const personalizedEvents = isAuthenticated
                     border="none"
                     color="black"
                   >
-                    <Image src={cross} alt="Отменить" boxSize={{ base: '12px', sm:"15px", md: '15px' }} />
+                    <Image src={cross} alt="Отменить" boxSize={{ base: '20px', sm:"15px", md: '15px' }} />
                   </Button>
                 )}
               </Box>
@@ -789,8 +794,14 @@ const personalizedEvents = isAuthenticated
                 borderRadius="full"
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleCategoryChange}
+                flexShrink={0}
+                flexGrow={0}
+                w="fit-content"
+                
+                
               >
-                <SelectTrigger width="185px">
+                <SelectTrigger width="fit-content"
+                    minW={{ base: '16px',  md: '180px' }}>
                   <Box
                     textWrap="nowrap"
                     as="span"
@@ -810,12 +821,17 @@ const personalizedEvents = isAuthenticated
                   ))}
                 </SelectContent>
               </SelectRoot>
-            </HStack>
-            <HStack gap={{ base: '1', lg: '4', xl: '4' }} >
+              </HStack>
+            
+            <HStack gap={{ base: '1', lg: '4', xl: '4' }}
+                    w={{ base: "100%", md: "auto" }}
+                    justify={{ base: "space-between", md: "flex-end" }}>
               <SelectRoot
                 className="light"
                 size={{ base: 'sm', md: 'md' }}
                 multiple
+                flexShrink={0}
+                w="fit-content"
                 collection={districts}
                 bg="white"
                 overflow="hidden"
@@ -823,8 +839,9 @@ const personalizedEvents = isAuthenticated
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleDistrictChange}
                 mr={{ sm: "140px", md: "0px" }}
+                
               >
-                <SelectTrigger>
+                <SelectTrigger width={{ base: "120px", sm: "140px", md: "185px" }}>
                   <Flex alignItems="center" gap="5px" pr={{ base: '16px', md: '20px' }} width={{ base: "80px", md: "auto" }}>
                     <Image
                       src={position}
@@ -851,6 +868,9 @@ const personalizedEvents = isAuthenticated
                 maxHeight={{ base: '36px', md: '40px' }}
                 bg="white"
                 borderRadius="full"
+                flexShrink={0}
+                flexGrow={0}
+                w="fit-content"
                 color="black"
                 fontSize={{ base: '10px', sm: "12px", md: 'sm' }}
                 height="40px"
@@ -860,6 +880,7 @@ const personalizedEvents = isAuthenticated
                 onClick={() => setIsCalendarModalOpen(true)}
                 fontWeight="400"
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
+                
               >
                 <Image
                   display={{ base: 'none', md: 'block' }}
@@ -871,7 +892,7 @@ const personalizedEvents = isAuthenticated
                 <Text>Календарь событий</Text>
               </Button>
             </HStack>
-          </Flex>
+            </Flex>
         </ContainerFluid>
 
         <motion.div {...sectionReveal} style={{ width: '100%' }}>
