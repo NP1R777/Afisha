@@ -193,7 +193,7 @@ const Layout = () => {
             boxShadow="0 12px 28px rgba(8, 12, 34, 0.35)"
             backdropFilter="blur(7px)"
           >
-          <HStack mt={3} align="center" mb={2} justify="space-between" w="100%">
+          <HStack mt={{ base: 1, xl: 3 }} align="center" mb={{ base: 1, xl: 2 }} justify="space-between" w="100%">
             <Text
               fontFamily="Unbounded"
               color="gray.300"
@@ -206,7 +206,7 @@ const Layout = () => {
             <Image
               src="/icons/logo-filled.svg"
               alt="logo"
-              boxSize="40px"
+              boxSize={{ base: '30px', xl: "40px"}}
               objectFit="contain"
               userSelect="none"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -230,8 +230,8 @@ const Layout = () => {
       />
       <Box
         position="fixed"
-        right="40px"
-        bottom="60px"
+        right={{ base: '10px', xl: "40px"}}
+        bottom={{ base: '10px', xl: "60px"}}
         zIndex={100}
         cursor="pointer"
         onClick={openModal}
@@ -246,10 +246,9 @@ const Layout = () => {
         <Image
           src={assistant}
           alt="assistant"
-          maxW={{ base: '120px', md: '180px', lg: '110px' }}
+          maxW={{ base: '80px', md: '100px', lg: '110px' }}
           pointerEvents="none"
           userSelect="none"
-
         />
         </Box>
         <AiAssistantModal
