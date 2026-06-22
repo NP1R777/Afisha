@@ -801,7 +801,7 @@ const Events = () => {
                 transform: 'translateY(-1px)',
                 boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
               }}
-              onClick={() => navigate('/organizer')}
+              onClick={() => navigate(`/organizer/${eventDetails.organization}`)}
             >
               Страница организатора
             </Button>

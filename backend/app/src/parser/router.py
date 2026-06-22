@@ -15,6 +15,8 @@ from src.parser.schemas import (
     ParseLaunchResponse,
     ParseManualResolveRequest,
     ParseManualResolveResponse,
+    ParseOrganizationBackfillRequest,
+    ParseOrganizationBackfillResponse,
     ParseSourceInfo,
     ParseStatusUpdateRequest,
     ParseStatusUpdateResponse,
@@ -23,6 +25,7 @@ from src.parser.schemas import (
 from src.parser.service import (
     backfill_event_images_to_minio,
     backfill_event_categories,
+    backfill_organization_info,
     delete_parsed_event_manually,
     distribute_parsed_events,
     list_parsed_events,
@@ -111,6 +114,23 @@ async def backfill_event_images(
     settings: AppSettings = Depends(get_settings),
 ) -> ParseImageBackfillResponse:
     return await backfill_event_images_to_minio(
+        db_connect=db_connect,
+        request=payload,
+        settings=settings,
+    )
+
+
+@router.post(
+    "/organizations/backfill",
+    response_model=ParseOrganizationBackfillResponse,
+    summary="Ручное обновление данных организаций из источников",
+)
+async def backfill_organizations(
+    payload: ParseOrganizationBackfillRequest,
+    db_connect: AsyncSession = Depends(get_db),
+    settings: AppSettings = Depends(get_settings),
+) -> ParseOrganizationBackfillResponse:
+    return await backfill_organization_info(
         db_connect=db_connect,
         request=payload,
         settings=settings,

@@ -47,6 +47,33 @@ export interface AdminEvent {
   time_slots?: AdminTimeSlot[];
 }
 
+export interface AdminOrganization {
+  id: number;
+  name_org: string;
+  address?: string | null;
+  organizator?: string | null;
+  description?: string | null;
+  picture_org?: string | null;
+  external_url?: string | null;
+  created_at?: string | null;
+  update_at?: string | null;
+  deleted_at?: string | null;
+}
+
+export interface AdminOrganizationListResponse {
+  total: number;
+  items: AdminOrganization[];
+}
+
+export interface AdminOrganizationPayload {
+  name_org?: string;
+  address?: string | null;
+  organizator?: string | null;
+  description?: string | null;
+  picture_org?: string | null;
+  external_url?: string | null;
+}
+
 export interface ParserRunPayload {
   source_keys?: string[];
   include_reserve?: boolean;
