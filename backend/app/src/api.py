@@ -6,7 +6,7 @@ from src.news.router import router as news_router
 from src.parser.router import router as parser_router
 from src.assistant.router import router as assistant_router
 from src.organization.router import router as organization_router
-from src.oraganaizer_application.router import router as organization_application_router
+from src.organizer_application.router import router as organization_application_router
 
 api_router = APIRouter()
 
