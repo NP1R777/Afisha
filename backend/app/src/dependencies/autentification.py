@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from database.models import User
+from database.models import User, RoleEnum
 from core.settings import AppSettings
 from src.user.schemas import UserTokenPayload
 from fastapi import Depends, HTTPException
@@ -33,3 +33,18 @@ async def get_current_user(token_payload: UserTokenPayload = Depends(get_token_p
     if not user:
         raise HTTPException(status_code=404, detail="Не найдено пользователь по данным из токена")
     return user
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Зависимость для проверки, что текущий пользователь — администратор.
+    """
+    if not current_user.role or current_user.role.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён. Требуется роль администратора."
+        )
+    
+    return current_user
