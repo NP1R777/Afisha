@@ -6,6 +6,7 @@ from src.news.router import router as news_router
 from src.parser.router import router as parser_router
 from src.assistant.router import router as assistant_router
 from src.organization.router import router as organization_router
+from src.oraganaizer_application.router import router as organization_application_router
 
 api_router = APIRouter()
 
@@ -16,3 +17,4 @@ api_router.include_router(news_router, tags=["news"])
 api_router.include_router(parser_router, tags=["parser"])
 api_router.include_router(assistant_router, tags=["assistant"])
 api_router.include_router(organization_router, tags=["organization"])
+api_router.include_router(organization_application_router, tags=["organization_application"])

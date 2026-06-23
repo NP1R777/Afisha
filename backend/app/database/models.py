@@ -1,5 +1,6 @@
 import enum
 from datetime import date, datetime, time
+from typing import Optional
 
 from sqlalchemy import (
     DATE,
@@ -15,9 +16,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     text,
-    MetaData,
+    MetaData
 )
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship, Mapped
 
 
 convention = {
@@ -58,6 +59,12 @@ class ParsedProcessStatus(str, enum.Enum):
     error = "error"
 
 
+class ApplicationStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=convention)
 
@@ -83,6 +90,9 @@ class User(Base):
     role = relationship("Roles", back_populates="user", uselist=False)
     preferred_groups = relationship("UserGroupsEvent", back_populates="user", cascade="all, delete-orphan")
     liked_events = relationship("UserToEvent", back_populates="user", cascade="all, delete-orphan")
+    organizer_application: Mapped[Optional["OrganizerApplication"]] = relationship(
+        "OrganizerApplication", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        )
 
 
 class Roles(Base):
@@ -295,6 +305,38 @@ class ParsedEvent(Base):
     )
     processed_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
     error_text: str = Column(Text, nullable=True)
+
+
+class OrganizerApplication(Base):
+    __tablename__ = "organizer_applications"
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    created_at: datetime = Column(TIMESTAMP(timezone=False), server_default=NOW_AT_UTC, nullable=False)
+    updated_at: datetime = Column(
+        TIMESTAMP(timezone=False),
+        server_default=NOW_AT_UTC,
+        onupdate=NOW_AT_UTC,
+        nullable=False,
+    )
+    deleted_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
+
+    user_id: int = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, 
+        unique=True
+    )
+    status: ApplicationStatus = Column(
+        Enum(ApplicationStatus, name="application_status"),
+        nullable=False,
+        server_default=ApplicationStatus.pending.value,
+    )
+    message: str = Column(Text, nullable=True)           # сообщение от пользователя
+    review_comment: str = Column(Text, nullable=True)    # комментарий админа
+    reviewed_by: int = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
+
+    user = relationship("User", back_populates="organizer_application")
 
 
 # Backward-compatible alias
