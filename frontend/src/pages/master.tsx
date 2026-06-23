@@ -1040,7 +1040,7 @@ const personalizedEvents = isAuthenticated
           >
             <Heading
               lineHeight={1}
-              fontSize={{ xl: '64px', lg: '40px', sm: '30px', base: '25px' }}
+              fontSize={{ xl: '64px', lg: '40px', sm: '30px', base: '20px' }}
               fontFamily="Unbounded"
               color="white"
               textAlign="center"

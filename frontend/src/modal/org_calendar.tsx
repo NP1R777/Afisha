@@ -1,5 +1,6 @@
 import React from "react";
-import { Box, Grid, VStack, Text, Flex } from "@chakra-ui/react";
+import { Box, Grid, VStack, Text, Flex,
+    useBreakpointValue } from "@chakra-ui/react";
 
 const days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const months = [
@@ -8,6 +9,7 @@ const months = [
   "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
 ];
 const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 
 // const testEvents = [
 //   { date: "2026-01-12", title: "Спектакль Гамлет", time: "18:00" },
@@ -90,6 +92,7 @@ function generateDaysForMonth(monthIndex: number): Day[] {
   const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
   const prevMonthDays = monthLengths[prevMonthIndex];
 
+  
   for (let i = startDay - 1; i >= 0; i--) {
     daysArray.push({ value: prevMonthDays - i, isCurrentMonth: false });
   }
@@ -104,7 +107,6 @@ function generateDaysForMonth(monthIndex: number): Day[] {
   return daysArray;
 }
 
-
 type CalendarEvent = {
   date: string;
   title: string;
@@ -117,7 +119,7 @@ type Props = {
 };
 
 export const Calendar: React.FC = () => {
-  const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
+  // const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
   const orgEvents = React.useMemo(() => {
   return mockEvents.filter(e => Number(e.organization) === 1);
 }, []);
@@ -131,6 +133,40 @@ const calendarEvents = React.useMemo(() => {
     }))
   );
 }, []);
+const [isOpen, setIsOpen] = React.useState(false);
+const [selectedEvents, setSelectedEvents] = React.useState<CalendarEvent[]>([]);
+const [selectedDate, setSelectedDate] = React.useState('');
+
+const [mobileMonth, setMobileMonth] = React.useState(0);
+const prevMonth = () => {
+    setMobileMonth(prev => prev === 0 ? 11 : prev - 1);
+};
+
+const nextMonth = () => {
+    setMobileMonth(prev => prev === 11 ? 0 : prev + 1);
+};
+const isMobile = useBreakpointValue({
+    base: true,
+    md: false
+});
+    React.useEffect(() => {
+      if (!selectedDate) return;
+
+      const timer = setTimeout(() => {
+        setSelectedDate('');
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }, [selectedDate]);
+
+const handleDayClick = (
+    fullDate: string,
+    events: CalendarEvent[]
+) => {
+    setSelectedDate(fullDate);
+    setSelectedEvents(events);
+    setIsOpen(true);
+};
 
   const getEventsForDay = (day: Day, monthIndex: number) => {
     if (!day.isCurrentMonth) return [];
@@ -143,28 +179,40 @@ const calendarEvents = React.useMemo(() => {
   };
 
   return (
-    <Box bg="#6B84EA" w="95%" py={7} borderRadius="20px" mt={10} ml="auto">
+    <Box bg="#6B84EA" w={{ base: "100%", md: "95%" }}
+        py={{ base: 4, md: 7 }}
+        px={{ base: 3, md: 0 }}
+        borderRadius="20px"
+        mt={{ md: 10, base: 5 }}
+        ml="auto">
       <VStack gap={6} align="center">
         <Box bg="#A3B3F2" color="white" px={4} py={2} borderRadius="20px">
           <Text fontSize="xl" textAlign="center">2026 год</Text>
         </Box>
-        <Grid templateColumns="repeat(4, 1fr)" gap={6}>
+        <Grid templateColumns={{
+              base: "1fr",
+              md: "repeat(2, 1fr)",
+              lg: "repeat(4, 1fr)"
+            }}
+            gap={{ base: 4, md: 6 }}
+            justifyItems="center">
           {Array.from({ length: 12 }).map((_, i) => (
             <Box
               key={i}
               bg="#A3B3F2"
               borderRadius="20px"
-              p={4}
+              p={{ base: 3, md: 4 }}
               color="white"
-              w="270px"
-              boxShadow="lg"
+                w={{ base: "100%", md: "270px" }}
+                maxW="270px"
+                boxShadow="lg"
             >
-              <Text fontWeight="bold" mb={2} textAlign="center">
+              <Text fontWeight="bold" mb={2} textAlign="center" fontSize={{ base: "sm", md: "md" }}>
                 {months[i]}
               </Text>
               <Grid templateColumns="repeat(7, 1fr)" gap={1} mb={2}>
                 {days.map(d => (
-                  <Text key={d} fontSize="xs" textAlign="center" opacity={0.8}>
+                  <Text key={d} fontSize={{ base: "10px", md: "xs" }} textAlign="center" opacity={0.8}>
                     {d}
                   </Text>
                 ))}
@@ -181,10 +229,17 @@ const calendarEvents = React.useMemo(() => {
                     <Box key={idx} position="relative">
                       <Box
                         textAlign="center"
-                        fontSize="sm"
-                        p={1}
+                        fontSize={{ base: "xs", md: "sm" }}
+                        p={{ base: 0.5, md: 1 }}
                         borderRadius="6px"
                         bg={active ? "#6B84EA" : "transparent"}
+                        onClick={() => {
+                              if (!active) return;
+
+                              setSelectedDate(prev =>
+                                  prev === fullDate ? '' : fullDate
+                              );
+                          }}
                         color={
                           active
                             ? "white"
@@ -194,19 +249,20 @@ const calendarEvents = React.useMemo(() => {
                         }
                         cursor={active ? "pointer" : "default"}
                         _hover={active ? { bg: "#4C6BE6" } : {}}
-                        onMouseEnter={() => active && setHoveredDate(fullDate)}
-                        onMouseLeave={() => setHoveredDate(null)}
+                        // onMouseEnter={() => active && setHoveredDate(fullDate)}
+                        // onMouseLeave={() => setHoveredDate(null)}
                       >
                         {day.value}
                       </Box>
 
                       {/* Всплывающий блок с мероприятиями */}
-                      {active && hoveredDate === fullDate && (
+                      {active && selectedDate === fullDate && (
+                        
                         <Box
-                          position="absolute"
-                          bottom="120%"
+                          position="fixed"
+                          top="50%"
                           left="50%"
-                          transform="translateX(-50%)"
+                          transform="translate(-50%, -50%)"
                           bg="#4C6BE6"
                           color="white"
                           p={3}
@@ -215,9 +271,27 @@ const calendarEvents = React.useMemo(() => {
                           zIndex={10}
                           boxShadow="lg"
                         >
-                          <Text textAlign="center" fontWeight="bold" fontSize="sm" mb={2}>
-                            {fullDate.split("-").reverse().join(".")}
-                          </Text>
+                          
+                          <Box position="relative" mb={2}>
+                            <Text
+                              textAlign="center"
+                              fontWeight="bold"
+                              fontSize="sm"
+                            >
+                              {fullDate.split("-").reverse().join(".")}
+                            </Text>
+
+                            <Text
+                              position="absolute"
+                              right="0"
+                              top="50%"
+                              transform="translateY(-50%)"
+                              cursor="pointer"
+                              onClick={() => setSelectedDate('')}
+                            >
+                              ✕
+                            </Text>
+                          </Box>
                           <VStack align="start" gap={2}>
                             {eventsForDay.map((event, idx) => (
                               <Box key={idx} w="100%">
@@ -229,6 +303,7 @@ const calendarEvents = React.useMemo(() => {
                             ))}
                           </VStack>
                         </Box>
+                        
                       )}
                     </Box>
                   );
