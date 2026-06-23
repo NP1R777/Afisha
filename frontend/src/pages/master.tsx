@@ -21,6 +21,7 @@ import cross from '../pictures/cross.png';
 import EventImage from '../pictures/picture.png';
 import EventCalendarModal from '../modal/calendar';
 
+
 interface Event {
   id?: number;
   external_url: string;
@@ -672,9 +673,14 @@ const personalizedEvents = isAuthenticated
   return (
     <ContainerFluid>
       <Flex direction="column" align="center" height="100%">
-        <ContainerFluid position="fixed" zIndex={1}>
+        <ContainerFluid position="fixed" zIndex={1} top={{ base: "90px" }} >
           <Flex
-            justify="space-between"
+            justify={{ base: "center", md: "space-between" }}
+            direction={{ base: "column", md: "row" }}
+            align={{ base: "flex-start", md: "center" }}
+            flexWrap={{ base: "wrap", md: "nowrap" }}
+            gap={{ base: 2, md: 0 }}
+            textAlign={{ base: "left", md: "left" }}
             fontFamily="Unbounded"
             w="100%"
             bg="rgba(22, 27, 66, 0.45)"
@@ -685,14 +691,17 @@ const personalizedEvents = isAuthenticated
             boxShadow="0 10px 28px rgba(7, 11, 34, 0.33)"
             backdropFilter="blur(6px)"
           >
-            <HStack gap={{ xl: '4', lg: '4', base: '1' }}>
+            <HStack w={{ base: "100%", md: "auto" }}
+                justify={{ base: "space-between", md: "flex-start" }} 
+                gap={{ base: '1', lg: '4', xl: '4' }}>
               <Box
-                
+                ml={{ base: "0px", md: "0" }}
                 bg="white"
                 borderRadius="full"
                 color="black"
                 py={{ base: '4px', md: '6px' }}
                 px={{ base: '8px',  sm:"20px", md: '26px' }}
+                
                 position="relative"
                 height={{ base: '36px', md: '40px' }}
                 display="flex"
@@ -704,6 +713,7 @@ const personalizedEvents = isAuthenticated
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 _hover={{ bg: 'gray.50', boxShadow: '0 10px 20px rgba(13, 18, 45, 0.22)' }}
                 transition="all 0.2s"
+                
               >
                             
               <DatePicker
@@ -744,7 +754,7 @@ const personalizedEvents = isAuthenticated
 
                 customInput={
                   <Text
-                    fontSize={{ base: '8px', sm: "12px", md: 'sm', lg: '15px', '2xl': '15px' }}
+                    fontSize={{ base: '10px', sm: "12px", md: 'sm', lg: '15px', '2xl': '15px' }}
                     whiteSpace="nowrap"
                     display="inline-block"
                   >
@@ -756,12 +766,11 @@ const personalizedEvents = isAuthenticated
                   </Text>
                 }
               />
-
               {(startDate || endDate) && (
                   <Button
                     position="absolute"
                     p={0}
-                    right={{ base: '-2px', sm:"-9px", md: '-4px' }}
+                    right={{ base: '-30px', sm:"-9px", md: '-4px' }}
                     top="0"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -771,7 +780,7 @@ const personalizedEvents = isAuthenticated
                     border="none"
                     color="black"
                   >
-                    <Image src={cross} alt="Отменить" boxSize={{ base: '12px', sm:"15px", md: '15px' }} />
+                    <Image src={cross} alt="Отменить" boxSize={{ base: '20px', sm:"15px", md: '15px' }} />
                   </Button>
                 )}
               </Box>
@@ -785,13 +794,19 @@ const personalizedEvents = isAuthenticated
                 borderRadius="full"
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleCategoryChange}
+                flexShrink={0}
+                flexGrow={0}
+                w="fit-content"
+                
+                
               >
-                <SelectTrigger width="185px">
+                <SelectTrigger width="fit-content"
+                    minW={{ base: '16px',  md: '180px' }}>
                   <Box
                     textWrap="nowrap"
                     as="span"
                     pr={{ base: '16px', sm:"20px", md: '20px' }}
-                    fontSize={{ base: '8px', sm:"12px", md: 'sm' }}
+                    fontSize={{ base: '10px', sm:"12px", md: 'sm' }}
                     color="black"
                     cursor="pointer"
                   >
@@ -806,21 +821,28 @@ const personalizedEvents = isAuthenticated
                   ))}
                 </SelectContent>
               </SelectRoot>
-            </HStack>
-            <HStack gap={{ base: '1', lg: '4', xl: '4' }}>
+              </HStack>
+            
+            <HStack gap={{ base: '1', lg: '4', xl: '4' }}
+                    w={{ base: "100%", md: "auto" }}
+                    justify={{ base: "space-between", md: "flex-end" }}>
               <SelectRoot
                 className="light"
                 size={{ base: 'sm', md: 'md' }}
                 multiple
+                flexShrink={0}
+                w="fit-content"
                 collection={districts}
                 bg="white"
                 overflow="hidden"
                 borderRadius="full"
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
                 onChange={handleDistrictChange}
+                mr={{ sm: "140px", md: "0px" }}
+                
               >
-                <SelectTrigger>
-                  <Flex alignItems="center" gap="5px" pr={{ base: '16px', md: '20px' }}>
+                <SelectTrigger width={{ base: "120px", sm: "140px", md: "185px" }}>
+                  <Flex alignItems="center" gap="5px" pr={{ base: '16px', md: '20px' }} width={{ base: "80px", md: "auto" }}>
                     <Image
                       src={position}
                       display={{ base: 'none', md: 'block' }}
@@ -828,7 +850,7 @@ const personalizedEvents = isAuthenticated
                       boxSize={{ base: '16px', md: '20px' }}
                       objectFit="contain"
                     />
-                    <Box as="span" fontSize={{ base: '10px', md: 'sm' }} color="black" cursor="pointer">
+                    <Box as="span" fontSize={{ base: '10px', sm: "12px", md: 'sm' }} color="black" cursor="pointer">
                       Районы
                     </Box>
                   </Flex>
@@ -846,8 +868,11 @@ const personalizedEvents = isAuthenticated
                 maxHeight={{ base: '36px', md: '40px' }}
                 bg="white"
                 borderRadius="full"
+                flexShrink={0}
+                flexGrow={0}
+                w="fit-content"
                 color="black"
-                fontSize={{ base: '8px', md: 'sm' }}
+                fontSize={{ base: '10px', sm: "12px", md: 'sm' }}
                 height="40px"
                 px={{ base: '10px', md: '16px' }}
                 _hover={{ bg: 'gray.50' }}
@@ -855,6 +880,7 @@ const personalizedEvents = isAuthenticated
                 onClick={() => setIsCalendarModalOpen(true)}
                 fontWeight="400"
                 boxShadow="0 6px 16px rgba(13, 18, 45, 0.16)"
+                
               >
                 <Image
                   display={{ base: 'none', md: 'block' }}
@@ -866,12 +892,12 @@ const personalizedEvents = isAuthenticated
                 <Text>Календарь событий</Text>
               </Button>
             </HStack>
-          </Flex>
+            </Flex>
         </ContainerFluid>
 
         <motion.div {...sectionReveal} style={{ width: '100%' }}>
           <VStack
-            mt="40px"
+            mt={{ base: "100px", md: "40px" }}
             align="center"
             maxW={{ md: '75%', base: '90%' }}
             p={{ lg: 10, base: 4 }}
@@ -888,7 +914,7 @@ const personalizedEvents = isAuthenticated
               as="h1"
               fontWeight={500}
               lineHeight={1}
-              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
+              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '20px' }}
               alignSelf="center"
               fontFamily="Unbounded"
               textShadow="0 10px 28px rgba(0,0,0,0.35)"
@@ -899,7 +925,7 @@ const personalizedEvents = isAuthenticated
               as="h1"
               fontWeight={500}
               lineHeight={1}
-              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '16px' }}
+              fontSize={{ xl: '68px', lg: '32px', sm:"30px", base: '22px' }}
               alignSelf="center"
               fontFamily="Unbounded"
               textShadow="0 10px 28px rgba(0,0,0,0.35)"
@@ -909,7 +935,7 @@ const personalizedEvents = isAuthenticated
             <Text
               fontSize={{ xl: '24px', lg: '16px', sm:"15px", base: '12px' }}
               fontWeight="300"
-              mt={{ xl: '20px', lg: '20px', sm:"30px", base: '5px' }}
+              mt={{ xl: '20px', lg: '20px', sm:"10px", base: '5px' }}
               textAlign="center"
               fontFamily="Unbounded"
               lineHeight={1.65}
@@ -1001,7 +1027,7 @@ const personalizedEvents = isAuthenticated
          {isAuthenticated && (
           <Box
             mt={9}
-            w={{base: "700px", xl: "1100px"}}
+            w={{base: "350px", sm: "470px", xl: "1100px"}}
                 p={4}
               
                 color="white"
@@ -1014,7 +1040,7 @@ const personalizedEvents = isAuthenticated
           >
             <Heading
               lineHeight={1}
-              fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
+              fontSize={{ xl: '64px', lg: '40px', sm: '30px', base: '25px' }}
               fontFamily="Unbounded"
               color="white"
               textAlign="center"
@@ -1026,7 +1052,7 @@ const personalizedEvents = isAuthenticated
             <Flex
               justify="center"
               gap={8}
-              mt={{ base: '35px', lg: '20px', xl: '60px' }}
+              mt={{ base: '30px', lg: '20px', xl: '60px' }}
               wrap="wrap"
             >
               {personalizedEvents
@@ -1165,11 +1191,11 @@ const personalizedEvents = isAuthenticated
         )}
       {hasVisibleEvents && (
         <Text
-          mt={10}
-          mb={6}
+          mt={{ base: '5', xl: '10' }}
+          mb={{ base: '2', xl: '6' }}
           textAlign="center"
           fontFamily="Unbounded"
-          fontSize={{ base: '18px', md: '28px', xl: '70px' }}
+          fontSize={{ base: '25px', sm: '35px', md: '28px', xl: '70px' }}
           fontWeight="500"
           color="white"
           textShadow="0 8px 22px rgba(0,0,0,0.3)"
@@ -1195,8 +1221,7 @@ const personalizedEvents = isAuthenticated
                 id={`category-${category.id}`}
                 scrollMarginTop="120px"
                 key={category.id}
-                w={{base: "700px", xl: "1100px"}}
-                
+                w={{base: "350px", sm: "470px",xl: "1100px"}}
                 p={4}
                 color="white"
                 userSelect="none"
@@ -1208,7 +1233,7 @@ const personalizedEvents = isAuthenticated
               >
                 <Heading
                   lineHeight={1}
-                  fontSize={{ xl: '64px', lg: '40px', base: '30px' }}
+                  fontSize={{ xl: '64px', lg: '40px', sm:'30px', base: '25px' }}
                   fontFamily="Unbounded"
                   color="white"
                   textAlign="center"
@@ -1216,7 +1241,7 @@ const personalizedEvents = isAuthenticated
                 >
                   {category.name}
                 </Heading>
-                <Flex justify="center" gap={8} mt={{ base: '35px', lg: '20px', xl: '60px' }} zIndex={2}>
+                <Flex justify="center" gap={8} mt={{ base: '25px', lg: '20px', xl: '60px' }} zIndex={2}>
                   {filteredEvents.length ? (
                     filteredEvents
                       .slice(categoryIndexes[category.id] || 0, (categoryIndexes[category.id] || 0) + itemsPerPage)
@@ -1250,6 +1275,7 @@ const personalizedEvents = isAuthenticated
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
                                 borderRadius="6px"
                                 objectFit="cover"
+                                
                                 boxShadow="0 10px 24px rgba(11, 16, 42, 0.34)"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
@@ -1261,6 +1287,7 @@ const personalizedEvents = isAuthenticated
                                 position="absolute"
                                 bottom={{  xl: '0px', md: '0.1px', base: '0px' }}
                                 bgImage={`url(${wave})`}
+                                
                                 bgSize="cover"
                                 width={{ xl: '240px', sm: '200px', base: '140px' }}
                                 height="150px"

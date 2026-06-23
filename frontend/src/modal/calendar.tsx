@@ -10,6 +10,7 @@ import cloud2 from '../pictures/cloud2.png';
 import left from '../pictures/lev1.png';
 import right from '../pictures/prav1.png';
 import tickets from '../pictures/tickets.png';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   isOpen: boolean;
@@ -31,7 +32,8 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
     const [currentDate, setCurrentDate] = useState(new Date(2026, 5));
     const [selectedAge, setSelectedAge] = useState('');
     const [isAgeOpen, setIsAgeOpen] = useState(false);
-
+    const navigate = useNavigate();
+const isMobile = window.innerWidth < 768;
     const ageRestrictions = createListCollection({
         items: [
             { label: '0+', value: '0+' },
@@ -42,6 +44,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
         ],
     });
 
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const fetchCalendarEvents = async () => {
         try {
 
@@ -77,6 +80,16 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
             fetchCalendarEvents();
         }
     }, [isOpen, currentDate, selectedAge]);
+
+    useEffect(() => {
+    if (!selectedDate) return;
+
+    const timer = setTimeout(() => {
+        setSelectedDate(null);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+}, [selectedDate]);
 
     const handleAgeChange = (values: string[]) => {
         setSelectedAge(values[0] || '');
@@ -231,45 +244,50 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
             zIndex: 1000,
             },
             content: {
-            inset: '50% auto auto 50%',
-            transform: 'translate(-50%, -50%)',
-            padding: 0,
-            border: 'none',
-            borderRadius: '20px',
-            maxWidth: '700px',
-            width: '90%',
-            background: '#22212C',
+                inset: '50% auto auto 50%',
+                transform: 'translate(-50%, -50%)',
+                padding: 0,
+                border: 'none',
+                borderRadius: '20px',
+
+                width: '95%',
+                maxWidth: '700px',
+
+                maxHeight: '95vh',
+                overflow: 'auto',
+
+                background: '#22212C',
             },
         }}>
-            <Box p={5} color="white" fontFamily="Unbounded">
-                <Flex justify="center" align="center" mb={1} gap={12}>
+            <Box p={{base:3, md:5}} color="white" fontFamily="Unbounded">
+                <Flex justify="center" align="center" mb={1} gap={{base:2, md:12}}>
                     <Image
                         src={cloud2}
                         alt="decor-left"
-                        boxSize="80px"
+                        boxSize={{base:'40px', md:'80px'}}
                         objectFit="contain"
                     />
 
-                    <Text fontSize="30px" fontWeight="bold" textAlign="center">
+                    <Text fontSize={{base:'16px', md:'30px'}} fontWeight="bold" textAlign="center">
                         Календарь событий
                     </Text>
 
                     <Image
                         src={cloud}
                         alt="decor-right"
-                        boxSize="80px"
+                        boxSize={{base:'40px', md:'80px'}}
                         objectFit="contain"
                     />
                 </Flex>
-                <Box bg="white" borderRadius="xl" p={4} color="black" fontWeight="medium">
-                    <Text textAlign="center" mb={3} fontSize="20px">
+                <Box bg="white" borderRadius="xl" p={{base:2, md:4}} color="black" fontWeight="medium">
+                    <Text textAlign="center" mb={3} fontSize={{base:'16px', md:'20px'}}>
                         {getMonthTitle(currentDate)}
                     </Text>
 
                     {/* Дни недели */}
                     <Grid templateColumns="repeat(7, 1fr)" gap={2} mb={2}>
                     {['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'].map(day => (
-                        <Text key={day} textAlign="center" fontSize="sm">
+                        <Text key={day} textAlign="center" fontSize={{base:'10px', md:'sm'}}>
                             {day}
                         </Text>
                     ))}
@@ -378,7 +396,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                         return (
                             <Box
                                 key={i}
-                                height="60px"
+                                height={{base:'40px', md:'60px'}}
                                 borderRadius="md"
                                 bg={bgColor}
                                 color={textColor}
@@ -387,11 +405,20 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                 alignItems="flex-start"
                                 justifyContent="flex-start"
                                 pt={1}
-                                pl={2}
-                                fontSize="sm"
+                                pl={{base:1, md:2}}
+                                fontSize={{base:'11px', md:'sm'}}
                                 onMouseEnter={() => dateStr && setHoveredDate(dateStr)}
                                 onMouseLeave={() => setHoveredDate(null)}
                                 overflow="visible"
+                                onClick={() => {
+                                    if (!dateStr) return;
+
+                                    setHoveredDate(null);
+
+                                    setSelectedDate(prev =>
+                                        prev === dateStr ? null : dateStr
+                                    );
+                                }}
                             >
                                 {item.day}
                                 {hasEvents && (
@@ -403,29 +430,40 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                     <Image
                                         src={tickets}
                                         alt="decor-left"
-                                        boxSize="35px"
+                                        boxSize={{base:'22px', md:'35px'}}
                                         objectFit="contain"
                                     />
                                 </Box>
                             )}
-                                {hoveredDate === dateStr && eventsByDate[dateStr] && (
+                                {(
+                                        (!isMobile && hoveredDate === dateStr) ||
+                                        selectedDate === dateStr
+                                    ) && eventsByDate[dateStr] && (
                                     <Box
-                                        position="absolute"
+                                        position={isMobile ? 'fixed' : 'absolute'}
+                                        display="block"
                                         top="50%"
+                                        left={isMobile ? '50%' : undefined}
+                                        right={!isMobile ? tooltipStyle.right : undefined}
+                                        transform={
+                                            isMobile
+                                                ? 'translate(-50%, -50%)'
+                                                : tooltipStyle.transform
+                                        }
                                         // left="50%"
                                         // transform="translate(-50%, -120%)"
-                                        {...tooltipStyle}
+                                        {...(!isMobile && tooltipStyle)}
                                         bg="#34333C"
                                         color="white"
-                                        p={3}
+                                        p={{ base: 2, md: 3 }}
                                         borderRadius="xl"
                                         zIndex={20}
-                                        w="250px"
+                                        w={{ base: '170px', md: '250px' }}
                                         boxShadow="xl" 
                                         textAlign="center"
                                     >
                                         {/* Дата */}
-                                        <Text fontSize="13px" mb={2} fontWeight="medium">
+                                        <Text fontSize={{ base: '11px', md: '13px' }} mb={2} fontWeight="medium">
                                             {formatDisplayDate(dateStr)}
                                         </Text>
 
@@ -437,7 +475,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                                     {/* Организатор */}
                                                     <Text
                                                         fontWeight="bold"
-                                                        fontSize="13px"
+                                                        fontSize={{ base: '11px', md: '13px' }}
                                                         mb={1}
                                                     >
                                                         {organizer}
@@ -449,15 +487,19 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                                             key={idx}
                                                             justify="space-between"
                                                             align="center"
-                                                            fontSize="sm"
+                                                            fontSize={{ base: '9px', md: '10px' }}
                                                             mb={1}
                                                         >
-                                                            <Text fontSize="10px">
+                                                            <Text fontSize="10px" cursor="pointer"
+                                                                _hover={{
+                                                                    textDecoration: 'underline'
+                                                                }}
+                                                                onClick={() => navigate(`/event/${event.event_id}`)}>
                                                                 {event.title}
                                                             </Text>
 
                                                             <Text
-                                                                fontSize="10px"
+                                                                fontSize={{ base: '9px', md: '10px' }}
                                                                 whiteSpace="nowrap"
                                                             >
                                                                 {event.time}
@@ -475,11 +517,12 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                     </Grid>
                 </Box>
 
-                <Flex justify="space-between" align="center" mt={6}>
-                    <Flex gap={3}>
+                <Flex direction={{ base: 'column', md: 'row' }} gap={{base: 2, md: 4}} justify="space-between" align="center" mt={{base: 2, md: 6}}>
+                    <Flex gap={3} wrap="wrap" align="center"
+                            w="100%" justify={{base:'center', md:'flex-start'}}>
                         {/* Все события */}
                         <SelectRoot
-                            width="180px"
+                            width={{ base: '140px', md: '180px' }}
                             display="inline-block"
                             className="light"
                             size={{ base: 'sm', md: 'md' }}
@@ -495,7 +538,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                     textWrap="nowrap"
                                     px={2}
                                     py={2}
-                                    fontSize={{ base: '8px', sm: "12px", md: 'sm' }}
+                                    fontSize={{ base: '11px', sm: "12px", md: 'sm' }}
                                     color="black"
                                     cursor="pointer"
                                 >
@@ -503,7 +546,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                                 </Box>
                             </SelectTrigger>
 
-                            <SelectContent borderRadius="xl">
+                            <SelectContent borderRadius="xl" >
                                 {categories.items.map(category => (
                                     <SelectItem item={category} key={category.value}>
                                         {category.label}
@@ -517,9 +560,10 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                         {/* Кнопка */}
                         <Button
                             bg="white"
+                            w={{base:'100%', md:'auto'}}
                             color="black"
                             borderRadius="full"
-                            fontSize={{ base: '8px', sm: '12px', md: 'sm' }}
+                            fontSize={{ base: '11px', sm: '12px', md: 'sm' }}
                             px={4}
                             py={2}
                             onClick={() => setIsAgeOpen(prev => !prev)}
@@ -590,7 +634,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                     </Flex>
 
                     {/* 🔹 Правая часть — кнопки */}
-                    <Flex gap={2}>
+                    <Flex gap={1} w="100%" justify={{ base: 'center', md: 'flex-end' }}>
                         <Button
                             onClick={handlePrevMonth}
                             p={1}
@@ -601,7 +645,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                             _hover={{ bg: "transparent" }}
                             _active={{ bg: "transparent" }}
                         >
-                            <Image src={left} boxSize="40px" />
+                            <Image src={left} boxSize={{base:'32px', md:'40px'}} />
                         </Button>
 
                         <Button
@@ -612,7 +656,7 @@ const EventCalendarModal = ({ isOpen, onClose }: Props) => {
                             _hover={{ bg: "transparent" }}
                             _active={{ bg: "transparent" }}
                         >
-                            <Image src={right} boxSize="40px" />
+                            <Image src={right} boxSize={{base:'32px', md:'40px'}} />
                         </Button>
                     </Flex>
 

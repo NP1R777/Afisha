@@ -54,6 +54,7 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
             id: 1,
             type: 'assistant',
             text: 'Привет. Я твой ИИ помощник. Подскажу, какие мероприятия проходят в городе прямо сейчас, и подберу события с учётом твоих интересов. Чем могу помочь?',
+        
         },
     ]);
 
@@ -156,36 +157,37 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                     zIndex: 1000,
                 },
                 content: {
-                    inset: '50% auto auto 50%',
-                    transform: 'translate(-50%, -50%)',
-                    padding: 0,
-                    border: 'none',
-                    borderRadius: '36px',
-                    maxWidth: '760px',
-                    width: '90%',
-                    background: '#1D1B2E',
-                    overflow: 'hidden',
-                },
+    inset: '50% auto auto 50%',
+    transform: 'translate(-50%, -50%)',
+    padding: 0,
+    border: 'none',
+    borderRadius: '24px',
+    width: '95%',
+    maxWidth: '760px',
+    background: '#1D1B2E',
+    overflow: 'hidden',
+    maxHeight: '95vh',
+},
             }}
         >
 
-            <Box p={6} fontFamily="Unbounded">
+            <Box p={{ base: 3, md: 6 }} fontFamily="Unbounded">
                 {/* HEADER */}
-                <Flex align="center" gap={4} mb={6}>
+                <Flex direction={{md: 'row' }} align="center" gap={4} mb={6}>
                     <Image
                     src={assistant}
                     alt="assistant"
-                    maxW={{ base: '120px', md: '180px', lg: '70px' }}
+                    maxW={{ base: '60px', md: '70px', lg: '70px' }}
                     pointerEvents="none"
                     userSelect="none"
                     />
 
-                    <Box color="white" >
-                        <Text className="assistant-title" fontSize="25px">
+                    <Box color="white" textAlign={{ md: 'left' }}>
+                        <Text className="assistant-title" fontSize={{ base: '18px', md: '25px' }}>
                             ИИ ассистент
                         </Text>
 
-                        <Text className="assistant-subtitle">
+                        <Text className="assistant-subtitle" fontSize={{ base: '10px', md: '14px' }}>
                             Твой помощник по мероприятиям в городе
                         </Text>
                     </Box>
@@ -193,16 +195,14 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
 
                 {/* CHAT */}
                 <Box
-                    bgImage={`url(${background})`}
+                     bgImage={`url(${background})`}
                     borderRadius="24px"
                     overflow="hidden"
                     bgSize="cover"
                     backgroundPosition="center"
-                    p={4}
-                    mb={1}
-                    w="700px"
-                    h="500px"
-                    ml="6px"
+                    p={{ base: 2, md: 4 }}
+                    w="100%"
+                    h={{ base: '65vh', md: '500px' }}
                     display="flex"
                     flexDirection="column"
                 >
@@ -218,10 +218,17 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                             key={message.id}
                             justify={message.type === 'user' ? 'flex-end' : 'flex-start'}
                             mb={4}
-                            fontSize="15px"
+                            fontSize={{ base: '13px', md: '15px' }}
                         >
                             <Box
-                                maxW={message.type === 'assistant' && message.matches?.length ? '80%' : '55%'}
+                                maxW={{
+                                    base: '90%',
+                                    md:
+                                        message.type === 'assistant' &&
+                                        message.matches?.length
+                                            ? '80%'
+                                            : '55%',
+                                }}
                                 px={5}
                                 py={4}
                                 borderRadius="16px"
@@ -243,8 +250,8 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                                                     <Image
                                                         src={match.pictures_main || EventImage}
                                                         alt={match.name}
-                                                        width="52px"
-                                                        height="52px"
+                                                        width={{ base: '44px', md: '52px' }}
+                                                        height={{ base: '44px', md: '52px' }}
                                                         objectFit="cover"
                                                         borderRadius="8px"
                                                         flexShrink={0}
@@ -254,14 +261,14 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                                                     />
                                                     <Box minW={0} flex={1}>
                                                         <Text
-                                                            fontSize="12px"
+                                                            fontSize={{ base: '11px', md: '12px' }}
                                                             fontWeight="700"
                                                             lineClamp={2}
                                                         >
                                                             {match.name}
                                                         </Text>
                                                         {formatEventDate(match) && (
-                                                            <Text fontSize="11px" color="#2F3A70" mt={1} lineClamp={1}>
+                                                            <Text fontSize={{ base: '10px', md: '11px' }} color="#2F3A70" mt={1} lineClamp={1}>
                                                                 {formatEventDate(match)}
                                                             </Text>
                                                         )}
@@ -297,7 +304,7 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                         </Flex>
                     ))}
                     {isSending ? (
-                        <Flex justify="flex-start" mb={4} fontSize="15px">
+                        <Flex justify="flex-start" mb={4} fontSize={{ base: '13px', md: '15px' }}>
                             <Box
                                 maxW="55%"
                                 px={5}
@@ -313,10 +320,13 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                     </Flex>
 
                     {/* INPUT */}
-                    <Flex gap={3}
+                    <Flex direction={{ base: 'column', md: 'row' }}
+                            gap={3}
+                            mt={3}
                         align="center">
                         <Input
                             value={value}
+                            h={{ base: '44px', md: '40px' }}
                             bg="#FFFFFF"
                             borderRadius="10px"
                             onChange={e => setValue(e.target.value)}
@@ -337,6 +347,8 @@ const AiAssistantModal = ({ isOpen, onClose }: Props) => {
                             bg="#0C0066"
                             borderRadius="10px"
                             disabled={isSending}
+                            w={{ base: '100%', md: 'auto' }}
+                            minW={{ md: '120px' }}
                         >
                             {isSending ? '...' : 'Отправить'}
                         </Button>
