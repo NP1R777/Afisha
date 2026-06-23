@@ -22,51 +22,11 @@ const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const mockEvents = [
   {
     organization: 1,
-    name: "Спектакль Гамлет",
+    name: "	Экскурсия «Закулисье»",
     time_slots: [
       {
-        date_event: "2026-06-19T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Ханума",
-    time_slots: [
-      {
-        date_event: "2026-06-20T00:00:00",
-        start_time: "20:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Зелёная коляска",
-    time_slots: [
-      {
-        date_event: "2026-06-20T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Сон в летнюю ночь",
-    time_slots: [
-      {
-        date_event: "2026-06-18T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Преступник со справкой",
-    time_slots: [
-      {
-        date_event: "2026-06-21T00:00:00",
-        start_time: "17:30:00",
+        date_event: "2026-06-24T00:00:00",
+        start_time: "15:00:00",
       },
     ],
   },
@@ -76,6 +36,16 @@ const mockEvents = [
     time_slots: [
       {
         date_event: "2026-06-27T00:00:00",
+        start_time: "18:00:00",
+      },
+    ],
+  },
+  {
+    organization: 1,
+    name: "Сны белой земли",
+    time_slots: [
+      {
+        date_event: "2026-09-09T00:00:00",
         start_time: "18:00:00",
       },
     ],

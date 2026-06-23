@@ -789,26 +789,27 @@ const Events = () => {
                 </Text>
               ) : null}
 
-            <Button
-              mt={4}
-              bg="rgba(255,255,255,0.12)"
-              color="white"
-              border="1px solid rgba(255,255,255,0.3)"
-              borderRadius="full"
-              px={{ base: 4, md: 6 }}
-              py={{ base: 4, md: 6 }}
-              fontSize={{ base: '14px', md: '16px', lg: '18px' }}
-              textDecoration="none"
-              transition="all .2s ease"
-              _hover={{
-                bg: 'rgba(255,255,255,0.22)',
-                transform: 'translateY(-1px)',
-                boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
-              }}
-              onClick={() => navigate(`/organizer/${eventDetails.organization}`)}
-            >
-              Страница организатора
-            </Button>
+            {eventDetails.organization === 1 && (
+              <Button
+                mt={4}
+                bg="rgba(255,255,255,0.12)"
+                color="white"
+                border="1px solid rgba(255,255,255,0.3)"
+                borderRadius="full"
+                px={{ base: 4, md: 6 }}
+                py={{ base: 4, md: 6 }}
+                fontSize={{ base: '14px', md: '16px', lg: '18px' }}
+                transition="all .2s ease"
+                _hover={{
+                  bg: 'rgba(255,255,255,0.22)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
+                }}
+                onClick={() => navigate(`/organizer/${eventDetails.organization}`)}
+              >
+                Страница организатора
+              </Button>
+            )}
           </Box>
         </motion.div>
       </Box>

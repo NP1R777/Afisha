@@ -28,6 +28,12 @@ type EventItem = {
     is_organizer_event: boolean;
 };
 
+type GroupedEvent = {
+    event_id: number;
+    title: string;
+    times: string[];
+};
+
 const EventCalendarModal = ({ isOpen, onClose }: Props) => {
     const [currentDate, setCurrentDate] = useState(new Date(2026, 5));
     const [selectedAge, setSelectedAge] = useState('');
@@ -95,17 +101,31 @@ const isMobile = window.innerWidth < 768;
         setSelectedAge(values[0] || '');
     };
 
-    const groupByOrganizer = (events: EventItem[]) => {
-        return events.reduce((acc, event) => {
-            if (!acc[event.organizer]) {
-                acc[event.organizer] = [];
-            }
+const groupByOrganizer = (events: EventItem[]) => {
+    return events.reduce((acc, event) => {
 
-            acc[event.organizer].push(event);
+        if (!acc[event.organizer]) {
+            acc[event.organizer] = [];
+        }
 
-            return acc;
-        }, {} as Record<string, EventItem[]>);
-    };
+        const existing = acc[event.organizer].find(
+            e => e.event_id === event.event_id
+        );
+
+        if (existing) {
+            existing.times.push(event.time);
+        } else {
+            acc[event.organizer].push({
+                event_id: event.event_id,
+                title: event.title,
+                times: [event.time]
+            });
+        }
+
+        return acc;
+
+    }, {} as Record<string, GroupedEvent[]>);
+};
 
     const [events, setEvents] = useState<EventItem[]>([]);
     
@@ -234,6 +254,7 @@ const isMobile = window.innerWidth < 768;
         currentDate.getMonth() === today.getMonth() &&
         currentDate.getFullYear() === today.getFullYear();
 
+        
     return (
         <Modal
         isOpen={isOpen}
@@ -458,7 +479,7 @@ const isMobile = window.innerWidth < 768;
                                         p={{ base: 2, md: 3 }}
                                         borderRadius="xl"
                                         zIndex={20}
-                                        w={{ base: '170px', md: '250px' }}
+                                        w={{ base: '200px', md: '250px' }}
                                         boxShadow="xl" 
                                         textAlign="center"
                                     >
@@ -482,9 +503,9 @@ const isMobile = window.innerWidth < 768;
                                                     </Text>
 
                                                     {/* События */}
-                                                    {events.map((event, idx) => (
+                                                    {events.map((event) => (
                                                         <Flex
-                                                            key={idx}
+                                                            key={event.event_id}
                                                             justify="space-between"
                                                             align="center"
                                                             fontSize={{ base: '9px', md: '10px' }}
@@ -502,7 +523,7 @@ const isMobile = window.innerWidth < 768;
                                                                 fontSize={{ base: '9px', md: '10px' }}
                                                                 whiteSpace="nowrap"
                                                             >
-                                                                {event.time}
+                                                                {event.times.join(', ')}
                                                             </Text>
                                                         </Flex>
                                                     ))}
@@ -521,7 +542,7 @@ const isMobile = window.innerWidth < 768;
                     <Flex gap={3} wrap="wrap" align="center"
                             w="100%" justify={{base:'center', md:'flex-start'}}>
                         {/* Все события */}
-                        <SelectRoot
+                        {/* <SelectRoot
                             width={{ base: '140px', md: '180px' }}
                             display="inline-block"
                             className="light"
@@ -553,7 +574,7 @@ const isMobile = window.innerWidth < 768;
                                     </SelectItem>
                                 ))}
                             </SelectContent>
-                        </SelectRoot>
+                        </SelectRoot> */}
 
                         {/* Возрастное ограничение */}
                         <Box position="relative">

@@ -398,14 +398,17 @@ const Frame = () => {
 
   const organizationsMap: Record<number, string> = {
     1: 'Заполярный театр драмы',
-    2: 'Администрация города Норильска',
-    3: 'Кинотеатр Родина',
-    4: 'Городской центр культуры',
+    4: 'Кинотеатр Родина',
+    3: 'Администрация города Норильска',
+    2: 'Городской центр культуры',
     5: 'Талнахская детская школа искусств',
     6: 'Норильская детская школа искусств',
-    7: 'Норильский колледж искусств',
-    8: 'Афиша Северного города',
-    9: 'Культурно-досуговый центр имени В. Высоцкого',
+    7: 'Культурно-досуговый центр имени В. Высоцкого',
+    8: 'Синема Арт Холл',
+    9: 'Площадь Набережная',
+    10: 'Музей Норильска художественная галерея',
+    11: 'Полярная арт-резиденция PolArt',
+    12: 'Площадь Комсомольская',
   };
 
   const districts = createListCollection({
@@ -1024,7 +1027,7 @@ const personalizedEvents = isAuthenticated
             города
           </Box>
         </Grid>
-         {isAuthenticated && (
+         {isAuthenticated && personalizedEvents.length > 0 && (
           <Box
             mt={9}
             w={{base: "350px", sm: "470px", xl: "1100px"}}
@@ -1048,7 +1051,7 @@ const personalizedEvents = isAuthenticated
             >
               Подборка для вас
             </Heading>
-
+          
             <Flex
               justify="center"
               gap={8}
@@ -1152,6 +1155,7 @@ const personalizedEvents = isAuthenticated
                   </motion.div>
                 ))}
             </Flex>
+            
             {personalizedEvents.length > itemsPerPage && (
             <HStack justify="flex-end" w={{ xl: '100%', lg: '88%' }} mt={4}>
               <Button

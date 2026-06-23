@@ -266,7 +266,7 @@ const monthNames = [
           <Box
             bg="#6B84EA"
             borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
+            height={{  base: '220px', lg: '260px' }}
             width={{ base: '170px', lg: '250px' }}
             userSelect="none"
             fontWeight="semibold"
@@ -280,7 +280,7 @@ const monthNames = [
             <Image
               src={imageSrc}
               alt="cloud"
-              width={{ base: '41%', lg: '90%' }}
+              width={{ base: '46%', lg: '90%' }}
               height={{ base: '30%', lg: '90%' }}
               objectFit="cover"
               pointerEvents="none"
@@ -306,7 +306,7 @@ const monthNames = [
           <Box
             bg="#6B84EA"
             borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
+            height={{ base: '220px', lg: '260px' }}
             minWidth="400px"
             position="relative"
             p={4}
@@ -317,16 +317,16 @@ const monthNames = [
               bg="white"
               borderRadius="xl"
               color="#A3B3F2"
-              height={{ base: '40px', lg: '50px' }}
-              width={{ base: '220px', lg: '250px' }}
-              fontSize={{ base: '16px', lg: '18px' }}
+              height={{ base: '35px', lg: '50px' }}
+              width={{ base: '190px', lg: '250px' }}
+              fontSize={{ base: '14px', lg: '18px' }}
               display="flex"
               alignItems="center"
               justifyContent="center"
             >
               <p>Мои предпочтения</p>
             </Box>
-            <Flex wrap="wrap" gap={4} mt={4}>
+            <Flex wrap="wrap" gap={{ base: 2, lg: 4 }} mt={4}>
               {categories && categories.length > 0 ? (
                 categories.map((preference, index) => (
                   <Box
@@ -334,13 +334,14 @@ const monthNames = [
                     bg="#A3B3F2"
                     borderRadius="xl"
                     color="white"
-                    height={{ base: '35px', lg: '40px' }}
+                    height={{ base: '30px', lg: '40px' }}
                     width="auto"
-                    fontSize={{ base: '13px', lg: '20px' }}
+                    fontSize={{ base: '12px', lg: '20px' }}
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
-                    px={4}
+                    px={{ base: 3, lg: 4 }}
+                    
                   >
                     <p>{getPreferenceText(Number(preference))}</p>
                   </Box>
@@ -355,12 +356,12 @@ const monthNames = [
             <Button
               bg="white"
               color="#6B84EA"
-              size="md"
+              size={{ base: 'xs', md: 'md' }}
               borderRadius="xl"
               position="absolute"
               onClick={openCategoriesModal}
-              bottom="26px"
-              right="26px"
+              bottom={{ base: '10px', md: '26px' }}
+              right={{ base: '10px', md: '26px' }}
               _hover={{
                 bg: '#4C6BE6',
                 color: 'white',
@@ -372,7 +373,7 @@ const monthNames = [
           <Box
             bg="#6B84EA"
             borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
+            height={{ base: '220px', lg: '260px' }}
             width={{ base: '210px', lg: '250px' }}
           >
             <Flex direction="column" align="center" justify="center" height="100%" gap={4} userSelect="none">
