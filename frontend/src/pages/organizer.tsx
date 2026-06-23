@@ -272,7 +272,7 @@ const Organizer = () => {
                 mx="auto"
                 zIndex={1}
                 fontFamily="Unbounded" userSelect="none">
-                <Text fontSize={{ "2xl": '70px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="400px">
+                <Text fontSize={{ "2xl": '70px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="500px">
                     {organizerName}
                 </Text>
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "20px" }} color="white" fontWeight="bold" mt="50px">
@@ -533,9 +533,9 @@ const Organizer = () => {
                     План мероприятий
                 </Text>
                 <Calendar
-                    organizerName={organizerName}
-                    canManageEvents={roleResolved && isOrganizerRole}
-                    onEventCreated={loadOrganizerContent}
+                    // organizerName={organizerName}
+                    // canManageEvents={roleResolved && isOrganizerRole}
+                    // onEventCreated={loadOrganizerContent}
                 />
             </Box>
         </Flex>

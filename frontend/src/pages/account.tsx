@@ -139,7 +139,7 @@ const monthNames = [
 
       const data = response.data;
 
-      console.log('USER DATA:', data);
+      // console.log('USER DATA:', data);
 
       if (data.username) {
         setUsername(data.username);
@@ -178,7 +178,7 @@ const monthNames = [
 
       const data = response.data;
 
-      console.log('LIKED EVENTS:', data);
+      // console.log('LIKED EVENTS:', data);
 
       const flattenedEvents = Array.isArray(data[0])
         ? data.flat()
@@ -417,7 +417,7 @@ const monthNames = [
                 direction={{ base: 'row', md: 'column' }}
                 gap={7}
                 userSelect="none"
-                mb={9}
+                mb={{ base: 1, md: 9 }}
                 overflowX="auto"
                 overflowY="hidden"
                 width="100%"
@@ -503,7 +503,7 @@ const monthNames = [
                                 {month ?? '—'}
                               </Text>
                              </Flex>
-                             <Flex mt={5}>
+                             <Flex mt={{ base: 6, md: 5 }}>
                               <Text fontSize="20px" textAlign="center" mb={2}>
                                 {formatTime(event.start_time)}
                               </Text>

@@ -133,7 +133,7 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
         <Flex justifyContent="center" alignItems="center" marginBottom="10px">
           <Image src={icon} alt="Logo" boxSize={{ base: '45px', md:'50px',lg:'70px'}} objectFit="contain" />
         </Flex>
-        <Heading as="h1" color="white" fontSize={{ base: '16px',sm: '17px', md:'28px',lg:'31px'}} fontWeight="900" mb="3" userSelect="none" fontFamily="Unbounded" lineHeight="1.2">
+        <Heading as="h1" color="white" fontSize={{ base: '20px',sm: '17px', md:'28px',lg:'31px'}} fontWeight="900" mb="3" userSelect="none" fontFamily="Unbounded" lineHeight="1.2">
           Выберите интересующие вас <br />
           категории мероприятий
         </Heading>
@@ -148,7 +148,7 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
               fontWeight="600"
               padding="15px"
               px={5}
-              py={6}
+              py={{ base: 1, md: 6 }}
               boxShadow={selectedCategories.includes(item.name) ? '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)' : 'none'}
               _hover={{
                 boxShadow: '0px 0px 0px 4px #7296CC, 0px 0px 15px rgba(0, 123, 255, 0.75)',
@@ -169,7 +169,7 @@ const CategoriesModal: React.FC<CategoriesModalProps> = ({ isOpen, onRequestClos
             fontWeight="600"
             fontFamily="Unbounded"
             px={8}
-            py={7}
+            py={{ base: 6, md: 7 }}
             boxShadow="0px 4px 32px rgba(114, 150, 204, 0.5)"
             _hover={{ bg: '#7296CC' }}
             width={{ base: '180px', md: '240px', lg: '260px' }}

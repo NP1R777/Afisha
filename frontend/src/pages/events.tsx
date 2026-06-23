@@ -435,7 +435,7 @@ const Events = () => {
             objectFit="cover"
             objectPosition="top center"
             width="100%"
-            height={{ base: '275px', sm: "320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
+            height={{ base: '320px', sm: "380px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
             position="absolute"
             top={0}
             left={0}
@@ -450,7 +450,7 @@ const Events = () => {
             alt="Overlay Image"
             objectFit="cover"
             width="100%"
-            height={{ base: '275px', sm: "320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
+            height={{ base: '320px', sm: "380px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
             position="absolute"
             top={0}
             left={0}
@@ -620,9 +620,10 @@ const Events = () => {
                   <Flex
                     w="100%"
                     justify="space-between"
-                    align={{ base: 'start', md: 'center' }}
-                    direction={{ base: 'column', md: 'row' }}
-                    gap={{ base: 3, md: 4 }}
+                    align="center"
+                    direction={{ base: 'row', md: 'row' }}
+                    wrap={{ base: 'wrap', md: 'nowrap' }}
+                    gap={{ base: 2, md: 4 }}
                   >
                     <HStack gap="14px">
                       <Text
@@ -648,11 +649,14 @@ const Events = () => {
                       fontSize={{ "2xl": '24px', lg: '20px', md: '16px', base: '14px' }}
                       fontWeight="500"
                       textShadow="0 0 14px rgba(196, 219, 255, 0.45)"
+                      
                     >
                       {d.timeLabel}
                     </Text>
 
-                    <HStack gap={{ base: 2, md: 3 }} align="center" ml={{ md: 'auto' }}>
+                    <HStack gap={{ base: 2, md: 3 }} align="center" ml={{ base: 'auto', md: 'auto' }}
+                          w={{ base: '100%', md: 'auto' }}
+                          justify={{ base: 'center', md: 'flex-start' }}>
                       <Box
                         as="button"
                         onClick={() => toggleFavorite(index)}
@@ -759,7 +763,7 @@ const Events = () => {
         >
           <Box
             mt={5}
-            mb={10}
+            mb={{ base: 1, md: 10 }}
             bg="rgba(17, 23, 58, 0.52)"
             border="1px solid rgba(255,255,255,0.2)"
             borderRadius="22px"
