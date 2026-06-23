@@ -91,7 +91,8 @@ class User(Base):
     preferred_groups = relationship("UserGroupsEvent", back_populates="user", cascade="all, delete-orphan")
     liked_events = relationship("UserToEvent", back_populates="user", cascade="all, delete-orphan")
     organizer_application: Mapped[Optional["OrganizerApplication"]] = relationship(
-        "OrganizerApplication", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "OrganizerApplication", back_populates="user", uselist=False,
+        cascade="all, delete-orphan", foreign_keys="[OrganizerApplication.user_id]"
         )
 
 
@@ -336,7 +337,9 @@ class OrganizerApplication(Base):
     reviewed_by: int = Column(Integer, ForeignKey("users.id"), nullable=True)
     reviewed_at: datetime = Column(TIMESTAMP(timezone=False), nullable=True)
 
-    user = relationship("User", back_populates="organizer_application")
+    user = relationship("User", back_populates="organizer_application",
+                        foreign_keys="[OrganizerApplication.user_id]"
+                        )
 
 
 # Backward-compatible alias
