@@ -103,6 +103,7 @@ const Events = () => {
     return `от ${rawPrice} ₽`;
   };
 
+  
   const formatDescriptionParagraphs = (rawDescription: string): string[] => {
     const normalized = (rawDescription || '').replace(/\r/g, '').trim();
     if (!normalized) {
@@ -137,16 +138,25 @@ const Events = () => {
 
   const organizationsMap: Record<number, string> = {
     1: 'Заполярный театр драмы',
-    2: 'Администрация города Норильска',
-    3: 'Кинотеатр Родина',
-    4: 'Городской центр культуры',
+    4: 'Кинотеатр Родина',
+    3: 'Администрация города Норильска',
+    2: 'Городской центр культуры',
     5: 'Талнахская детская школа искусств',
     6: 'Норильская детская школа искусств',
-    7: 'Норильский колледж искусств',
-    8: 'Афиша Северного города',
-    9: 'Культурно-досуговый центр имени В. Высоцкого',
+    7: 'Культурно-досуговый центр имени В. Высоцкого',
+    8: 'Cinema Art Hall',
+    9: 'Площадь Набережная',
+    10: 'Музей Норильска художественная галерея',
+    11: 'Полярная арт-резиденция PolArt',
+    12: 'Площадь Комсомольская',
+    14: 'КДЦ Юбилейный',
+    17: 'Музей НА-Гора',
+    16: 'Музей Норильска',
+    18: 'СПОРТИВНЫЙ КОМПЛЕКС "ТАЛНАХ"',
+    15: 'Таймырский краеведческий музей',
+    13: 'Фаблаб-Норильск',
+    
   };
-
   const toggleFavorite = async (index: number) => {
     if (!userId) {
       setIsLoginOpen(true);
@@ -319,7 +329,7 @@ const Events = () => {
             : legacyDates,
 
           duration: data.duration || data.start_time || '',
-
+organization: Number(data.organization) || null,
           time_slots: normalizedTimeSlots,
         };
 
@@ -384,20 +394,20 @@ const Events = () => {
     transition: { duration: 0.45, ease: 'easeOut' as const },
   };
 
-  const scheduleRows = (eventDetails.time_slots || []).map((slot) => {
-    const { day, month } = parseDateParts(slot.date_event);
-    const slotTime = formatScheduleValue(slot.start_time);
-    const timeLabel =
+const scheduleRows = (eventDetails.time_slots || []).map((slot) => {
+  const { day, month } = parseDateParts(slot.date_event);
+  const slotTime = formatScheduleValue(slot.start_time);
+
+  return {
+    day,
+    month,
+    timeLabel:
       slotTime !== '—' && slotTime !== '00:00'
         ? slotTime
-        : 'Время начала не указано';
+        : null,
+  };
+});
 
-    return {
-      day,
-      month,
-      timeLabel,
-    };
-  });
   const descriptionParagraphs = formatDescriptionParagraphs(eventDetails.description || '');
   const descriptionPreviewLimit = 3;
   const hasLongDescription = descriptionParagraphs.length > descriptionPreviewLimit;
@@ -414,7 +424,8 @@ const Events = () => {
     setIsLoginOpen(false);
     setIsRegisterOpen(true);
   };
-
+const organizationId = Number(eventDetails.organization);
+const isValidOrgId = Number.isFinite(organizationId) && organizationId > 0;
   return (
     <Flex w="100%">
       <LoginModal
@@ -644,15 +655,16 @@ const Events = () => {
                       </Text>
                     </HStack>
 
-                    <Text
-                      color="white"
-                      fontSize={{ "2xl": '24px', lg: '20px', md: '16px', base: '14px' }}
-                      fontWeight="500"
-                      textShadow="0 0 14px rgba(196, 219, 255, 0.45)"
-                      
-                    >
-                      {d.timeLabel}
-                    </Text>
+                    {d.timeLabel && (
+                      <Text
+                        color="white"
+                        fontSize={{ "2xl": '24px', lg: '20px', md: '16px', base: '14px' }}
+                        fontWeight="500"
+                        textShadow="0 0 14px rgba(196, 219, 255, 0.45)"
+                      >
+                        {d.timeLabel}
+                      </Text>
+                    )}
 
                     <HStack gap={{ base: 2, md: 3 }} align="center" ml={{ base: 'auto', md: 'auto' }}
                           w={{ base: '100%', md: 'auto' }}
@@ -789,7 +801,8 @@ const Events = () => {
                 </Text>
               ) : null}
 
-            {eventDetails.organization === 1 && (
+             {Number(eventDetails.organization) >= 1 &&
+                Number(eventDetails.organization) <= 18 && (
               <Button
                 mt={4}
                 bg="rgba(255,255,255,0.12)"
@@ -805,7 +818,7 @@ const Events = () => {
                   transform: 'translateY(-1px)',
                   boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
                 }}
-                onClick={() => navigate(`/organizer/${eventDetails.organization}`)}
+                onClick={() => navigate(`/organizer/${organizationId}`)}
               >
                 Страница организатора
               </Button>

@@ -19,38 +19,6 @@ const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 //   { date: "2026-12-05", title: "Щелкунчик", time: "18:00" }
 // ];
 
-const mockEvents = [
-  {
-    organization: 1,
-    name: "	Экскурсия «Закулисье»",
-    time_slots: [
-      {
-        date_event: "2026-06-24T00:00:00",
-        start_time: "15:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Капитанская дочка",
-    time_slots: [
-      {
-        date_event: "2026-06-27T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-  {
-    organization: 1,
-    name: "Сны белой земли",
-    time_slots: [
-      {
-        date_event: "2026-09-09T00:00:00",
-        start_time: "18:00:00",
-      },
-    ],
-  },
-];
 type Day = { value: number; isCurrentMonth: boolean };
 
 // Генерация дней для месяца
@@ -78,31 +46,65 @@ function generateDaysForMonth(monthIndex: number): Day[] {
 }
 
 type CalendarEvent = {
-  date: string;
-  title: string;
-  time: string;
-  organization?: number | string;
+    id:number;
+    date:string;
+    title:string;
+    time:string;
 };
 
-type Props = {
-  events: any[]; // временно, потому что API сложный
+type CalendarProps = {
+  events?: CalendarEvent[];
 };
 
-export const Calendar: React.FC = () => {
+const mockEvents: CalendarEvent[] = [
+  {
+    id: 2,
+    date: "2026-06-27",
+    title: "Капитанская дочка",
+    time: "18:00",
+  },
+  {
+    id: 27,
+    date: "2026-09-09",
+    title: "Сны белой Земли",
+    time: "18:00",
+  },
+  {
+    id: 58,
+    date: "2026-09-10",
+    title: "Волки и овцы",
+    time: "18:00",
+  },
+  {
+    id: 59,
+    date: "2026-09-11",
+    title: "Сон смешного человека",
+    time: "18:00",
+  },
+  {
+    id: 60,
+    date: "2026-09-12",
+    title: "Рикки-Тикки-Тави",
+    time: "11:00",
+  },
+];
+
+export const Calendar = ({ events = mockEvents }: CalendarProps) => {
+  const calendarEvents = events;
   // const [hoveredDate, setHoveredDate] = React.useState<string | null>(null);
-  const orgEvents = React.useMemo(() => {
-  return mockEvents.filter(e => Number(e.organization) === 1);
-}, []);
 
-const calendarEvents = React.useMemo(() => {
-  return mockEvents.flatMap(e =>
-    (e.time_slots || []).map((slot: any) => ({
-      date: slot.date_event.split("T")[0],
-      title: e.name,
-      time: slot.start_time.slice(0, 5),
-    }))
-  );
-}, []);
+
+// const calendarEvents = React.useMemo(() => {
+//   return events.flatMap(e =>
+//     (e.time_slots || []).map(slot => ({
+//       id: e.id,
+//       date: slot.date_event.split("T")[0],
+//       title: e.name,
+//       time: slot.start_time.slice(0, 5),
+//     }))
+//   );
+// }, [events]);
+
 const [isOpen, setIsOpen] = React.useState(false);
 const [selectedEvents, setSelectedEvents] = React.useState<CalendarEvent[]>([]);
 const [selectedDate, setSelectedDate] = React.useState('');
@@ -111,6 +113,9 @@ const [mobileMonth, setMobileMonth] = React.useState(0);
 const prevMonth = () => {
     setMobileMonth(prev => prev === 0 ? 11 : prev - 1);
 };
+interface CalendarProps {
+  events?: Event[];
+}
 
 const nextMonth = () => {
     setMobileMonth(prev => prev === 11 ? 0 : prev + 1);

@@ -479,7 +479,7 @@ const groupByOrganizer = (events: EventItem[]) => {
                                         p={{ base: 2, md: 3 }}
                                         borderRadius="xl"
                                         zIndex={20}
-                                        w={{ base: '200px', md: '250px' }}
+                                        w={{ base: '250px', md: '250px' }}
                                         boxShadow="xl" 
                                         textAlign="center"
                                     >
@@ -492,24 +492,24 @@ const groupByOrganizer = (events: EventItem[]) => {
                                         <Box bg="white" color="black" borderRadius="lg" p={2} textAlign="left">
                                         {groupedEvents &&
                                             Object.entries(groupedEvents).map(([organizer, events]) => (
-                                                <Box key={organizer} mb={2}>
+                                                <Box key={organizer} mb={{ base: 0.1, md: 2 }}>
                                                     {/* Организатор */}
                                                     <Text
                                                         fontWeight="bold"
                                                         fontSize={{ base: '11px', md: '13px' }}
-                                                        mb={1}
+                                                        mb={{ base: 0.1, md: 1 }}
                                                     >
                                                         {organizer}
                                                     </Text>
 
                                                     {/* События */}
-                                                    {events.map((event) => (
+                                                    {events.slice(0, 3).map((event) => (
                                                         <Flex
                                                             key={event.event_id}
                                                             justify="space-between"
                                                             align="center"
                                                             fontSize={{ base: '9px', md: '10px' }}
-                                                            mb={1}
+                                                            mb={{ base: 0.1, md: 1 }}
                                                         >
                                                             <Text fontSize="10px" cursor="pointer"
                                                                 _hover={{
@@ -527,6 +527,7 @@ const groupByOrganizer = (events: EventItem[]) => {
                                                             </Text>
                                                         </Flex>
                                                     ))}
+                                                    
                                                 </Box>
                                             ))}
                                         </Box>

@@ -11,6 +11,7 @@ import wave from '../pictures/wave31.png';
 import { Calendar } from '../modal/org_calendar';
 import { useUser } from "../addition/context";
 import { useMediaQuery } from '@chakra-ui/react';
+import { useParams } from "react-router-dom";
 
 interface TimeSlot {
     date_event: string;
@@ -22,7 +23,7 @@ interface OrganizerEventCard {
     name: string;
     location: string;
     price: number | null;
-    pictures_url: string;
+    pictures_main: string;
     organization: number | string;
     time_slots?: TimeSlot[];
 }
@@ -43,7 +44,11 @@ const CITY_LABELS: Record<string, string> = {
 
 const Organizer = () => {
     const { userId, role, setRole } = useUser();
-    const organizerName = 'Заполярный театр драмы';
+   const { id } = useParams<{ id: string }>();
+    const ORGANIZER_ID = Number(id);
+
+    const [organizer, setOrganizer] = React.useState<OrganizerInfo | null>(null);
+
     const [roleResolved, setRoleResolved] = React.useState(false);
     const isOrganizerRole = role === 'organizator';
     const [events, setEvents] = React.useState<OrganizerEventCard[]>([]);
@@ -55,15 +60,23 @@ const Organizer = () => {
     const [isMd, isXl] = useMediaQuery(
         ['(min-width: 768px)', '(min-width: 1280px)']
         );
-
         const itemsPerPage = (() => {
         if (isXl) return 4;
         if (isMd) return 3;
         return 2;
         })();
     // const visibleEvents = events.slice(currentIndex, currentIndex + itemsPerPage); убраа и добавила нижнее для филтрации вручную
-
-
+interface OrganizerInfo {
+    id: number;
+    name_org: string;
+    address: string | null;
+    organizator: string | null;
+    description: string;
+    picture_org: string;
+    external_url: string | null;
+    events: OrganizerEventCard[];
+    news: OrganizerNewsCard[];
+}
     const [newsIndex, setNewsIndex] = React.useState(0);
 
     const visibleNewsEvents = newsEvents.slice(
@@ -73,96 +86,56 @@ const Organizer = () => {
 
     
     const loadOrganizerContent = React.useCallback(async () => {
-        setLoadingContent(true);
-        setContentError(null);
-        try {
-            const [eventsResult, newsResult] = await Promise.allSettled([
-                axios.get('/event/events'),
-                axios.get('/news/all'),
-            ]);
+    setLoadingContent(true);
+    setContentError(null);
 
-            const eventsData =
-                eventsResult.status === 'fulfilled' && Array.isArray(eventsResult.value.data)
-                    ? eventsResult.value.data
-                    : [];
-            const normalizedEvents = eventsData.map((item: any) => {
-                const cityRaw = (item?.city || '').toString().toLowerCase();
-                return {
-                    id: Number(item?.id),
-                    name: String(item?.name || ''),
-                    location: String(item?.address || CITY_LABELS[cityRaw] || 'Адрес не указан'),
-                    price:
-                        item?.price !== null && item?.price !== undefined && !Number.isNaN(Number(item.price))
-                            ? Number(item.price)
-                            : null,
-                    pictures_url:
-                        String(
-                            item?.pictures_main ||
-                            item?.pictures_url ||
-                            ''
-                        ),
-                    organization: item?.organization,
-                    time_slots: item?.time_slots || [],
-                } as OrganizerEventCard;
-            }).filter((item: OrganizerEventCard) => Number.isFinite(item.id) && item.id > 0);
+    try {
+        const response = await axios.get(
+            `/organization/${ORGANIZER_ID}?events_limit=50&news_limit=50`
+        );
 
-            const newsData =
-                newsResult.status === 'fulfilled' && Array.isArray(newsResult.value.data)
-                    ? newsResult.value.data
-                    : [];
-            const normalizedNews = newsData.map((item: any) => ({
-                id: Number(item?.id),
-                name: String(item?.name || ''),
-                location: String(item?.address || item?.organizator || 'Новость без адреса'),
-            } as OrganizerNewsCard)).filter((item: OrganizerNewsCard) => Number.isFinite(item.id) && item.id > 0);
-            
-            setEvents(normalizedEvents);
-            setNewsEvents(normalizedNews);
-            setCurrentIndex(0);
-            setNewsIndex(0);
+        const data = response.data;
 
-            const eventError =
-                eventsResult.status === 'rejected' && eventsResult.reason?.response?.status !== 404
-                    ? eventsResult.reason
-                    : null;
-            const newsError =
-                newsResult.status === 'rejected' && newsResult.reason?.response?.status !== 404
-                    ? newsResult.reason
-                    : null;
-            const firstError = eventError || newsError;
-            if (firstError) {
-                const detail = firstError?.response?.data?.detail;
-                setContentError(typeof detail === 'string' ? detail : (firstError?.message || 'Часть данных не загрузилась.'));
-            }
-        } catch (err: any) {
-            const detail = err?.response?.data?.detail;
-            setEvents([]);
-            setNewsEvents([]);
-            setContentError(typeof detail === 'string' ? detail : (err?.message || 'Не удалось загрузить данные страницы.'));
-        } finally {
-            setLoadingContent(false);
-        }
-    }, []);
-    const filteredEvents = React.useMemo(() => {
-    return events.filter(
-        (event) => Number(event.organization) === 1
-    );
-}, [events]);
+        setOrganizer(data);
 
-const visibleEvents = filteredEvents.slice(
+        setEvents(data.events ?? []);
+        setNewsEvents(data.news ?? []);
+
+        setCurrentIndex(0);
+        setNewsIndex(0);
+
+    } catch (err: any) {
+        const detail = err?.response?.data?.detail;
+
+        setOrganizer(null);
+        setEvents([]);
+        setNewsEvents([]);
+
+        setContentError(
+            typeof detail === 'string'
+                ? detail
+                : err?.message || 'Не удалось загрузить данные'
+        );
+    } finally {
+        setLoadingContent(false);
+    }
+}, []);
+
+
+
+const visibleEvents = events.slice(
     currentIndex,
     currentIndex + itemsPerPage
 );
 
 const calendarEvents = React.useMemo(() => {
-  return events
-    .filter(e => Number(e.organization) === 1)
-    .flatMap(e =>
-      (e.time_slots || []).map(slot => ({
-        date: slot.date_event.split("T")[0], // 👉 2026-06-18
-        title: e.name,
-        time: slot.start_time.slice(0, 5) // 👉 21:25
-      }))
+    return events.flatMap(e =>
+        (e.time_slots || []).map(slot => ({
+            id: e.id,
+            date: slot.date_event.split("T")[0],
+            title: e.name,
+            time: slot.start_time.slice(0, 5),
+        }))
     );
 }, [events]);
 
@@ -201,12 +174,15 @@ const calendarEvents = React.useMemo(() => {
 React.useEffect(() => {
   window.scrollTo(0, 0);
 }, []);
+
+
+
     return (
         <Flex w="100%">
-            {Organizer_picture && (
+            
                 <Box position="absolute" top={0} left={0} width="100%" height='100%' maxWidth="1960px">
                 <Image
-                    src={Organizer_picture}
+                    src={organizer?.picture_org}
                     alt="Изображение мероприятия"
                     objectFit="cover"
                     objectPosition="top center"
@@ -233,7 +209,7 @@ React.useEffect(() => {
                     zIndex={1}
                 />
                 </Box>
-            )}
+            
             <Box
                 width="100%"
                 maxW="1960px"
@@ -270,7 +246,7 @@ React.useEffect(() => {
                                   WebkitBoxOrient: 'vertical',
                                 }}
                               >
-                                {organizerName}
+                                {organizer?.name_org ?? 'Организатор'}
                               </Heading>
             
                             </VStack>
@@ -291,18 +267,27 @@ React.useEffect(() => {
                     Адрес
                 </Text>
                 <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white" mt={{md: "5", base: "2" }}>
-                    Улица Строителей, 17
+                    {organizer?.address || 'Адрес не указан'}
                 </Text>
-                <Text fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }} color="white"  mt={{md: "5", base: "2" }}>
-                    <a
-                    href="https://кдц-высоцкого.рф/repertuar/?place=9a05e654-1532-4d5c-a486-d33fb5dbbc3f&city=7379699a-aff5-49a7-82b0-c53189dc2c44&language=ru"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: 'white', textDecoration: 'underline' }}
-                >
-                    Ссылка на организатора
-                </a>
-                </Text>
+                {organizer?.external_url && (
+                        <Text
+                            fontSize={{ "2xl": '20px', lg: '15px', md: "14px", base: "10px" }}
+                            color="white"
+                            mt={{ md: "5", base: "2" }}
+                        >
+                            <a
+                                href={organizer.external_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                    color: 'white',
+                                    textDecoration: 'underline',
+                                }}
+                            >
+                                Ссылка на организатора
+                            </a>
+                        </Text>
+                    )}
                 </Box>
             </motion.div>
             <Box
@@ -350,7 +335,7 @@ React.useEffect(() => {
                               }}
                             >
                               <Image
-                                src={event.pictures_url || EventImage}
+                                src={event.pictures_main || EventImage}
                                 alt={event.name}
                                 width="100%"
                                 height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
@@ -442,12 +427,12 @@ React.useEffect(() => {
                             setCurrentIndex(prev =>
                                 Math.min(
                                     prev + itemsPerPage,
-                                    Math.max(filteredEvents.length - itemsPerPage, 0)
+                                    Math.max(events.length - itemsPerPage, 0)
                                 )
                             )
                         }
                         disabled={
-                            currentIndex + itemsPerPage >= filteredEvents.length
+                            currentIndex + itemsPerPage >= events.length
                         }
                         bg="transparent"
                         borderRadius="full"
@@ -460,9 +445,10 @@ React.useEffect(() => {
                     </Button>
                 </HStack> 
                 </Box>
-                {/* <Box
-                mt={9}
-                w={{base: "700px", xl: "1100px"}}
+                {newsEvents.length > 0 && (
+                <Box
+                mt={{ base: 3, md: 9 }}
+                w={{base: "320px", sm: "450px", xl: "1100px"}}
                 p={4}
                 color="white"
                 userSelect="none"
@@ -483,7 +469,7 @@ React.useEffect(() => {
                     Новости
                 </Text>
 
-                <Flex justify="center" gap={8} mt="40px" zIndex={2}>
+                <Flex justify="center" gap={{ base: 2, sm: 4, xl: 8 }} mt={{ base: '15px', lg: '40px', xl: '60px' }} zIndex={2}>
                     
                     {visibleNewsEvents.map((event, index) => (
                         <motion.div
@@ -493,7 +479,6 @@ React.useEffect(() => {
                         exit={{ opacity: 0, x: -50 }}
                         transition={{ duration: 0.5, delay: index * 0.2 }}
                     >
-                        <Link to={`/event/${event.id}`}>
                         <VStack
                                 align="center"
                                 textAlign="center"
@@ -509,7 +494,7 @@ React.useEffect(() => {
                                 }}
                                 >
                                 <Image
-                                    src={event.pictures_url || EventImage}
+                                    src={EventImage}
                                     alt={event.name}
                                     width="100%"
                                     height={{ xl: '360px', md: '300px', sm: "290px", base: '200px' }}
@@ -564,10 +549,10 @@ React.useEffect(() => {
                                     border="1px solid rgba(12, 24, 70, 0.2)"
                                     boxShadow="0 6px 16px rgba(13, 18, 45, 0.2)"
                                 >
-                                    <Text>Прочитать новость</Text>
+                                    <Text>Новость</Text>
                                 </Box>
                                 </VStack>
-                        </Link>
+                        
                     </motion.div>
                     ))}
                     {!loadingContent && visibleNewsEvents.length === 0 ? (
@@ -582,8 +567,8 @@ React.useEffect(() => {
                         bg="transparent"
                         borderRadius="full"
                         boxShadow="0 0 0 2px white"
-                        width="50px"
-                        height="50px"
+                        width={{ xl: '50px', sm: '45px', base: '40px' }}
+height={{ xl: '50px', sm: '45px', base: '40px' }}
                         _disabled={{ cursor: 'default', opacity: 0.5 }}
                     >
                         <FaArrowLeft color="white" />
@@ -595,19 +580,21 @@ React.useEffect(() => {
                         bg="transparent"
                         borderRadius="full"
                         boxShadow="0 0 0 2px white"
-                        width="50px"
-                        height="50px"
+                        width={{ xl: '50px', sm: '45px', base: '40px' }}
+height={{ xl: '50px', sm: '45px', base: '40px' }}
                         _disabled={{ cursor: 'default', opacity: 0.5 }}
                     >
                         <FaArrowRight color="white" />
                     </Button>
                 </HStack>
-                </Box> */}
+                </Box>
+                )}
                 <Text fontSize={{ "2xl": '50px', lg: '40px', md: "30px", base: "28px" }} color="white" fontWeight="bold" mt={{ md: "40px", base: "15px" }} ml={{ md: "55px", base: "10px" }} textAlign="center">
                     План мероприятий
                 </Text>
-                <Calendar />
+                <Calendar events={calendarEvents}/>
             </Box>
+            
         </Flex>
     );
 };
