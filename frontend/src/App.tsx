@@ -26,7 +26,7 @@ function App() {
             <Route path="/event/:eventId" element={<Events />} />
             <Route path="/account" element={<Account />} />
             <Route path="/organizer" element={<Organizer />} />
-            <Route path="/organizer/:organizationId" element={<Organizer />} />
+            <Route path="/organizer/:id" element={<Organizer />} />
           </Route>
         </Routes>
       </BrowserRouter>

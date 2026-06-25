@@ -103,6 +103,7 @@ const Events = () => {
     return `от ${rawPrice} ₽`;
   };
 
+  
   const formatDescriptionParagraphs = (rawDescription: string): string[] => {
     const normalized = (rawDescription || '').replace(/\r/g, '').trim();
     if (!normalized) {
@@ -137,16 +138,25 @@ const Events = () => {
 
   const organizationsMap: Record<number, string> = {
     1: 'Заполярный театр драмы',
-    2: 'Администрация города Норильска',
-    3: 'Кинотеатр Родина',
-    4: 'Городской центр культуры',
+    4: 'Кинотеатр Родина',
+    3: 'Администрация города Норильска',
+    2: 'Городской центр культуры',
     5: 'Талнахская детская школа искусств',
     6: 'Норильская детская школа искусств',
-    7: 'Норильский колледж искусств',
-    8: 'Афиша Северного города',
-    9: 'Культурно-досуговый центр имени В. Высоцкого',
+    7: 'Культурно-досуговый центр имени В. Высоцкого',
+    8: 'Cinema Art Hall',
+    9: 'Площадь Набережная',
+    10: 'Музей Норильска художественная галерея',
+    11: 'Полярная арт-резиденция PolArt',
+    12: 'Площадь Комсомольская',
+    14: 'КДЦ Юбилейный',
+    17: 'Музей НА-Гора',
+    16: 'Музей Норильска',
+    18: 'СПОРТИВНЫЙ КОМПЛЕКС "ТАЛНАХ"',
+    15: 'Таймырский краеведческий музей',
+    13: 'Фаблаб-Норильск',
+    
   };
-
   const toggleFavorite = async (index: number) => {
     if (!userId) {
       setIsLoginOpen(true);
@@ -319,7 +329,7 @@ const Events = () => {
             : legacyDates,
 
           duration: data.duration || data.start_time || '',
-
+organization: Number(data.organization) || null,
           time_slots: normalizedTimeSlots,
         };
 
@@ -384,20 +394,20 @@ const Events = () => {
     transition: { duration: 0.45, ease: 'easeOut' as const },
   };
 
-  const scheduleRows = (eventDetails.time_slots || []).map((slot) => {
-    const { day, month } = parseDateParts(slot.date_event);
-    const slotTime = formatScheduleValue(slot.start_time);
-    const timeLabel =
+const scheduleRows = (eventDetails.time_slots || []).map((slot) => {
+  const { day, month } = parseDateParts(slot.date_event);
+  const slotTime = formatScheduleValue(slot.start_time);
+
+  return {
+    day,
+    month,
+    timeLabel:
       slotTime !== '—' && slotTime !== '00:00'
         ? slotTime
-        : 'Время начала не указано';
+        : null,
+  };
+});
 
-    return {
-      day,
-      month,
-      timeLabel,
-    };
-  });
   const descriptionParagraphs = formatDescriptionParagraphs(eventDetails.description || '');
   const descriptionPreviewLimit = 3;
   const hasLongDescription = descriptionParagraphs.length > descriptionPreviewLimit;
@@ -414,7 +424,8 @@ const Events = () => {
     setIsLoginOpen(false);
     setIsRegisterOpen(true);
   };
-
+const organizationId = Number(eventDetails.organization);
+const isValidOrgId = Number.isFinite(organizationId) && organizationId > 0;
   return (
     <Flex w="100%">
       <LoginModal
@@ -435,7 +446,7 @@ const Events = () => {
             objectFit="cover"
             objectPosition="top center"
             width="100%"
-            height={{ base: '275px', sm: "320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
+            height={{ base: '320px', sm: "380px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
             position="absolute"
             top={0}
             left={0}
@@ -450,7 +461,7 @@ const Events = () => {
             alt="Overlay Image"
             objectFit="cover"
             width="100%"
-            height={{ base: '275px', sm: "320px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
+            height={{ base: '320px', sm: "380px", md: '430px', lg: '430px', xl: '540px', "2xl": '735px' }}
             position="absolute"
             top={0}
             left={0}
@@ -620,9 +631,10 @@ const Events = () => {
                   <Flex
                     w="100%"
                     justify="space-between"
-                    align={{ base: 'start', md: 'center' }}
-                    direction={{ base: 'column', md: 'row' }}
-                    gap={{ base: 3, md: 4 }}
+                    align="center"
+                    direction={{ base: 'row', md: 'row' }}
+                    wrap={{ base: 'wrap', md: 'nowrap' }}
+                    gap={{ base: 2, md: 4 }}
                   >
                     <HStack gap="14px">
                       <Text
@@ -643,16 +655,20 @@ const Events = () => {
                       </Text>
                     </HStack>
 
-                    <Text
-                      color="white"
-                      fontSize={{ "2xl": '24px', lg: '20px', md: '16px', base: '14px' }}
-                      fontWeight="500"
-                      textShadow="0 0 14px rgba(196, 219, 255, 0.45)"
-                    >
-                      {d.timeLabel}
-                    </Text>
+                    {d.timeLabel && (
+                      <Text
+                        color="white"
+                        fontSize={{ "2xl": '24px', lg: '20px', md: '16px', base: '14px' }}
+                        fontWeight="500"
+                        textShadow="0 0 14px rgba(196, 219, 255, 0.45)"
+                      >
+                        {d.timeLabel}
+                      </Text>
+                    )}
 
-                    <HStack gap={{ base: 2, md: 3 }} align="center" ml={{ md: 'auto' }}>
+                    <HStack gap={{ base: 2, md: 3 }} align="center" ml={{ base: 'auto', md: 'auto' }}
+                          w={{ base: '100%', md: 'auto' }}
+                          justify={{ base: 'center', md: 'flex-start' }}>
                       <Box
                         as="button"
                         onClick={() => toggleFavorite(index)}
@@ -759,7 +775,7 @@ const Events = () => {
         >
           <Box
             mt={5}
-            mb={10}
+            mb={{ base: 1, md: 10 }}
             bg="rgba(17, 23, 58, 0.52)"
             border="1px solid rgba(255,255,255,0.2)"
             borderRadius="22px"
@@ -785,26 +801,28 @@ const Events = () => {
                 </Text>
               ) : null}
 
-            <Button
-              mt={4}
-              bg="rgba(255,255,255,0.12)"
-              color="white"
-              border="1px solid rgba(255,255,255,0.3)"
-              borderRadius="full"
-              px={{ base: 4, md: 6 }}
-              py={{ base: 4, md: 6 }}
-              fontSize={{ base: '14px', md: '16px', lg: '18px' }}
-              textDecoration="none"
-              transition="all .2s ease"
-              _hover={{
-                bg: 'rgba(255,255,255,0.22)',
-                transform: 'translateY(-1px)',
-                boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
-              }}
-              onClick={() => navigate(`/organizer/${eventDetails.organization}`)}
-            >
-              Страница организатора
-            </Button>
+             {Number(eventDetails.organization) >= 1 &&
+                Number(eventDetails.organization) <= 18 && (
+              <Button
+                mt={4}
+                bg="rgba(255,255,255,0.12)"
+                color="white"
+                border="1px solid rgba(255,255,255,0.3)"
+                borderRadius="full"
+                px={{ base: 4, md: 6 }}
+                py={{ base: 4, md: 6 }}
+                fontSize={{ base: '14px', md: '16px', lg: '18px' }}
+                transition="all .2s ease"
+                _hover={{
+                  bg: 'rgba(255,255,255,0.22)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 10px 24px rgba(8, 12, 30, 0.35)',
+                }}
+                onClick={() => navigate(`/organizer/${organizationId}`)}
+              >
+                Страница организатора
+              </Button>
+            )}
           </Box>
         </motion.div>
       </Box>

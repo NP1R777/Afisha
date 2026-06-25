@@ -71,15 +71,26 @@ const Account = () => {
   };
 
   const organizationsMap: Record<number, string> = {
-  1: 'Заполярный театр драмы',
-  2: 'Администрация города Норильска',
-  3: 'Кинотеатр Родина',
-  4: 'Городской центр культуры',
-  5: 'Талнахская детская школа искусств',
-  6: 'Норильская детская школа искусств',
-  7: 'Норильский колледж искусств',
-  9: 'Культурно-досуговый центр имени В. Высоцкого',
-};
+    1: 'Заполярный театр драмы',
+    4: 'Кинотеатр Родина',
+    3: 'Администрация города Норильска',
+    2: 'Городской центр культуры',
+    5: 'Талнахская детская школа искусств',
+    6: 'Норильская детская школа искусств',
+    7: 'Культурно-досуговый центр имени В. Высоцкого',
+    8: 'Cinema Art Hall',
+    9: 'Площадь Набережная',
+    10: 'Музей Норильска художественная галерея',
+    11: 'Полярная арт-резиденция PolArt',
+    12: 'Площадь Комсомольская',
+    14: 'КДЦ Юбилейный',
+    17: 'Музей НА-Гора',
+    16: 'Музей Норильска',
+    18: 'СПОРТИВНЫЙ КОМПЛЕКС "ТАЛНАХ"',
+    15: 'Таймырский краеведческий музей',
+    13: 'Фаблаб-Норильск',
+    
+  };
 
 const monthNames = [
   'ЯНВАРЯ',
@@ -139,7 +150,7 @@ const monthNames = [
 
       const data = response.data;
 
-      console.log('USER DATA:', data);
+      // console.log('USER DATA:', data);
 
       if (data.username) {
         setUsername(data.username);
@@ -178,7 +189,7 @@ const monthNames = [
 
       const data = response.data;
 
-      console.log('LIKED EVENTS:', data);
+      // console.log('LIKED EVENTS:', data);
 
       const flattenedEvents = Array.isArray(data[0])
         ? data.flat()
@@ -266,7 +277,7 @@ const monthNames = [
           <Box
             bg="#6B84EA"
             borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
+            height={{  base: '220px', lg: '260px' }}
             width={{ base: '170px', lg: '250px' }}
             userSelect="none"
             fontWeight="semibold"
@@ -280,7 +291,7 @@ const monthNames = [
             <Image
               src={imageSrc}
               alt="cloud"
-              width={{ base: '41%', lg: '90%' }}
+              width={{ base: '46%', lg: '90%' }}
               height={{ base: '30%', lg: '90%' }}
               objectFit="cover"
               pointerEvents="none"
@@ -306,7 +317,7 @@ const monthNames = [
           <Box
             bg="#6B84EA"
             borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
+            height={{ base: '220px', lg: '260px' }}
             minWidth="400px"
             position="relative"
             p={4}
@@ -317,16 +328,16 @@ const monthNames = [
               bg="white"
               borderRadius="xl"
               color="#A3B3F2"
-              height={{ base: '40px', lg: '50px' }}
-              width={{ base: '220px', lg: '250px' }}
-              fontSize={{ base: '16px', lg: '18px' }}
+              height={{ base: '35px', lg: '50px' }}
+              width={{ base: '190px', lg: '250px' }}
+              fontSize={{ base: '14px', lg: '18px' }}
               display="flex"
               alignItems="center"
               justifyContent="center"
             >
               <p>Мои предпочтения</p>
             </Box>
-            <Flex wrap="wrap" gap={4} mt={4}>
+            <Flex wrap="wrap" gap={{ base: 2, lg: 4 }} mt={4}>
               {categories && categories.length > 0 ? (
                 categories.map((preference, index) => (
                   <Box
@@ -334,13 +345,14 @@ const monthNames = [
                     bg="#A3B3F2"
                     borderRadius="xl"
                     color="white"
-                    height={{ base: '35px', lg: '40px' }}
+                    height={{ base: '30px', lg: '40px' }}
                     width="auto"
-                    fontSize={{ base: '13px', lg: '20px' }}
+                    fontSize={{ base: '12px', lg: '20px' }}
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
-                    px={4}
+                    px={{ base: 3, lg: 4 }}
+                    
                   >
                     <p>{getPreferenceText(Number(preference))}</p>
                   </Box>
@@ -355,12 +367,12 @@ const monthNames = [
             <Button
               bg="white"
               color="#6B84EA"
-              size="md"
+              size={{ base: 'xs', md: 'md' }}
               borderRadius="xl"
               position="absolute"
               onClick={openCategoriesModal}
-              bottom="26px"
-              right="26px"
+              bottom={{ base: '10px', md: '26px' }}
+              right={{ base: '10px', md: '26px' }}
               _hover={{
                 bg: '#4C6BE6',
                 color: 'white',
@@ -372,7 +384,7 @@ const monthNames = [
           <Box
             bg="#6B84EA"
             borderRadius="xl"
-            height={{ base: '200px', lg: '260px' }}
+            height={{ base: '220px', lg: '260px' }}
             width={{ base: '210px', lg: '250px' }}
           >
             <Flex direction="column" align="center" justify="center" height="100%" gap={4} userSelect="none">
@@ -417,7 +429,7 @@ const monthNames = [
                 direction={{ base: 'row', md: 'column' }}
                 gap={7}
                 userSelect="none"
-                mb={9}
+                mb={{ base: 1, md: 9 }}
                 overflowX="auto"
                 overflowY="hidden"
                 width="100%"
@@ -503,7 +515,7 @@ const monthNames = [
                                 {month ?? '—'}
                               </Text>
                              </Flex>
-                             <Flex mt={5}>
+                             <Flex mt={{ base: 6, md: 5 }}>
                               <Text fontSize="20px" textAlign="center" mb={2}>
                                 {formatTime(event.start_time)}
                               </Text>
