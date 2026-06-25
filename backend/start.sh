@@ -1,8 +1,7 @@
-#!/bin/bash
-set -e
+#!/bin/sh
 
-echo "📦 Применяем миграции Alembic..."
+echo "🚀 Запуск Alembic миграций..."
 alembic upgrade head
 
-echo "🚀 Запускаем приложение..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+echo "🌐 Запуск FastAPI приложения..."
+uvicorn app.main:app --host 0.0.0.0 --port 8000
